@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clamp, floorDiv, inverseLerp, lerp, mod, smoothstep } from "./math";
+import { clamp, floorDiv, inverseLerp, lerp, mod, smoothstep, terrace } from "./math";
 
 describe("mod", () => {
   it("is non-negative for negative dividends", () => {
@@ -33,5 +33,32 @@ describe("interpolation", () => {
     expect(smoothstep(0, 1, -1)).toBe(0);
     expect(smoothstep(0, 1, 0.5)).toBe(0.5);
     expect(smoothstep(0, 1, 2)).toBe(1);
+  });
+});
+
+describe("terrace", () => {
+  const step = 0.1;
+  const riser = 0.25;
+
+  it("passes through each step boundary", () => {
+    expect(terrace(0.3, step, riser)).toBeCloseTo(0.3);
+  });
+
+  it("is flat along a tread", () => {
+    expect(terrace(0.31, step, riser)).toBeCloseTo(0.3);
+    expect(terrace(0.37, step, riser)).toBeCloseTo(0.3);
+  });
+
+  it("climbs to the next step across the riser", () => {
+    expect(terrace(0.3875, step, riser)).toBeCloseTo(0.35);
+    expect(terrace(0.3999999, step, riser)).toBeCloseTo(0.4);
+  });
+
+  it("never descends", () => {
+    let previous = -Infinity;
+    for (let v = 0; v < 1; v += 0.001) {
+      expect(terrace(v, step, riser)).toBeGreaterThanOrEqual(previous);
+      previous = terrace(v, step, riser);
+    }
   });
 });

@@ -60,7 +60,7 @@ describe("generateChunk", () => {
       .toMatchInlineSnapshot(`
         [
           1333413235,
-          98339656,
+          756559853,
           1051477940,
         ]
       `);

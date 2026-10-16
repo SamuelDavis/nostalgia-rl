@@ -1,4 +1,5 @@
-import { type Field2, clamp, createNoise, fbm, hashString, smoothstep } from "../lib";
+import { type Field2, clamp, createNoise, fbm, hashString, lerp, smoothstep, terrace } from "../lib";
+import { HEIGHT_LEVELS } from "./constants";
 
 export interface Fields {
   readonly elevation: Field2;
@@ -10,6 +11,9 @@ export interface Fields {
 const layer = (seed: number, name: string, octaves: number, frequency: number): Field2 =>
   fbm(createNoise(seed, hashString(name)), { octaves, frequency });
 
+const TERRACE_STEP = 16 / HEIGHT_LEVELS;
+const TERRACE_RISER = 0.3;
+
 const distanceFromOrigin = (x: number, y: number) => Math.sqrt(x * x + y * y);
 
 export const createFields = (seed: number): Fields => {
@@ -17,21 +21,31 @@ export const createFields = (seed: number): Fields => {
   const ridges = layer(seed, "ridges", 4, 1 / 700);
   const ranges = layer(seed, "ranges", 2, 1 / 2000);
   const hills = layer(seed, "hills", 3, 1 / 110);
+  const ledges = layer(seed, "ledges", 2, 1 / 150);
   const heat = layer(seed, "temperature", 3, 1 / 3000);
   const wetness = layer(seed, "moisture", 4, 1 / 1500);
 
   const landness = (x: number, y: number) =>
     continent(x, y) + 0.4 * (1 - smoothstep(0, 1800, distanceFromOrigin(x, y)));
 
-  const drainage: Field2 = (x, y) => {
+  const relief = (x: number, y: number) => {
     const land = landness(x, y);
     const ridge = smoothstep(0.6, 0.97, 1 - Math.abs(ridges(x, y)));
     const range = smoothstep(-0.15, 0.25, ranges(x, y));
     const mountains = smoothstep(0.08, 0.4, land) * range * ridge;
-    return 0.3 + land * 0.3 + mountains * 0.55;
+    return { mountains, drainage: 0.3 + land * 0.3 + mountains * 0.55 };
   };
 
-  const elevation: Field2 = (x, y) => clamp(drainage(x, y) + hills(x, y) * 0.04, 0, 0.999);
+  const drainage: Field2 = (x, y) => relief(x, y).drainage;
+
+  const elevation: Field2 = (x, y) => {
+    const { mountains, drainage } = relief(x, y);
+    const smooth = drainage + hills(x, y) * 0.04;
+    const terracing = smoothstep(0.05, 0.3, mountains);
+    const phase = ledges(x, y) * TERRACE_STEP;
+    const terraced = terrace(smooth + phase, TERRACE_STEP, TERRACE_RISER) - phase;
+    return clamp(lerp(smooth, terraced, terracing), 0, 0.999);
+  };
 
   const temperature: Field2 = (x, y) => clamp(0.5 + heat(x, y) * 0.8 - Math.max(0, elevation(x, y) - 0.55) * 1.2, 0, 1);
 

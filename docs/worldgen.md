@@ -15,7 +15,7 @@ The constants live in `src/worldgen/constants.ts`.
 
 Each stage depends only on coarser stages within a bounded neighbourhood. That is what lets any chunk be generated in isolation.
 
-1. **Fields** (`fields.ts`): continuous noise fields for `elevation`, `temperature`, and `moisture`, plus `drainage`, a smoothed elevation that rivers follow. Elevation combines a continent layer, ridged mountain ranges, and small hills. Land is biased to appear near the origin.
+1. **Fields** (`fields.ts`): continuous noise fields for `elevation`, `temperature`, and `moisture`, plus `drainage`, a smoothed elevation that rivers follow. Elevation combines a continent layer, ridged mountain ranges, and small hills; mountains are terraced into ledges. Land is biased to appear near the origin.
 2. **Biomes** (`biome.ts`): a Whittaker-style classification by elevation, temperature, and moisture: ocean, beach, grassland, forest, desert, or mountain.
 3. **Rivers** (`rivers.ts`): a macro cell may hold a river source on high ground. From there the river follows the drainage gradient downhill, meandering, until it reaches the sea or ends in a lake at a local minimum. Its water level never rises, descends no faster than half `MAX_CLIMB` per tile (headroom for rounding), and it widens downstream.
 4. **Camps** (`world.ts`): settlement sites on flat, dry, non-mountain land, away from rivers. The world spawn is the nearest valid site to the origin. Macro cells around the spawn always get camps.

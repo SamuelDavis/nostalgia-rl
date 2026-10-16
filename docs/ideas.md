@@ -19,3 +19,7 @@ Every peer could keep a full copy of the world's changes. If the host drops, a p
 ## Ability picks instead of classes
 
 On level-up, players choose abilities from a pool (for example, warrior, wizard, or thief abilities) instead of picking a class, so classes can be mixed freely.
+
+## Smoothed grid movement
+
+Render movement between tiles as a short glide with acceleration and deceleration, so a slower turn (~250 ms) feels continuous while still reading as grid steps. Presentation only: game state stays on the grid. Deferred from phase 1, which uses 100 ms turns instead.

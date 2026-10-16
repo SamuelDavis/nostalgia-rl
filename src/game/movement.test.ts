@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { MAX_CLIMB, Water } from "../worldgen";
+import { Feature, MAX_CLIMB, Water } from "../worldgen";
 import { Direction, blockerBetween, stepToward } from "./movement";
 
-const land = (height: number) => ({ height, water: Water.None });
+const land = (height: number) => ({ height, water: Water.None, feature: Feature.None });
 
 describe("stepToward", () => {
   it("moves one tile in a cardinal direction, y growing southward", () => {
@@ -25,7 +25,11 @@ describe("blockerBetween", () => {
   });
 
   it("lets you wade shallow water but not deep water", () => {
-    expect(blockerBetween(land(64), { height: 63, water: Water.Shallow })).toBeUndefined();
-    expect(blockerBetween(land(64), { height: 63, water: Water.Deep })).toBe("deep water");
+    expect(blockerBetween(land(64), { ...land(63), water: Water.Shallow })).toBeUndefined();
+    expect(blockerBetween(land(64), { ...land(63), water: Water.Deep })).toBe("deep water");
+  });
+
+  it("lets you cross deep water by bridge", () => {
+    expect(blockerBetween(land(64), { height: 63, water: Water.Deep, feature: Feature.Bridge })).toBeUndefined();
   });
 });

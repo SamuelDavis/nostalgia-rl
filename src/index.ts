@@ -8,7 +8,7 @@ import { HEIGHT_MODES, type HeightMode } from "./view/palette";
 import { drawViewport } from "./view/viewport";
 import { createWorldgen } from "./worldgen";
 
-const DEFAULT_TURN_MS = 250;
+const DEFAULT_TURN_MS = 100;
 
 const KEY_DIRECTIONS: Record<string, Direction> = {
   KeyW: Direction.North,

@@ -1,5 +1,5 @@
 import type { Point } from "../lib";
-import { MAX_CLIMB, Water } from "../worldgen";
+import { Feature, MAX_CLIMB, Water } from "../worldgen";
 
 export const Direction = { North: 0, East: 1, South: 2, West: 3 } as const;
 export type Direction = (typeof Direction)[keyof typeof Direction];
@@ -21,12 +21,13 @@ export type Blocker = "cliff" | "deep water";
 interface Footing {
   readonly height: number;
   readonly water: Water;
+  readonly feature: Feature;
 }
 
 export const isCliff = (from: Footing, to: Footing): boolean => Math.abs(to.height - from.height) > MAX_CLIMB;
 
 export const blockerBetween = (from: Footing, to: Footing): Blocker | undefined => {
-  if (to.water === Water.Deep) return "deep water";
+  if (to.water === Water.Deep && to.feature !== Feature.Bridge) return "deep water";
   if (isCliff(from, to)) return "cliff";
   return undefined;
 };

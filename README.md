@@ -64,4 +64,5 @@ These are requirements, not designs. How to meet them is decided in the multipla
 - **TypeScript and Vite**, browser-only at runtime. Node is used only for tooling and tests.
 - **Determinism:** anything a peer must reproduce independently is a pure function of seed and coordinates. The rules are in [docs/worldgen.md](docs/worldgen.md#determinism).
 - **Single source of truth:** docs reference code rather than restating it. Keep this README short; add topical docs under `docs/` and link them here.
+- **Data-authoritative (preference):** game state never depends on rendering; the view only communicates state. Ideally the UI is swappable (GUI, CLI, test harness). Don't let this override phase goals.
 - **Git:** solo project. Use short-lived branches merged into the main branch once green, with conventional commit messages.
