@@ -23,6 +23,17 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 
 _Record user feedback verbatim, newest first, with the commit it refers to._
 
+### 1f1f12c: ledges, trails, glades
+
+> - In general, I really like it.
+> - Yeah, the paths in general are pretty straight, which is not awesome.
+> - Holy cow, `?seed=1&x=24&y=168` is a rats' nest of crossing paths; I believe this is a mountain and a forest path mixing?
+> - I feel that paths should be sporaddic; roads are continuous, but paths are broken up - is that best left purely as a rendering thing, or is it worth baking into the data somehow (e.g. calculate path route then overwrite obstacles, then add path tiles semi-randomly to some percentage? Or, leave it to rendering: in data it's all path and the renderer only draws some of it or something?)
+>
+> I also want to invite; like how I was able to suggest "why not let things generate normally then add paths on top" feel free to take some time to google or review your training and think: are there idiomatic or accepted ways of doing natural world generation? Are there smart algorithms mathematicians have already proved out for doing this stuff super efficiently? Those sorts of "step back, am I making this more complicated than it needs to be" thinking
+
+Diagnosis: the nest at (24, 168) is one glade's forest trails (3 trails, 10 branches), not a mountain trail; trails ignore each other, so they cross. Research: [worldgen techniques](../research/worldgen-techniques.md).
+
 ### 8e5fbda: terraced mountains (second message, after the model proposed hard ledges plus mountain paths)
 
 > Can I suggest, would it be possible/simpler to let the mountains generate normally and then generate mountain paths (like roads, with passability like bridges)?
