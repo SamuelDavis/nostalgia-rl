@@ -4,7 +4,7 @@ A real-time, open-world roguelike with peer-to-peer drop-in multiplayer, in the 
 
 It follows the classic roguelike conventions: a grid, turn-based movement, cardinal facing, and glyph-first presentation. The difference is that turns run on a real-time clock, as in _Crypt of the NecroDancer_: the world advances one turn about every 250 ms whether or not you act. The world is a seeded, infinite, Minecraft-style overworld with biomes, height, and features, not a stack of dungeon floors. Friends join a running world in real time.
 
-This file is the handoff document for a fresh session. It gives intent and current state and links to topical docs. Read the linked docs only when your task touches them.
+This file is the handoff document for a fresh session. It gives intent and current state and links to topical docs. Read the linked docs only when your task touches them. Domain vocabulary is in [CONTEXT.md](CONTEXT.md); architectural decisions are in [docs/adr](docs/adr).
 
 ## How we work
 

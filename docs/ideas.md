@@ -2,15 +2,9 @@
 
 Candidate directions the user liked. They aren't commitments: adopt one only when a phase calls for it, and record the decision in that phase's doc.
 
-## Spaces: entrances to separately generated maps
+## Feature generators
 
-The overworld is one space. Entrances on it (mineshafts, house doors, dungeon stairs) teleport to other, finite spaces. Each space is built by its own generator, chosen by entrance type: Rogue-style rooms, cellular-automaton caves, jigsaw dungeons, and so on.
-
-- A space's identity comes from the seed and its entrance, so every peer generates the same one.
-- Spaces are persistent and shared like any other world feature, not per-party instances.
-- Each floor of a multi-floor dungeon is its own space, linked by stairs.
-
-This allows recognisable, hand-shaped dungeons without complicating the overworld generator.
+Superseded the earlier "spaces" idea (separate maps behind teleporting entrances): see [ADR 0001](adr/0001-contiguous-world-with-features.md). Candidate feature types, each with its own generator: Rogue-style cave levels under mountains, multi-storey houses and castles, towns, deep forests and their glades. Multi-level dungeons are one feature with several vertical levels, linked by stairs.
 
 ## World forking and elective persistence
 
