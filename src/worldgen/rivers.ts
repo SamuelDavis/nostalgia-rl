@@ -1,5 +1,5 @@
 import { type Point, createNoise, hash, hashString, intBetween, unit } from "../lib";
-import { MACRO_SIZE, SEA_LEVEL, heightLevel } from "./constants";
+import { MACRO_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
 import type { Fields } from "./fields";
 
 export interface RiverNode extends Point {
@@ -19,8 +19,9 @@ export interface River {
 
 const SALT = hashString("rivers");
 const SOURCE_CHANCE = 0.7;
-const MIN_SOURCE_LEVEL = 8;
+const MIN_SOURCE_LEVEL = heightLevel(0.5);
 const STEP = 4;
+const MAX_DESCENT = (MAX_CLIMB / 2) * STEP;
 const MAX_STEPS = 300;
 const STAGNATION_STEPS = 40;
 const GRADIENT_SPAN = 20;
@@ -85,7 +86,8 @@ export const traceRiver = (seed: number, fields: Fields, cx: number, cy: number)
     };
 
     const elevation = fields.elevation(position.x, position.y);
-    const level = Math.min(nodes.at(-1)!.level, heightLevel(elevation));
+    const previous = nodes.at(-1)!.level;
+    const level = Math.max(previous - MAX_DESCENT, Math.min(previous, heightLevel(elevation)));
     const halfWidth = Math.min(MAX_HALF_WIDTH, 1 + Math.floor(step / STEPS_PER_WIDTH));
     nodes.push({ ...position, level, halfWidth });
 

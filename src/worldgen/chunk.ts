@@ -1,7 +1,8 @@
 import { Biome, Feature, Ground, Water } from "./terrain";
 import { type Point, createNoise, distance, floorDiv, hash, hashString, projectOntoSegment, unit } from "../lib";
 import { classifyBiome } from "./biome";
-import { CHUNK_SIZE, MACRO_SIZE, SEA_LEVEL, heightLevel } from "./constants";
+import { CHUNK_SIZE, MACRO_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
+import type { RiverNode } from "./rivers";
 import type { Camp, Worldgen } from "./world";
 
 export interface Chunk {
@@ -17,10 +18,11 @@ export interface Chunk {
 export const tileIndex = (lx: number, ly: number): number => ly * CHUNK_SIZE + lx;
 
 const TILES = CHUNK_SIZE * CHUNK_SIZE;
-const BANK_WIDTH = 4;
+const BANK_WIDTH = 12;
 const ROAD_HALF_WIDTH = 1.1;
-const CAMP_RADIUS = 7;
+const CAMP_RADIUS = 12;
 const CAMP_YARD = 5;
+const SNOW_LEVEL = heightLevel(0.8125);
 const TENT_OFFSETS: readonly Point[] = [
   { x: -4, y: -2 },
   { x: 3, y: -3 },
@@ -33,10 +35,8 @@ const GROUND_SALT = hashString("ground");
 const COLD = 0.3;
 
 interface Channel {
-  readonly a: Point;
-  readonly b: Point;
-  readonly level: number;
-  readonly halfWidth: number;
+  readonly a: RiverNode;
+  readonly b: RiverNode;
 }
 
 interface Pool extends Point {
@@ -51,7 +51,7 @@ const groundFor = (biome: Biome, height: number, temperature: number): Ground =>
     case Biome.Desert:
       return Ground.Sand;
     case Biome.Mountain:
-      return height >= 13 || temperature < COLD ? Ground.Snow : Ground.Rock;
+      return height >= SNOW_LEVEL || temperature < COLD ? Ground.Snow : Ground.Rock;
     default:
       return temperature < COLD - 0.08 ? Ground.Snow : Ground.Grass;
   }
@@ -84,6 +84,13 @@ const decorationFor = (biome: Biome, roll: number): Feature => {
   return Feature.None;
 };
 
+const bankRise = (gap: number): number => Math.ceil(gap) * MAX_CLIMB;
+
+const settleTowardCamp = (level: number, campLevel: number, gap: number): number => {
+  const slack = Math.ceil(Math.max(0, gap - CAMP_YARD)) * MAX_CLIMB;
+  return Math.min(campLevel + slack, Math.max(campLevel - slack, level));
+};
+
 const nearbyCamps = (world: Worldgen, cx: number, cy: number): Camp[] => {
   const cell = world.cellOf({ x: cx * CHUNK_SIZE, y: cy * CHUNK_SIZE });
   return [-1, 0, 1].flatMap((dy) => [-1, 0, 1].flatMap((dx) => world.campAt(cell.cx + dx, cell.cy + dy) ?? []));
@@ -110,9 +117,7 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
   const channels: Channel[] = rivers.flatMap((river) =>
     river.nodes.flatMap((a, i) => {
       const b = river.nodes[i + 1];
-      return b && segmentNear(a, b, b.halfWidth + BANK_WIDTH + reach)
-        ? [{ a, b, level: b.level, halfWidth: b.halfWidth }]
-        : [];
+      return b && segmentNear(a, b, b.halfWidth + BANK_WIDTH + reach) ? [{ a, b }] : [];
     }),
   );
   const pools: Pool[] = rivers.flatMap((river) =>
@@ -158,22 +163,22 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
         if (gap <= 0) {
           tileWater = gap <= -2 ? Water.Deep : Water.Shallow;
           level = Math.min(level, pool.level);
-        } else if (gap <= BANK_WIDTH) level = Math.min(level, pool.level + Math.ceil(gap));
+        } else if (gap <= BANK_WIDTH) level = Math.min(level, pool.level + bankRise(gap));
       }
 
-      for (const channel of channels) {
-        const gap = projectOntoSegment(center, channel.a, channel.b).distance - channel.halfWidth;
+      for (const { a, b } of channels) {
+        const projection = projectOntoSegment(center, a, b);
+        const gap = projection.distance - b.halfWidth;
+        const bed = Math.round(a.level + (b.level - a.level) * projection.t);
         if (gap <= 0) {
-          if (tileWater !== Water.Deep) tileWater = channel.halfWidth >= 2 && gap <= -1 ? Water.Deep : Water.Shallow;
-          level = Math.min(level, channel.level);
-        } else if (gap <= BANK_WIDTH) level = Math.min(level, channel.level + Math.ceil(gap));
+          if (tileWater !== Water.Deep) tileWater = b.halfWidth >= 2 && gap <= -1 ? Water.Deep : Water.Shallow;
+          level = Math.min(level, bed);
+        } else if (gap <= BANK_WIDTH) level = Math.min(level, bed + bankRise(gap));
       }
 
       const nearWater =
         tileWater === Water.None &&
-        channels.some(
-          (channel) => projectOntoSegment(center, channel.a, channel.b).distance - channel.halfWidth <= 1.5,
-        );
+        channels.some(({ a, b }) => projectOntoSegment(center, a, b).distance - b.halfWidth <= 1.5);
 
       const onRoad = roadSegments.some(({ a, b }) => projectOntoSegment(center, a, b).distance <= ROAD_HALF_WIDTH);
       const nearRoad =
@@ -181,10 +186,11 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
 
       const camp = camps.find((c) => distance(center, { x: c.x + 0.5, y: c.y + 0.5 }) <= CAMP_RADIUS);
       if (camp) {
-        level = heightLevel(fields.elevation(camp.x + 0.5, camp.y + 0.5));
+        const gap = distance(center, { x: camp.x + 0.5, y: camp.y + 0.5 });
+        level = settleTowardCamp(level, heightLevel(fields.elevation(camp.x + 0.5, camp.y + 0.5)), gap);
         tileWater = Water.None;
         if (onRoad) tileGround = Ground.Road;
-        else if (distance(center, { x: camp.x + 0.5, y: camp.y + 0.5 }) <= CAMP_YARD) tileGround = Ground.Dirt;
+        else if (gap <= CAMP_YARD) tileGround = Ground.Dirt;
         if (x === camp.x && y === camp.y) tileFeature = Feature.Campfire;
         else if (TENT_OFFSETS.some((o) => x === camp.x + o.x && y === camp.y + o.y)) tileFeature = Feature.Tent;
       } else if (onRoad) {

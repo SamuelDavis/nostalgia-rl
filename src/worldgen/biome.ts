@@ -1,9 +1,9 @@
 import { Biome } from "./terrain";
-import { HEIGHT_LEVELS, SEA_LEVEL, heightLevel } from "./constants";
+import { SEA_ELEVATION, SEA_LEVEL, heightLevel } from "./constants";
 
-const BEACH_ELEVATION = (SEA_LEVEL + 0.2) / HEIGHT_LEVELS;
+const BEACH_ELEVATION = SEA_ELEVATION + 0.0125;
 
-const MOUNTAIN_LEVEL = 11;
+const MOUNTAIN_LEVEL = heightLevel(0.6875);
 
 export const classifyBiome = (elevation: number, temperature: number, moisture: number): Biome => {
   const height = heightLevel(elevation);

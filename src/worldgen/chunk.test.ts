@@ -1,12 +1,19 @@
 import { Feature, Ground, Water } from "./terrain";
-import { distance, floorDiv, hash } from "../lib";
+import { distance, floorDiv, hash, memoize } from "../lib";
 import { describe, expect, it } from "vitest";
 import { type Chunk, generateChunk, tileIndex } from "./chunk";
-import { CHUNK_SIZE, SEA_LEVEL, heightLevel } from "./constants";
+import { CHUNK_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
 import { createWorldgen } from "./world";
 
+const cachedChunk = memoize(
+  ({ world, cx, cy }: { world: ReturnType<typeof createWorldgen>; cx: number; cy: number }) =>
+    generateChunk(world, cx, cy),
+  ({ world, cx, cy }) => `${world.seed},${cx},${cy}`,
+  64,
+);
+
 const tileAt = (world: ReturnType<typeof createWorldgen>, x: number, y: number) => {
-  const chunk = generateChunk(world, floorDiv(x, CHUNK_SIZE), floorDiv(y, CHUNK_SIZE));
+  const chunk = cachedChunk({ world, cx: floorDiv(x, CHUNK_SIZE), cy: floorDiv(y, CHUNK_SIZE) });
   const i = tileIndex(x - chunk.cx * CHUNK_SIZE, y - chunk.cy * CHUNK_SIZE);
   return { chunk, i };
 };
@@ -16,6 +23,25 @@ const digest = (chunk: Chunk) =>
     (h, layer) => layer.reduce((acc, v) => hash(acc, v), h),
     0,
   );
+
+const heightAt = (world: ReturnType<typeof createWorldgen>, x: number, y: number) => {
+  const { chunk, i } = tileAt(world, x, y);
+  return { height: chunk.height[i]!, water: chunk.water[i]! };
+};
+
+const NEIGHBOURS = [
+  [1, 0],
+  [0, 1],
+] as const;
+
+const steepestStep = (levelAt: (x: number, y: number) => number, x: number, y: number) =>
+  Math.max(...NEIGHBOURS.map(([dx, dy]) => Math.abs(levelAt(x + dx, y + dy) - levelAt(x, y))));
+
+const expectNoCarvedCliff = (world: ReturnType<typeof createWorldgen>, x: number, y: number) => {
+  const carved = steepestStep((x, y) => heightAt(world, x, y).height, x, y);
+  const natural = steepestStep((x, y) => heightLevel(world.fields.elevation(x + 0.5, y + 0.5)), x, y);
+  expect(carved).toBeLessThanOrEqual(Math.max(MAX_CLIMB, natural));
+};
 
 describe("generateChunk", () => {
   it("is independent of generation order and world instance", () => {
@@ -33,9 +59,9 @@ describe("generateChunk", () => {
     expect([generateChunk(world, 0, 0), generateChunk(world, -5, 9), generateChunk(world, 20, -13)].map(digest))
       .toMatchInlineSnapshot(`
         [
-          1300940276,
-          53854920,
-          2193426854,
+          1333413235,
+          98339656,
+          1051477940,
         ]
       `);
   });
@@ -92,5 +118,27 @@ describe("generateChunk", () => {
     const world = createWorldgen(1);
     const trees = generateChunk(world, 2, 2).feature.filter((f) => f === Feature.Oak || f === Feature.Pine);
     expect(trees.length).toBeGreaterThan(0);
+  });
+
+  it("settles camps without carving cliffs", () => {
+    for (const seed of [1, 2, 3]) {
+      const world = createWorldgen(seed);
+      const { spawn } = world;
+      for (let y = spawn.y - 14; y <= spawn.y + 14; y++)
+        for (let x = spawn.x - 14; x <= spawn.x + 14; x++)
+          if (distance({ x, y }, spawn) <= 13) expectNoCarvedCliff(world, x, y);
+    }
+  });
+
+  it("carves rivers without cliffs", () => {
+    for (const seed of [1, 2, 3]) {
+      const world = createWorldgen(seed);
+      const { cx, cy } = world.cellOf(world.spawn);
+      for (const river of world.riversNear(cx, cy))
+        for (const node of river.nodes.slice(1, -1)) {
+          const x = Math.floor(node.x);
+          for (let y = Math.floor(node.y) - 6; y <= Math.floor(node.y) + 6; y++) expectNoCarvedCliff(world, x, y);
+        }
+    }
   });
 });

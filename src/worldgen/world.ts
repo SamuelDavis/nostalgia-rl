@@ -12,7 +12,7 @@ import {
   unit,
 } from "../lib";
 import { classifyBiome } from "./biome";
-import { MACRO_SIZE, SEA_LEVEL, heightLevel } from "./constants";
+import { MACRO_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
 import { type Fields, createFields } from "./fields";
 import { MAX_RIVER_REACH, type River, traceRiver } from "./rivers";
 import { Biome } from "./terrain";
@@ -50,6 +50,7 @@ const ROAD_SALT = hashString("roads");
 const CAMP_CHANCE = 0.55;
 const CAMP_ATTEMPTS = 4;
 const CAMP_MARGIN = 32;
+const CAMP_FLATNESS = 8;
 const RIVER_CLEARANCE = 10;
 const SPAWN_SEARCH_STEP = 16;
 const SPAWN_SEARCH_RINGS = 60;
@@ -156,7 +157,8 @@ export const createWorldgen = (seed: number): Worldgen => {
     const center = level(p);
     const biome = biomeAt(p);
     if (biome === Biome.Ocean || biome === Biome.Beach || biome === Biome.Mountain) return false;
-    if (FLATNESS_PROBES.some((o) => Math.abs(level({ x: p.x + o.x, y: p.y + o.y }) - center) > 1)) return false;
+    if (FLATNESS_PROBES.some((o) => Math.abs(level({ x: p.x + o.x, y: p.y + o.y }) - center) > CAMP_FLATNESS))
+      return false;
     return riversNearCell(cellOf(p)).every((river) => riverDistance(river, p) > RIVER_CLEARANCE);
   };
 
@@ -228,9 +230,9 @@ export const createWorldgen = (seed: number): Worldgen => {
           .filter((n) => (n.x !== g.x || n.y !== g.y) && inBounds(n) && gridLevel(n) >= SEA_LEVEL),
       cost: (a, b) => {
         const step = a.x !== b.x && a.y !== b.y ? Math.SQRT2 : 1;
-        const rise = Math.abs(gridLevel(a) - gridLevel(b));
+        const slope = Math.abs(gridLevel(a) - gridLevel(b)) / (step * ROAD_STEP);
         const wobble = 0.6 * (1 + roadNoise(b.x / 12, b.y / 12));
-        return step * (1 + wobble + (rise === 0 ? 0 : rise === 1 ? 1.5 : 25 * rise));
+        return step * (1 + wobble + (slope <= MAX_CLIMB ? slope : 25 * slope));
       },
       heuristic: (g) => distance(g, goal),
       keyOf: key,
