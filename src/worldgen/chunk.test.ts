@@ -1,4 +1,4 @@
-import { Feature, Ground, Water } from "./terrain";
+import { Feature, Water, Way } from "./terrain";
 import { distance, floorDiv, hash, memoize } from "../lib";
 import { describe, expect, it } from "vitest";
 import { type Chunk, generateChunk, tileIndex } from "./chunk";
@@ -59,9 +59,9 @@ describe("generateChunk", () => {
     expect([generateChunk(world, 0, 0), generateChunk(world, -5, 9), generateChunk(world, 20, -13)].map(digest))
       .toMatchInlineSnapshot(`
         [
-          1333413235,
-          3918996341,
-          1954642708,
+          1978637268,
+          4274719351,
+          1051477940,
         ]
       `);
   });
@@ -104,7 +104,7 @@ describe("generateChunk", () => {
         const { chunk, i } = tileAt(world, Math.floor(node.x), Math.floor(node.y));
         const water = chunk.water[i] !== Water.None;
         if (water) expect(chunk.feature[i]).toBe(Feature.Bridge);
-        else expect(chunk.ground[i]).toBe(Ground.Road);
+        else expect(chunk.way[i]).toBe(Way.Road);
       }
   });
 

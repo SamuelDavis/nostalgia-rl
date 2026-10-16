@@ -7,7 +7,7 @@
 The constants live in `src/worldgen/constants.ts`.
 
 - **Tile:** one grid cell, with integer coordinates. The world is unbounded in every direction.
-- **Chunk:** `CHUNK_SIZE`² tiles; the unit of generation and caching. A chunk is a set of flat typed arrays indexed by `tileIndex(lx, ly)`: `height`, `ground`, `water`, `feature`, and `biome`. The value sets are in `src/worldgen/terrain.ts`.
+- **Chunk:** `CHUNK_SIZE`² tiles; the unit of generation and caching. A chunk is a set of flat typed arrays indexed by `tileIndex(lx, ly)`: `height`, `ground`, `water`, `feature`, `biome`, and `way` (road or path over the natural ground). The value sets are in `src/worldgen/terrain.ts`.
 - **Macro cell:** `MACRO_SIZE`² tiles; the unit for placing large features such as river sources and camps.
 - **Height:** integer levels from 0 to `HEIGHT_LEVELS - 1`, fine enough that natural slope can exceed `MAX_CLIMB`, the most a walker can climb or descend per step; steeper steps are cliffs. Tiles below `SEA_LEVEL` are ocean, and the ocean surface sits at `SEA_LEVEL - 1`. Express thresholds as elevations (0–1) converted with `heightLevel`, so they survive changes to `HEIGHT_LEVELS`.
 
@@ -19,14 +19,15 @@ Each stage depends only on coarser stages within a bounded neighbourhood. That i
 2. **Biomes** (`biome.ts`): a Whittaker-style classification by elevation, temperature, and moisture: ocean, beach, grassland, forest, desert, or mountain.
 3. **Rivers** (`rivers.ts`): a macro cell may hold a river source on high ground. From there the river follows the drainage gradient downhill, meandering, until it reaches the sea or ends in a lake at a local minimum. Its water level never rises, descends no faster than half `MAX_CLIMB` per tile (headroom for rounding), and it widens downstream.
 4. **Camps** (`world.ts`): settlement sites on flat, dry, non-mountain land, away from rivers. The world spawn is the nearest valid site to the origin. Macro cells around the spawn always get camps.
-5. **Roads** (`world.ts`, routed by `routing.ts`): least-cost paths (A\* on a coarse grid that penalises slope and avoids the sea) between camps in neighbouring cells. Roads touching the spawn always exist.
-6. **Trails** (`trails.ts`, `world.ts`): footpaths that guarantee access, crossing ledges by stairs (see `src/game/movement.ts`). Mountain trails are routed from the nearest camp to a macro cell's peak, penalising grade quadratically. Forest trails snake and branch out of a glade in each well-forested macro cell.
-7. **Chunk** (`chunk.ts`), per tile:
+5. **Route network** (`world.ts`, `routing.ts`, `trails.ts`): which places connect comes from the relative neighbourhood graph, and how comes from weighted A\* over a cost field with 16 move directions. See [research](research/worldgen-techniques.md).
+   - **Roads** link each camp to its relative neighbours within two cells, each pair owned by one side. Cost: slope, with steps steeper than `MAX_CLIMB` heavily penalised, plus wobble noise.
+   - **Trails** start at landmarks: a glade (clearing) in each well-forested macro cell and a peak in each mountainous one. Each links to its nearest 1–5 relative neighbours among nearby camps, glades and peaks, with the count biased toward 1. Cost: grade on elevation before ledges (ledges are crossed by stairs, see `src/game/movement.ts`), plus difficulty noise. Tiles already on a road or an earlier trail are discounted, so trails merge instead of crossing.
+6. **Chunk** (`chunk.ts`), per tile:
    - classify the biome;
    - flood the ocean;
    - carve rivers and lakes, with beds interpolated between nodes and banks that rise `MAX_CLIMB` per tile;
-   - pave roads and trails, placing bridges over water;
-   - flatten camp yards, settle their surroundings within `MAX_CLIMB` per tile, and place tents and a campfire;
+   - lay roads and trails into the `way` layer, placing bridges over water;
+   - flatten camp yards, settle their surroundings within `MAX_CLIMB` per tile, and place tents (never on a way) and a campfire;
    - grow vegetation from biome density plus a grove noise layer (forests with clearings, groves in grassland), leaving glades clear;
    - add decorations.
      Snow appears in cold areas, with a noise-dithered edge.
@@ -46,7 +47,7 @@ Peers will generate terrain independently, so results must be bit-identical acro
 - `*.test.ts` files sit next to their sources. They check:
   - **determinism:** generation order and world instance don't affect results;
   - **golden digests** of three chunks (`chunk.test.ts`): update them deliberately, with `-u`, whenever generation is meant to change;
-  - **invariants across seeds:** rivers never flow uphill and end in sea or lake, roads cross land, the spawn is dry and near the origin, and carving (rivers, camps) never makes a step steeper than `max(MAX_CLIMB, natural step)`; trails are walkable end to end under the game's movement rules (`src/game/trails.test.ts`).
+  - **invariants across seeds:** rivers never flow uphill and end in sea or lake, roads cross land, the spawn is dry and near the origin, and carving (rivers, camps) never makes a step steeper than `max(MAX_CLIMB, natural step)`; trails are walkable up to their far end under the game's movement rules (`src/game/trails.test.ts`).
 - `chunk.bench.ts` asserts a time budget for a warm chunk.
 
 ## Looking at the world

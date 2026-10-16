@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { projectOntoSegment } from "./geometry";
+import { projectOntoSegment, relativeNeighbours } from "./geometry";
 
 describe("projectOntoSegment", () => {
   const a = { x: 0, y: 0 };
@@ -28,5 +28,20 @@ describe("projectOntoSegment", () => {
       distance: 5,
       t: 0,
     });
+  });
+});
+
+describe("relativeNeighbours", () => {
+  it("keeps candidates with no third point closer to both ends", () => {
+    const origin = { x: 0, y: 0 };
+    const near = { x: 10, y: 0 };
+    const behindNear = { x: 20, y: 0 };
+    const side = { x: 0, y: 12 };
+    expect(relativeNeighbours(origin, [near, behindNear, side])).toEqual([near, side]);
+  });
+
+  it("ignores the origin among candidates", () => {
+    const origin = { x: 0, y: 0 };
+    expect(relativeNeighbours(origin, [origin, { x: 5, y: 5 }])).toEqual([{ x: 5, y: 5 }]);
   });
 });

@@ -3,14 +3,35 @@ import { SEA_LEVEL } from "./constants";
 
 const STEP = 4;
 const MARGIN = 96;
+const MAX_EXPANSIONS = 6000;
 
-export type GradeCost = (grade: number, at: Point) => number;
+export type UnitCost = (grade: number, at: Point) => number;
+
+const MOVES: readonly Point[] = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+  [1, 1],
+  [1, -1],
+  [-1, 1],
+  [-1, -1],
+  [1, 2],
+  [2, 1],
+  [-1, 2],
+  [-2, 1],
+  [1, -2],
+  [2, -1],
+  [-1, -2],
+  [-2, -1],
+].map(([x, y]) => ({ x: x!, y: y! }));
 
 export const route = (
   level: (p: Point) => number,
   from: Point,
   to: Point,
-  gradeCost: GradeCost,
+  unitCost: UnitCost,
+  typicalUnitCost: number,
 ): Point[] | undefined => {
   const minX = Math.min(from.x, to.x) - MARGIN;
   const maxX = Math.max(from.x, to.x) + MARGIN;
@@ -30,16 +51,15 @@ export const route = (
     start: { x: toGrid(from.x), y: toGrid(from.y) },
     isGoal: (g) => g.x === goal.x && g.y === goal.y,
     neighbors: (g) =>
-      [-1, 0, 1]
-        .flatMap((dx) => [-1, 0, 1].map((dy) => ({ x: g.x + dx, y: g.y + dy })))
-        .filter((n) => (n.x !== g.x || n.y !== g.y) && inBounds(n) && gridLevel(n) >= SEA_LEVEL),
+      MOVES.map((m) => ({ x: g.x + m.x, y: g.y + m.y })).filter((n) => inBounds(n) && gridLevel(n) >= SEA_LEVEL),
     cost: (a, b) => {
-      const length = a.x !== b.x && a.y !== b.y ? Math.SQRT2 : 1;
+      const length = distance(a, b);
       const grade = Math.abs(gridLevel(a) - gridLevel(b)) / (length * STEP);
-      return length * (1 + gradeCost(grade, { x: b.x * STEP, y: b.y * STEP }));
+      return length * unitCost(grade, { x: b.x * STEP, y: b.y * STEP });
     },
-    heuristic: (g) => distance(g, goal),
+    heuristic: (g) => distance(g, goal) * typicalUnitCost,
     keyOf: key,
+    maxExpansions: MAX_EXPANSIONS,
   });
   return path?.map((g) => ({ x: g.x * STEP, y: g.y * STEP }));
 };

@@ -14,10 +14,11 @@ export const Ground = {
   Sand: 2,
   Rock: 3,
   Snow: 4,
-  Road: 5,
-  Path: 6,
 } as const;
 export type Ground = (typeof Ground)[keyof typeof Ground];
+
+export const Way = { None: 0, Road: 1, Path: 2 } as const;
+export type Way = (typeof Way)[keyof typeof Way];
 
 export const Water = { None: 0, Shallow: 1, Deep: 2 } as const;
 export type Water = (typeof Water)[keyof typeof Water];

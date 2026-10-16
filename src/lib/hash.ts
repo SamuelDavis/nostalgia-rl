@@ -23,3 +23,12 @@ export const unit = (h: number): number => h / 2 ** 32;
 export const intBetween = (min: number, max: number, h: number): number => min + Math.floor(unit(h) * (max - min + 1));
 
 export const pick = <T>(items: readonly T[], h: number): T => items[Math.floor(unit(h) * items.length)]!;
+
+export const countBiasedLow = (max: number, h: number): number => {
+  let remaining = unit(h) * ((max * (max + 1)) / 2);
+  for (let count = 1; count < max; count++) {
+    remaining -= max + 1 - count;
+    if (remaining < 0) return count;
+  }
+  return max;
+};

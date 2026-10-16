@@ -6,6 +6,7 @@ import {
   type Feature,
   type Ground,
   type Water,
+  type Way,
   type Worldgen,
   generateChunk,
   tileIndex,
@@ -17,6 +18,7 @@ export interface Tile {
   readonly water: Water;
   readonly feature: Feature;
   readonly biome: Biome;
+  readonly way: Way;
 }
 
 export type Terrain = (x: number, y: number) => Tile;
@@ -38,6 +40,7 @@ export const createTerrain = (world: Worldgen): Terrain => {
       water: chunk.water[i] as Water,
       feature: chunk.feature[i] as Feature,
       biome: chunk.biome[i] as Biome,
+      way: chunk.way[i] as Way,
     };
   };
 };

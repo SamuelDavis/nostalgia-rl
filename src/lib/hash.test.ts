@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hash, hashString, intBetween, pick, unit } from "./hash";
+import { countBiasedLow, hash, hashString, intBetween, pick, unit } from "./hash";
 
 describe("hash", () => {
   it("is deterministic", () => {
@@ -53,5 +53,18 @@ describe("intBetween", () => {
 describe("pick", () => {
   it("selects an element", () => {
     expect(["a", "b", "c"]).toContain(pick(["a", "b", "c"], hash(9)));
+  });
+});
+
+describe("countBiasedLow", () => {
+  it("covers 1 to max", () => {
+    expect(countBiasedLow(5, 0)).toBe(1);
+    expect(countBiasedLow(5, 2 ** 32 - 1)).toBe(5);
+  });
+
+  it("weights counts linearly toward 1", () => {
+    const tally = [0, 0, 0, 0, 0, 0];
+    for (let i = 0; i < 15_000; i++) tally[countBiasedLow(5, hash(i))]!++;
+    expect(tally.slice(1).map((n) => Math.round(n / 1000))).toEqual([5, 4, 3, 2, 1]);
   });
 });

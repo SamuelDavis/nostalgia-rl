@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { Feature, Ground, MAX_CLIMB, Water } from "../worldgen";
+import { Feature, MAX_CLIMB, Water, Way } from "../worldgen";
 import { Direction, blockerBetween, isSwimming, stepToward } from "./movement";
 
-const land = (height: number) => ({ height, ground: Ground.Grass, water: Water.None, feature: Feature.None });
-const path = (height: number) => ({ ...land(height), ground: Ground.Path });
+const land = (height: number) => ({ height, way: Way.None, water: Water.None, feature: Feature.None });
+const path = (height: number) => ({ ...land(height), way: Way.Path });
 
 describe("stepToward", () => {
   it("moves one tile in a cardinal direction, y growing southward", () => {
@@ -27,7 +27,7 @@ describe("blockerBetween", () => {
 
   it("climbs any step by stairs between two trail tiles", () => {
     expect(blockerBetween(path(100), path(116))).toBeUndefined();
-    expect(blockerBetween(path(100), { ...land(116), ground: Ground.Road })).toBeUndefined();
+    expect(blockerBetween(path(100), { ...land(116), way: Way.Road })).toBeUndefined();
     expect(blockerBetween(land(100), path(116))).toBe("cliff");
   });
 
@@ -43,8 +43,8 @@ describe("blockerBetween", () => {
   it("walks through low plants and over bridges", () => {
     for (const feature of [Feature.Bush, Feature.Flowers, Feature.Tuft])
       expect(blockerBetween(land(100), { ...land(100), feature })).toBeUndefined();
-    const bridge = { height: 63, ground: Ground.Sand, water: Water.Deep, feature: Feature.Bridge };
-    expect(blockerBetween({ ...land(64), ground: Ground.Road }, bridge)).toBeUndefined();
+    const bridge = { height: 63, way: Way.Road, water: Water.Deep, feature: Feature.Bridge };
+    expect(blockerBetween({ ...land(64), way: Way.Road }, bridge)).toBeUndefined();
   });
 });
 

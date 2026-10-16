@@ -1,10 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { Feature, Ground, Water } from "../worldgen";
+import { Feature, Ground, Water, Way } from "../worldgen";
 import { Direction } from "./movement";
 import { playTurn, startSession } from "./session";
 import type { Terrain } from "./terrain";
 
-const flat: Terrain = () => ({ height: 100, ground: Ground.Grass, water: Water.None, feature: Feature.None, biome: 2 });
+const flat: Terrain = () => ({
+  height: 100,
+  ground: Ground.Grass,
+  water: Water.None,
+  feature: Feature.None,
+  biome: 2,
+  way: Way.None,
+});
 const walledEast: Terrain = (x, y) => (x > 0 ? { ...flat(x, y), feature: Feature.Boulder } : flat(x, y));
 
 describe("playTurn", () => {

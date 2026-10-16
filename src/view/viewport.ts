@@ -1,15 +1,27 @@
-import type { Point } from "../lib";
+import { type Point, hash, hashString, unit } from "../lib";
 import { isCliff, isStairs, isTrail } from "../game/movement";
 import type { Terrain, Tile } from "../game/terrain";
-import { Feature, Water } from "../worldgen";
-import { PLAYER_GLYPH, STAIRS_GLYPH, featureGlyph, groundGlyph, waterGlyph } from "./glyphs";
-import { type HeightMode, type Rgb, css, featureColor, groundColor, shade, surfaceColor, waterColor } from "./palette";
+import { Feature, Water, Way } from "../worldgen";
+import { PLAYER_GLYPH, STAIRS_GLYPH, featureGlyph, groundGlyph, waterGlyph, wayGlyph } from "./glyphs";
+import {
+  type HeightMode,
+  type Rgb,
+  css,
+  featureColor,
+  groundColor,
+  shade,
+  surfaceColor,
+  waterColor,
+  wayColor,
+} from "./palette";
 
 export const CELL_PX = 18;
 const CLIFF_COLOR = "rgb(20 15 10 / 0.85)";
 const CLIFF_WIDTH = 3;
 const PLAYER_COLOR: Rgb = [255, 255, 255];
 const GROUND_GLYPH_SHADE = 0.8;
+const PATH_VISIBILITY = 0.6;
+const PATH_SALT = hashString("path glyphs");
 
 interface Look {
   readonly background: Rgb;
@@ -27,17 +39,21 @@ const NEIGHBOURS: readonly Point[] = [
 const hasStairs = (terrain: Terrain, x: number, y: number, tile: Tile): boolean =>
   isTrail(tile) && NEIGHBOURS.some((o) => isStairs(tile, terrain(x + o.x, y + o.y)));
 
-const lookOf = (tile: Tile, mode: HeightMode): Look => {
+const isPathShown = (x: number, y: number) => unit(hash(PATH_SALT, x, y)) < PATH_VISIBILITY;
+
+const lookOf = (tile: Tile, mode: HeightMode, x: number, y: number): Look => {
+  const surface = tile.way === Way.Road ? wayColor[Way.Road] : groundColor[tile.ground];
   if (tile.feature !== Feature.None) {
-    const background =
-      tile.water === Water.None ? surfaceColor(mode, groundColor[tile.ground], tile.height) : waterColor[tile.water];
+    const background = tile.water === Water.None ? surfaceColor(mode, surface, tile.height) : waterColor[tile.water];
     return { background, glyph: featureGlyph[tile.feature], color: featureColor[tile.feature] };
   }
   if (tile.water !== Water.None) {
     const background = waterColor[tile.water];
     return { background, glyph: waterGlyph[tile.water], color: shade(background, 1.4) };
   }
-  const background = surfaceColor(mode, groundColor[tile.ground], tile.height);
+  const background = surfaceColor(mode, surface, tile.height);
+  if (tile.way === Way.Road || (tile.way === Way.Path && isPathShown(x, y)))
+    return { background, glyph: wayGlyph[tile.way], color: wayColor[tile.way] };
   const color = mode === "tint" ? groundColor[tile.ground] : shade(background, GROUND_GLYPH_SHADE);
   return { background, glyph: groundGlyph[tile.ground], color };
 };
@@ -67,7 +83,7 @@ export const drawViewport = (
     for (let x = left; x < left + columns; x++) {
       const { px, py } = screen(x, y);
       const tile = terrain(x, y);
-      const look = lookOf(tile, mode);
+      const look = lookOf(tile, mode, x, y);
       ctx.fillStyle = css(look.background);
       ctx.fillRect(px, py, CELL_PX, CELL_PX);
       const isPlayer = x === center.x && y === center.y;

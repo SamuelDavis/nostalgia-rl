@@ -1,6 +1,6 @@
 import { parseArgs } from "node:util";
 import { floorDiv } from "../src/lib";
-import { CHUNK_SIZE, Feature, Ground, Water, createWorldgen, generateChunk, tileIndex } from "../src/worldgen";
+import { CHUNK_SIZE, Feature, Ground, Water, Way, createWorldgen, generateChunk, tileIndex } from "../src/worldgen";
 import { fieldColor, overviewMarks } from "../src/view/overview";
 import {
   HEIGHT_MODES,
@@ -10,6 +10,7 @@ import {
   groundColor,
   surfaceColor,
   waterColor,
+  wayColor,
 } from "../src/view/palette";
 import { writePng } from "./png";
 
@@ -46,6 +47,8 @@ const tileColor = (x: number, y: number): Rgb => {
   const water = chunk.water[i] as Water;
   if (feature !== Feature.None) return featureColor[feature];
   if (water !== Water.None) return waterColor[water];
+  const way = chunk.way[i] as Way;
+  if (way !== Way.None) return wayColor[way];
   return surfaceColor(mode, groundColor[chunk.ground[i] as Ground], chunk.height[i]!);
 };
 

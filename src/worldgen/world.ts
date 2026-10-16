@@ -1,5 +1,6 @@
 import {
   type Point,
+  countBiasedLow,
   createNoise,
   distance,
   floorDiv,
@@ -8,6 +9,7 @@ import {
   intBetween,
   memoize,
   projectOntoSegment,
+  relativeNeighbours,
   unit,
 } from "../lib";
 import { biomeOf } from "./biome";
@@ -15,7 +17,7 @@ import { MACRO_SIZE, MAX_CLIMB, heightLevel } from "./constants";
 import { type Fields, createFields } from "./fields";
 import { MAX_RIVER_REACH, type River, traceRiver } from "./rivers";
 import { route } from "./routing";
-import { type Glade, type Trail, findPeak, traceForestTrails } from "./trails";
+import { type Glade, type Trail, findGlade, findPeak } from "./trails";
 import { Biome } from "./terrain";
 
 export interface Camp extends Point {
@@ -57,15 +59,17 @@ const CAMP_FLATNESS = 8;
 const RIVER_CLEARANCE = 10;
 const SPAWN_SEARCH_STEP = 16;
 const SPAWN_SEARCH_RINGS = 60;
-const ROAD_LINKS: readonly (readonly [dx: number, dy: number, chance: number])[] = [
-  [1, 0, 0.8],
-  [0, 1, 0.8],
-  [1, 1, 0.3],
-  [1, -1, 0.3],
-];
+const LINK_CELL_RADIUS = 2;
 const ROAD_WOBBLE_SCALE = 48;
+const ROAD_TYPICAL_COST = 2;
 const CELL_CACHE = 4096;
-const TRAIL_GRADE_PENALTY = 4 / (MAX_CLIMB * MAX_CLIMB);
+const TRAIL_SALT = hashString("trails");
+const MAX_TRAILS_PER_LANDMARK = 5;
+const TRAIL_DIFFICULTY = 1.2;
+const TRAIL_DIFFICULTY_SCALE = 60;
+const TRAIL_REUSE = 0.35;
+const TRAIL_TYPICAL_COST = 2.5;
+const STEEP_PENALTY = 25;
 
 const RIVER_CELL_RADIUS = Math.ceil(MAX_RIVER_REACH / MACRO_SIZE) + 1;
 const FLATNESS_PROBES: readonly Point[] = [
@@ -80,6 +84,26 @@ const FLATNESS_PROBES: readonly Point[] = [
 ];
 
 const cellKey = ({ cx, cy }: Cell) => `${cx},${cy}`;
+const pointKey = ({ x, y }: Point) => `${x},${y}`;
+
+const isForward = (from: Cell, to: Cell) => to.cy > from.cy || (to.cy === from.cy && to.cx > from.cx);
+
+const climbCost = (grade: number) => (grade <= MAX_CLIMB ? grade : STEEP_PENALTY * grade);
+
+const LandmarkKind = { Camp: 0, Glade: 1, Peak: 2 } as const;
+type LandmarkKind = (typeof LandmarkKind)[keyof typeof LandmarkKind];
+
+interface Landmark extends Point {
+  readonly cell: Cell;
+  readonly kind: LandmarkKind;
+}
+
+const isTrailhead = (l: Landmark) => l.kind !== LandmarkKind.Camp;
+
+const ownsLink = (head: Landmark, target: Landmark) =>
+  !isTrailhead(target) ||
+  isForward(head.cell, target.cell) ||
+  (head.cell.cx === target.cell.cx && head.cell.cy === target.cell.cy && target.kind > head.kind);
 
 interface Bounds {
   readonly minX: number;
@@ -124,6 +148,7 @@ const riverDistance = (river: River, p: Point): number => {
 export const createWorldgen = (seed: number): Worldgen => {
   const fields = createFields(seed);
   const roadNoise = createNoise(seed, ROAD_SALT);
+  const trailNoise = createNoise(seed, TRAIL_SALT);
   const level = (p: Point) => heightLevel(fields.elevation(p.x, p.y));
   const biomeAt = (p: Point) => biomeOf(fields.climate(p.x, p.y));
   const cellOf = (p: Point): Cell => ({
@@ -208,21 +233,31 @@ export const createWorldgen = (seed: number): Worldgen => {
   const campAt = (cx: number, cy: number) => campAtCell({ cx, cy });
 
   const routeRoad = (from: Camp, to: Camp) =>
-    route(level, from, to, (grade, at) => {
-      const wobble = 0.6 * (1 + roadNoise(at.x / ROAD_WOBBLE_SCALE, at.y / ROAD_WOBBLE_SCALE));
-      return wobble + (grade <= MAX_CLIMB ? grade : 25 * grade);
-    });
+    route(
+      level,
+      from,
+      to,
+      (grade, at) => {
+        const wobble = 0.6 * (1 + roadNoise(at.x / ROAD_WOBBLE_SCALE, at.y / ROAD_WOBBLE_SCALE));
+        return 1 + wobble + climbCost(grade);
+      },
+      ROAD_TYPICAL_COST,
+    );
 
   const roadsFromCell = memoize(
-    ({ cx, cy }: Cell): Road[] => {
-      const from = campAt(cx, cy);
+    (cell: Cell): Road[] => {
+      const from = campAtCell(cell);
       if (!from) return [];
-      return ROAD_LINKS.flatMap(([dx, dy, chance], link) => {
-        const to = campAt(cx + dx, cy + dy);
-        if (!to || unit(hash(seed, ROAD_SALT, cx, cy, link)) > chance) return [];
-        const nodes = routeRoad(from, to);
-        return nodes ? [{ from, to, nodes }] : [];
+      const camps = cellsAround(cell, LINK_CELL_RADIUS).flatMap((c) => {
+        const camp = campAtCell(c);
+        return camp ? [{ x: camp.x, y: camp.y, camp, cell: c }] : [];
       });
+      return relativeNeighbours(from, camps)
+        .filter((candidate) => isForward(cell, candidate.cell))
+        .flatMap(({ camp: to }) => {
+          const nodes = routeRoad(from, to);
+          return nodes ? [{ from, to, nodes }] : [];
+        });
     },
     cellKey,
     CELL_CACHE,
@@ -231,27 +266,50 @@ export const createWorldgen = (seed: number): Worldgen => {
 
   const roadsNearCell = memoize(
     (cell: Cell) =>
-      cellsAround(cell, 2)
+      cellsAround(cell, LINK_CELL_RADIUS)
         .flatMap(roadsFromCell)
         .filter((road) => overlaps(boundsOf(road.nodes, 8), cellBounds(cell))),
     cellKey,
     CELL_CACHE,
   );
 
-  const forestOf = memoize((cell: Cell) => traceForestTrails(seed, fields, cell.cx, cell.cy), cellKey, CELL_CACHE);
+  const gladeOf = memoize((cell: Cell) => findGlade(seed, fields, cell.cx, cell.cy), cellKey, CELL_CACHE);
+  const peakOf = memoize((cell: Cell) => findPeak(fields, cell.cx, cell.cy), cellKey, CELL_CACHE);
 
-  const mountainTrailOf = memoize(
-    (cell: Cell): Trail | undefined => {
-      const peak = findPeak(fields, cell.cx, cell.cy);
-      if (!peak) return undefined;
-      const anchor = cellsAround(cell, 1)
-        .flatMap((c) => campAtCell(c) ?? [])
-        .reduce<Camp | undefined>(
-          (best, camp) => (!best || distance(camp, peak) < distance(best, peak) ? camp : best),
-          undefined,
-        );
-      const nodes = anchor && route(level, anchor, peak, (grade) => grade * grade * TRAIL_GRADE_PENALTY);
-      return nodes && { nodes };
+  const landmarksIn = (cell: Cell): Landmark[] =>
+    (
+      [
+        [campAtCell(cell), LandmarkKind.Camp],
+        [gladeOf(cell), LandmarkKind.Glade],
+        [peakOf(cell), LandmarkKind.Peak],
+      ] as const
+    ).flatMap(([p, kind]) => (p ? [{ x: p.x, y: p.y, cell, kind }] : []));
+
+  const trailLevel = (p: Point) => heightLevel(fields.elevationBeforeLedges(p.x, p.y));
+
+  const trailsFromCell = memoize(
+    (cell: Cell): Trail[] => {
+      const candidates = cellsAround(cell, 1).flatMap(landmarksIn);
+      const walked = new Set(roadsNearCell(cell).flatMap((road) => road.nodes.map(pointKey)));
+      const unitCost = (grade: number, at: Point) => {
+        const difficulty =
+          TRAIL_DIFFICULTY * (1 + trailNoise(at.x / TRAIL_DIFFICULTY_SCALE, at.y / TRAIL_DIFFICULTY_SCALE));
+        return (1 + difficulty + climbCost(grade)) * (walked.has(pointKey(at)) ? TRAIL_REUSE : 1);
+      };
+      return landmarksIn(cell)
+        .filter(isTrailhead)
+        .flatMap((head) => {
+          const count = countBiasedLow(MAX_TRAILS_PER_LANDMARK, hash(seed, TRAIL_SALT, cell.cx, cell.cy, head.kind));
+          return relativeNeighbours(head, candidates)
+            .filter((target) => ownsLink(head, target))
+            .sort((a, b) => distance(head, a) - distance(head, b))
+            .slice(0, count)
+            .flatMap((target) => {
+              const nodes = route(trailLevel, head, target, unitCost, TRAIL_TYPICAL_COST);
+              nodes?.forEach((node) => walked.add(pointKey(node)));
+              return nodes ? [{ nodes }] : [];
+            });
+        });
     },
     cellKey,
     CELL_CACHE,
@@ -260,10 +318,7 @@ export const createWorldgen = (seed: number): Worldgen => {
   const trailsNearCell = memoize(
     (cell: Cell) =>
       cellsAround(cell, 2)
-        .flatMap((source) => {
-          const mountainTrail = mountainTrailOf(source);
-          return [...(forestOf(source)?.trails ?? []), ...(mountainTrail ? [mountainTrail] : [])];
-        })
+        .flatMap(trailsFromCell)
         .filter((trail) => overlaps(boundsOf(trail.nodes, 8), cellBounds(cell))),
     cellKey,
     CELL_CACHE,
@@ -272,7 +327,7 @@ export const createWorldgen = (seed: number): Worldgen => {
   const gladesNearCell = memoize(
     (cell: Cell) =>
       cellsAround(cell, 1).flatMap((source) => {
-        const glade = forestOf(source)?.glade;
+        const glade = gladeOf(source);
         return glade && overlaps(boundsOf([glade], glade.radius), cellBounds(cell)) ? [glade] : [];
       }),
     cellKey,

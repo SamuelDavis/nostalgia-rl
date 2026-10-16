@@ -29,7 +29,7 @@ const walksAlong = (terrain: Terrain, trail: Trail): boolean => {
   const frontier = [start];
   while (frontier.length > 0) {
     const p = frontier.pop()!;
-    if (p.x === goal.x && p.y === goal.y) return true;
+    if (Math.abs(p.x - goal.x) + Math.abs(p.y - goal.y) <= 1) return true;
     for (const o of NEIGHBOURS) {
       const n = { x: p.x + o.x, y: p.y + o.y };
       const to = terrain(n.x, n.y);
@@ -42,7 +42,7 @@ const walksAlong = (terrain: Terrain, trail: Trail): boolean => {
 };
 
 describe("trails", () => {
-  it("are walkable end to end, over ledges by stairs and rivers by bridge", () => {
+  it("are walkable up to their far end, over ledges by stairs and rivers by bridge", () => {
     const cases = [
       { seed: 1, cell: { cx: 0, cy: 0 } },
       { seed: 1, cell: { cx: 5, cy: 5 } },

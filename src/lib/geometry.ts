@@ -21,3 +21,14 @@ export const projectOntoSegment = (p: Point, a: Point, b: Point): SegmentProject
   const t = lengthSquared === 0 ? 0 : Math.min(1, Math.max(0, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSquared));
   return { distance: distance(p, { x: a.x + dx * t, y: a.y + dy * t }), t };
 };
+
+const samePoint = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
+
+export const relativeNeighbours = <P extends Point>(origin: Point, candidates: readonly P[]): P[] =>
+  candidates.filter((c) => {
+    if (samePoint(c, origin)) return false;
+    const span = distance(origin, c);
+    return !candidates.some(
+      (w) => !samePoint(w, c) && !samePoint(w, origin) && Math.max(distance(origin, w), distance(c, w)) < span,
+    );
+  });

@@ -1,4 +1,4 @@
-import { Feature, Ground, Water } from "../worldgen";
+import { Feature, Ground, Water, Way } from "../worldgen";
 
 export const PLAYER_GLYPH = "@";
 export const STAIRS_GLYPH = "≡";
@@ -23,8 +23,11 @@ export const groundGlyph: Record<Ground, string> = {
   [Ground.Sand]: "·",
   [Ground.Rock]: ":",
   [Ground.Snow]: "·",
-  [Ground.Road]: "=",
-  [Ground.Path]: "∙",
+};
+
+export const wayGlyph: Record<Exclude<Way, typeof Way.None>, string> = {
+  [Way.Road]: "=",
+  [Way.Path]: "∙",
 };
 
 export const waterGlyph: Record<Exclude<Water, typeof Water.None>, string> = {

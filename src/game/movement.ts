@@ -1,5 +1,5 @@
 import type { Point } from "../lib";
-import { Feature, Ground, MAX_CLIMB, Water } from "../worldgen";
+import { Feature, MAX_CLIMB, Water, Way } from "../worldgen";
 
 export const Direction = { North: 0, East: 1, South: 2, West: 3 } as const;
 export type Direction = (typeof Direction)[keyof typeof Direction];
@@ -20,7 +20,7 @@ export type Blocker = "cliff" | "obstacle";
 
 interface Footing {
   readonly height: number;
-  readonly ground: Ground;
+  readonly way: Way;
   readonly water: Water;
   readonly feature: Feature;
 }
@@ -34,8 +34,7 @@ const SOLID: ReadonlySet<Feature> = new Set([
   Feature.Campfire,
 ]);
 
-export const isTrail = ({ ground, feature }: Footing): boolean =>
-  ground === Ground.Road || ground === Ground.Path || feature === Feature.Bridge;
+export const isTrail = ({ way }: Footing): boolean => way !== Way.None;
 
 export const isStairs = (from: Footing, to: Footing): boolean =>
   Math.abs(to.height - from.height) > MAX_CLIMB && isTrail(from) && isTrail(to);

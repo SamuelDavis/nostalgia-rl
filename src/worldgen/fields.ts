@@ -9,6 +9,7 @@ export interface Climate {
 
 export interface Fields {
   readonly elevation: Field2;
+  readonly elevationBeforeLedges: Field2;
   readonly drainage: Field2;
   readonly temperature: Field2;
   readonly moisture: Field2;
@@ -44,9 +45,13 @@ export const createFields = (seed: number): Fields => {
 
   const drainage: Field2 = (x, y) => relief(x, y).drainage;
 
-  const elevation: Field2 = (x, y) => {
+  const smoothElevation = (x: number, y: number) => {
     const { mountains, drainage } = relief(x, y);
-    const smooth = drainage + hills(x, y) * 0.04;
+    return { mountains, smooth: drainage + hills(x, y) * 0.04 };
+  };
+
+  const elevation: Field2 = (x, y) => {
+    const { mountains, smooth } = smoothElevation(x, y);
     const terracing = smoothstep(0.05, 0.3, mountains);
     const phase = ledges(x, y) * TERRACE_STEP;
     const terraced = Math.floor((smooth + phase) / TERRACE_STEP) * TERRACE_STEP - phase;
@@ -65,6 +70,7 @@ export const createFields = (seed: number): Fields => {
 
   return {
     elevation,
+    elevationBeforeLedges: (x, y) => clamp(smoothElevation(x, y).smooth, 0, 0.999),
     drainage,
     temperature: (x, y) => temperatureAt(x, y, elevation(x, y)),
     moisture,
