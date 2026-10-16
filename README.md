@@ -21,6 +21,16 @@ Make a decision when the current phase needs it, and record it in that phase's d
 
 The overall progression follows the r/roguelikedev [Complete Roguelike Tutorial](https://rogueliketutorials.com/): map, player movement, field of view, monsters, combat, items, and so on. We adapt each step to a real-time clock and an open overworld, and multiplayer comes in when the user asks for it.
 
+## Multiplayer requirements
+
+These are requirements, not designs. How to meet them is decided in the multiplayer phase. Earlier phases should avoid choices that would make them hard to meet.
+
+- **Serverless peer-to-peer:** WebRTC, using STUN and the user's Cloudflare TURN server for traversal. There is no game server, and running costs stay minimal.
+- **Minecraft-style hosting:** a player generates a world, plays it, and shares a key. Friends join and leave in real time. There are no lobbies or accounts, and chat happens on other platforms.
+- **Any number of players:** no hard cap. The game warns or suggests limits based on observed network traffic and known peer-to-peer constraints.
+- **Intercontinental latency:** play stays fair and responsive between continents. The ~250 ms turn clock is the main budget for absorbing latency.
+- **Determinism:** each peer generates terrain locally from the seed (see [docs/worldgen.md](docs/worldgen.md#determinism)). Only changes and live state cross the network.
+
 ## Current state
 
 - **Phase 1, world generation:** in progress. See [docs/phases/01-worldgen.md](docs/phases/01-worldgen.md).
