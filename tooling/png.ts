@@ -1,7 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { PNG } from "pngjs";
-
-export type Rgb = readonly [number, number, number];
+import type { Rgb } from "../src/view/palette";
 
 export const writePng = (path: string, width: number, height: number, colorAt: (x: number, y: number) => Rgb): void => {
   const png = new PNG({ width, height });

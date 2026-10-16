@@ -1,0 +1,62 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: #ddd;
+  font:
+    12px/1.4 "DejaVu Sans Mono",
+    Menlo,
+    Consolas,
+    monospace;
+}
+
+canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+
+.hud {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  padding: 8px 10px;
+  background: rgb(0 0 0 / 0.72);
+  border-radius: 4px;
+}
+
+.hud dl {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0 12px;
+  margin: 0;
+}
+
+.hud dt {
+  color: #888;
+}
+
+.hud dd {
+  margin: 0;
+}
+
+.hud p {
+  margin: 6px 0 0;
+  color: #888;
+}
+
+canvas.map {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(80vmin, 768px);
+  height: min(80vmin, 768px);
+  image-rendering: pixelated;
+  border: 2px solid #444;
+}
+
+canvas.map[hidden] {
+  display: none;
+}

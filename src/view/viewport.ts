@@ -1,0 +1,85 @@
+import type { Point } from "../lib";
+import { isCliff } from "../game/movement";
+import type { Terrain, Tile } from "../game/terrain";
+import { Feature, Water } from "../worldgen";
+import { PLAYER_GLYPH, featureGlyph, groundGlyph, waterGlyph } from "./glyphs";
+import { type HeightMode, type Rgb, css, featureColor, groundColor, shade, surfaceColor, waterColor } from "./palette";
+
+export const CELL_PX = 18;
+const CLIFF_COLOR = "rgb(20 15 10 / 0.85)";
+const CLIFF_WIDTH = 3;
+const PLAYER_COLOR: Rgb = [255, 255, 255];
+const GROUND_GLYPH_SHADE = 0.8;
+
+interface Look {
+  readonly background: Rgb;
+  readonly glyph: string;
+  readonly color: Rgb;
+}
+
+const lookOf = (tile: Tile, mode: HeightMode): Look => {
+  if (tile.feature !== Feature.None) {
+    const background =
+      tile.water === Water.None ? surfaceColor(mode, groundColor[tile.ground], tile.height) : waterColor[tile.water];
+    return { background, glyph: featureGlyph[tile.feature], color: featureColor[tile.feature] };
+  }
+  if (tile.water !== Water.None) {
+    const background = waterColor[tile.water];
+    return { background, glyph: waterGlyph[tile.water], color: shade(background, 1.4) };
+  }
+  const background = surfaceColor(mode, groundColor[tile.ground], tile.height);
+  const color = mode === "tint" ? groundColor[tile.ground] : shade(background, GROUND_GLYPH_SHADE);
+  return { background, glyph: groundGlyph[tile.ground], color };
+};
+
+export const drawViewport = (
+  ctx: CanvasRenderingContext2D,
+  terrain: Terrain,
+  center: Point,
+  mode: HeightMode,
+): void => {
+  const columns = Math.ceil(ctx.canvas.clientWidth / CELL_PX) | 1;
+  const rows = Math.ceil(ctx.canvas.clientHeight / CELL_PX) | 1;
+  const left = center.x - (columns >> 1);
+  const top = center.y - (rows >> 1);
+  const originX = Math.floor((ctx.canvas.clientWidth - columns * CELL_PX) / 2);
+  const originY = Math.floor((ctx.canvas.clientHeight - rows * CELL_PX) / 2);
+  const screen = (x: number, y: number) => ({
+    px: originX + (x - left) * CELL_PX,
+    py: originY + (y - top) * CELL_PX,
+  });
+
+  ctx.font = `${CELL_PX - 3}px "DejaVu Sans Mono", Menlo, Consolas, monospace`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  for (let y = top; y < top + rows; y++)
+    for (let x = left; x < left + columns; x++) {
+      const { px, py } = screen(x, y);
+      const tile = terrain(x, y);
+      const look = lookOf(tile, mode);
+      ctx.fillStyle = css(look.background);
+      ctx.fillRect(px, py, CELL_PX, CELL_PX);
+      const isPlayer = x === center.x && y === center.y;
+      ctx.fillStyle = css(isPlayer ? PLAYER_COLOR : look.color);
+      ctx.fillText(isPlayer ? PLAYER_GLYPH : look.glyph, px + CELL_PX / 2, py + CELL_PX / 2 + 1);
+    }
+
+  ctx.strokeStyle = CLIFF_COLOR;
+  ctx.lineWidth = CLIFF_WIDTH;
+  ctx.beginPath();
+  for (let y = top - 1; y < top + rows; y++)
+    for (let x = left - 1; x < left + columns; x++) {
+      const tile = terrain(x, y);
+      const { px, py } = screen(x + 1, y + 1);
+      if (isCliff(tile, terrain(x + 1, y))) {
+        ctx.moveTo(px, py - CELL_PX);
+        ctx.lineTo(px, py);
+      }
+      if (isCliff(tile, terrain(x, y + 1))) {
+        ctx.moveTo(px - CELL_PX, py);
+        ctx.lineTo(px, py);
+      }
+    }
+  ctx.stroke();
+};

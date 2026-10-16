@@ -34,8 +34,8 @@ These are requirements, not designs. How to meet them is decided in the multipla
 ## Current state
 
 - **Phase 1, world generation:** in progress. See [docs/phases/01-worldgen.md](docs/phases/01-worldgen.md).
-- A deterministic, seeded world generator exists in `src/worldgen`, with no game around it yet. It was carried over from an earlier prototype as a starting point; treat it as a draft that playtests will reshape, not a settled design. How it works: [docs/worldgen.md](docs/worldgen.md).
-- `src/index.ts` is still the Vite placeholder.
+- A deterministic, seeded world generator exists in `src/worldgen`. It was carried over from an earlier prototype as a starting point; treat it as a draft that playtests will reshape, not a settled design. How it works: [docs/worldgen.md](docs/worldgen.md).
+- `npm run dev` gives a walkable world: `@` on the turn clock, glyph canvas, debug HUD, M map, H height mode. URL params: `seed`, `turn` (ms), `x`, `y` (start tile).
 
 ## Layout
 
@@ -43,6 +43,8 @@ These are requirements, not designs. How to meet them is decided in the multipla
 | -------------- | ---------------------------------------------------------------------- |
 | `src/lib`      | Game-agnostic utilities: hashing, seeded noise, math, A\*, LRU memoize |
 | `src/worldgen` | World generation ([docs/worldgen.md](docs/worldgen.md))                |
+| `src/game`     | Rules independent of presentation: movement, input, tile access        |
+| `src/view`     | Canvas viewport, HTML HUD and map, palette shared with `tooling`       |
 | `tooling`      | Node scripts for development, e.g. the offline map renderer            |
 | `docs/phases`  | One doc per phase: goal, decisions, playtest log                       |
 
