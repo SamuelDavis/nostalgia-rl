@@ -17,7 +17,7 @@ Development is phased and driven by playtests. The design is revealed progressiv
 
 Stop at each playable increment and hand it to the user. Verify things the way the user will experience them, by running and playing them. Tests protect logic, but they don't stand in for a playtest. When reporting, say plainly what you could not verify.
 
-Make a decision when the current phase needs it, and record it in that phase's doc. Future phases are deliberately unplanned.
+Make a decision when the current phase needs it, and record it in that phase's doc. Future phases are deliberately unplanned. Candidate directions the user liked are in [docs/ideas.md](docs/ideas.md); adopt one only when a phase calls for it.
 
 The overall progression follows the r/roguelikedev [Complete Roguelike Tutorial](https://rogueliketutorials.com/): map, player movement, field of view, monsters, combat, items, and so on. We adapt each step to a real-time clock and an open overworld, and multiplayer comes in when the user asks for it.
 
