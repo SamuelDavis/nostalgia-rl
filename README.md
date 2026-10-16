@@ -1,0 +1,55 @@
+# Nostalgia RL
+
+A real-time, open-world roguelike with peer-to-peer drop-in multiplayer, in the browser.
+
+It follows the classic roguelike conventions: a grid, turn-based movement, cardinal facing, and glyph-first presentation. The difference is that turns run on a real-time clock, as in _Crypt of the NecroDancer_: the world advances one turn about every 250 ms whether or not you act. The world is a seeded, infinite, Minecraft-style overworld with biomes, height, and features, not a stack of dungeon floors. Friends join a running world in real time.
+
+This file is the handoff document for a fresh session. It gives intent and current state and links to topical docs. Read the linked docs only when your task touches them.
+
+## How we work
+
+Development is phased and driven by playtests. The design is revealed progressively rather than specified up front.
+
+1. **Interview.** At the start of a phase, a few questions establish what this phase must deliver and how the user will judge it.
+2. **Build the smallest playable increment** that answers the phase's question.
+3. **Playtest.** The user plays it. Their feedback is recorded verbatim in the phase doc and drives the next iteration.
+4. **Iterate or advance.** Repeat until the user is satisfied, then start the next phase.
+
+Stop at each playable increment and hand it to the user. Verify things the way the user will experience them, by running and playing them. Tests protect logic, but they don't stand in for a playtest. When reporting, say plainly what you could not verify.
+
+Make a decision when the current phase needs it, and record it in that phase's doc. Future phases are deliberately unplanned.
+
+The overall progression follows the r/roguelikedev [Complete Roguelike Tutorial](https://rogueliketutorials.com/): map, player movement, field of view, monsters, combat, items, and so on. We adapt each step to a real-time clock and an open overworld, and multiplayer comes in when the user asks for it.
+
+## Current state
+
+- **Phase 1, world generation:** in progress. See [docs/phases/01-worldgen.md](docs/phases/01-worldgen.md).
+- A deterministic, seeded world generator exists in `src/worldgen`, with no game around it yet. It was carried over from an earlier prototype as a starting point; treat it as a draft that playtests will reshape, not a settled design. How it works: [docs/worldgen.md](docs/worldgen.md).
+- `src/index.ts` is still the Vite placeholder.
+
+## Layout
+
+| Path           | Contents                                                               |
+| -------------- | ---------------------------------------------------------------------- |
+| `src/lib`      | Game-agnostic utilities: hashing, seeded noise, math, A\*, LRU memoize |
+| `src/worldgen` | World generation ([docs/worldgen.md](docs/worldgen.md))                |
+| `tooling`      | Node scripts for development, e.g. the offline map renderer            |
+| `docs/phases`  | One doc per phase: goal, decisions, playtest log                       |
+
+## Commands
+
+| Command                             | Purpose                                                        |
+| ----------------------------------- | -------------------------------------------------------------- |
+| `npm run dev`                       | Vite dev server                                                |
+| `npm test`                          | Unit tests (Vitest)                                            |
+| `npm run bench`                     | Benchmarks (`*.bench.ts`)                                      |
+| `npm run typecheck`                 | TypeScript                                                     |
+| `npm run map -- --seed 1 --scale 8` | Render the world to `artifacts/map.png` (see docs/worldgen.md) |
+| `npm run format`                    | Prettier                                                       |
+
+## Conventions
+
+- **TypeScript and Vite**, browser-only at runtime. Node is used only for tooling and tests.
+- **Determinism:** anything a peer must reproduce independently is a pure function of seed and coordinates. The rules are in [docs/worldgen.md](docs/worldgen.md#determinism).
+- **Single source of truth:** docs reference code rather than restating it. Keep this README short; add topical docs under `docs/` and link them here.
+- **Git:** solo project. Use short-lived branches merged into the main branch once green, with conventional commit messages.

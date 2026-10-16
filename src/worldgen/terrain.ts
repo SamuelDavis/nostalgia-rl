@@ -1,0 +1,37 @@
+export const Biome = {
+  Ocean: 0,
+  Beach: 1,
+  Grassland: 2,
+  Forest: 3,
+  Desert: 4,
+  Mountain: 5,
+} as const;
+export type Biome = (typeof Biome)[keyof typeof Biome];
+
+export const Ground = {
+  Grass: 0,
+  Dirt: 1,
+  Sand: 2,
+  Rock: 3,
+  Snow: 4,
+  Road: 5,
+} as const;
+export type Ground = (typeof Ground)[keyof typeof Ground];
+
+export const Water = { None: 0, Shallow: 1, Deep: 2 } as const;
+export type Water = (typeof Water)[keyof typeof Water];
+
+export const Feature = {
+  None: 0,
+  Oak: 1,
+  Pine: 2,
+  Cactus: 3,
+  Bush: 4,
+  Boulder: 5,
+  Flowers: 6,
+  Tuft: 7,
+  Tent: 8,
+  Campfire: 9,
+  Bridge: 10,
+} as const;
+export type Feature = (typeof Feature)[keyof typeof Feature];
