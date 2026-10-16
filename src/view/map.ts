@@ -3,8 +3,8 @@ import type { Worldgen } from "../worldgen";
 import { fieldColor, overviewMarks } from "./overview";
 import { type HeightMode, css } from "./palette";
 
-const MAP_PX = 512;
-const TILES_PER_PX = 8;
+const MAP_PX = 256;
+const TILES_PER_PX = 4;
 const ROWS_PER_FRAME = 16;
 const PLAYER_MARK = "#ff3030";
 

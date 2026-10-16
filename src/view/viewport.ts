@@ -1,8 +1,8 @@
 import type { Point } from "../lib";
-import { isCliff } from "../game/movement";
+import { isCliff, isStairs, isTrail } from "../game/movement";
 import type { Terrain, Tile } from "../game/terrain";
 import { Feature, Water } from "../worldgen";
-import { PLAYER_GLYPH, featureGlyph, groundGlyph, waterGlyph } from "./glyphs";
+import { PLAYER_GLYPH, STAIRS_GLYPH, featureGlyph, groundGlyph, waterGlyph } from "./glyphs";
 import { type HeightMode, type Rgb, css, featureColor, groundColor, shade, surfaceColor, waterColor } from "./palette";
 
 export const CELL_PX = 18;
@@ -16,6 +16,16 @@ interface Look {
   readonly glyph: string;
   readonly color: Rgb;
 }
+
+const NEIGHBOURS: readonly Point[] = [
+  { x: 1, y: 0 },
+  { x: -1, y: 0 },
+  { x: 0, y: 1 },
+  { x: 0, y: -1 },
+];
+
+const hasStairs = (terrain: Terrain, x: number, y: number, tile: Tile): boolean =>
+  isTrail(tile) && NEIGHBOURS.some((o) => isStairs(tile, terrain(x + o.x, y + o.y)));
 
 const lookOf = (tile: Tile, mode: HeightMode): Look => {
   if (tile.feature !== Feature.None) {
@@ -61,8 +71,9 @@ export const drawViewport = (
       ctx.fillStyle = css(look.background);
       ctx.fillRect(px, py, CELL_PX, CELL_PX);
       const isPlayer = x === center.x && y === center.y;
+      const glyph = isPlayer ? PLAYER_GLYPH : hasStairs(terrain, x, y, tile) ? STAIRS_GLYPH : look.glyph;
       ctx.fillStyle = css(isPlayer ? PLAYER_COLOR : look.color);
-      ctx.fillText(isPlayer ? PLAYER_GLYPH : look.glyph, px + CELL_PX / 2, py + CELL_PX / 2 + 1);
+      ctx.fillText(glyph, px + CELL_PX / 2, py + CELL_PX / 2 + 1);
     }
 
   ctx.strokeStyle = CLIFF_COLOR;

@@ -1,16 +1,14 @@
-import { type Point, floorDiv } from "../lib";
-import { type Blocker, Direction } from "../game/movement";
+import { floorDiv } from "../lib";
+import { Direction, isSwimming } from "../game/movement";
+import type { Session } from "../game/session";
 import type { Tile } from "../game/terrain";
 import { Biome, CHUNK_SIZE, Feature, Ground, Water, type Worldgen } from "../worldgen";
 import type { HeightMode } from "./palette";
 
 export interface HudState {
-  readonly turn: number;
+  readonly session: Session;
   readonly turnMs: number;
-  readonly position: Point;
-  readonly facing: Direction;
   readonly tile: Tile;
-  readonly blocked: Blocker | undefined;
   readonly mode: HeightMode;
 }
 
@@ -28,7 +26,9 @@ export const createHud = (parent: HTMLElement, world: Worldgen) => {
   panel.append(table, help);
   parent.append(panel);
 
-  const update = ({ turn, turnMs, position: { x, y }, facing, tile, blocked, mode }: HudState) => {
+  const update = ({ session, turnMs, tile, mode }: HudState) => {
+    const { turn, facing, blocked } = session;
+    const { x, y } = session.position;
     const { elevation, temperature, moisture, drainage } = world.fields;
     const cell = world.cellOf({ x, y });
     const rows: [string, string][] = [
@@ -39,6 +39,7 @@ export const createHud = (parent: HTMLElement, world: Worldgen) => {
       ["macro cell", `${cell.cx}, ${cell.cy}`],
       ["facing", nameOf(Direction, facing)],
       ["blocked", blocked ?? "—"],
+      ["swimming", isSwimming(tile) ? "yes" : "no"],
       ["height", `${tile.height} (elevation ${fixed(elevation(x + 0.5, y + 0.5))})`],
       ["biome", nameOf(Biome, tile.biome)],
       ["ground", nameOf(Ground, tile.ground)],

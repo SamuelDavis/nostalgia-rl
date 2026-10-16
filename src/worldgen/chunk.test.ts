@@ -60,8 +60,8 @@ describe("generateChunk", () => {
       .toMatchInlineSnapshot(`
         [
           1333413235,
-          756559853,
-          1051477940,
+          3918996341,
+          1954642708,
         ]
       `);
   });

@@ -5,3 +5,4 @@ export * from "./fields";
 export * from "./rivers";
 export * from "./terrain";
 export * from "./world";
+export * from "./trails";

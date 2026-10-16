@@ -2,7 +2,6 @@ import {
   type Point,
   createNoise,
   distance,
-  findPath,
   floorDiv,
   hash,
   hashString,
@@ -11,10 +10,12 @@ import {
   projectOntoSegment,
   unit,
 } from "../lib";
-import { classifyBiome } from "./biome";
-import { MACRO_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
+import { biomeOf } from "./biome";
+import { MACRO_SIZE, MAX_CLIMB, heightLevel } from "./constants";
 import { type Fields, createFields } from "./fields";
 import { MAX_RIVER_REACH, type River, traceRiver } from "./rivers";
+import { route } from "./routing";
+import { type Glade, type Trail, findPeak, traceForestTrails } from "./trails";
 import { Biome } from "./terrain";
 
 export interface Camp extends Point {
@@ -41,6 +42,8 @@ export interface Worldgen {
   readonly campAt: (cx: number, cy: number) => Camp | undefined;
   readonly roadsFrom: (cx: number, cy: number) => readonly Road[];
   readonly roadsNear: (cx: number, cy: number) => readonly Road[];
+  readonly trailsNear: (cx: number, cy: number) => readonly Trail[];
+  readonly gladesNear: (cx: number, cy: number) => readonly Glade[];
 }
 
 const CAMP_SPACING = 120;
@@ -54,15 +57,15 @@ const CAMP_FLATNESS = 8;
 const RIVER_CLEARANCE = 10;
 const SPAWN_SEARCH_STEP = 16;
 const SPAWN_SEARCH_RINGS = 60;
-const ROAD_STEP = 4;
-const ROAD_MARGIN = 96;
 const ROAD_LINKS: readonly (readonly [dx: number, dy: number, chance: number])[] = [
   [1, 0, 0.8],
   [0, 1, 0.8],
   [1, 1, 0.3],
   [1, -1, 0.3],
 ];
+const ROAD_WOBBLE_SCALE = 48;
 const CELL_CACHE = 4096;
+const TRAIL_GRADE_PENALTY = 4 / (MAX_CLIMB * MAX_CLIMB);
 
 const RIVER_CELL_RADIUS = Math.ceil(MAX_RIVER_REACH / MACRO_SIZE) + 1;
 const FLATNESS_PROBES: readonly Point[] = [
@@ -122,8 +125,7 @@ export const createWorldgen = (seed: number): Worldgen => {
   const fields = createFields(seed);
   const roadNoise = createNoise(seed, ROAD_SALT);
   const level = (p: Point) => heightLevel(fields.elevation(p.x, p.y));
-  const biomeAt = (p: Point) =>
-    classifyBiome(fields.elevation(p.x, p.y), fields.temperature(p.x, p.y), fields.moisture(p.x, p.y));
+  const biomeAt = (p: Point) => biomeOf(fields.climate(p.x, p.y));
   const cellOf = (p: Point): Cell => ({
     cx: floorDiv(p.x, MACRO_SIZE),
     cy: floorDiv(p.y, MACRO_SIZE),
@@ -205,40 +207,11 @@ export const createWorldgen = (seed: number): Worldgen => {
   );
   const campAt = (cx: number, cy: number) => campAtCell({ cx, cy });
 
-  const routeRoad = (from: Camp, to: Camp): Point[] | undefined => {
-    const bounds = boundsOf([from, to], ROAD_MARGIN);
-    const toGrid = (v: number) => Math.round(v / ROAD_STEP);
-    const goal = { x: toGrid(to.x), y: toGrid(to.y) };
-    const levels = new Map<number, number>();
-    const key = (g: Point) => g.x * 100_003 + g.y;
-    const gridLevel = (g: Point) => {
-      const k = key(g);
-      if (!levels.has(k)) levels.set(k, level({ x: g.x * ROAD_STEP, y: g.y * ROAD_STEP }));
-      return levels.get(k)!;
-    };
-    const inBounds = (g: Point) =>
-      g.x * ROAD_STEP >= bounds.minX &&
-      g.x * ROAD_STEP <= bounds.maxX &&
-      g.y * ROAD_STEP >= bounds.minY &&
-      g.y * ROAD_STEP <= bounds.maxY;
-    const path = findPath<Point>({
-      start: { x: toGrid(from.x), y: toGrid(from.y) },
-      isGoal: (g) => g.x === goal.x && g.y === goal.y,
-      neighbors: (g) =>
-        [-1, 0, 1]
-          .flatMap((dx) => [-1, 0, 1].map((dy) => ({ x: g.x + dx, y: g.y + dy })))
-          .filter((n) => (n.x !== g.x || n.y !== g.y) && inBounds(n) && gridLevel(n) >= SEA_LEVEL),
-      cost: (a, b) => {
-        const step = a.x !== b.x && a.y !== b.y ? Math.SQRT2 : 1;
-        const slope = Math.abs(gridLevel(a) - gridLevel(b)) / (step * ROAD_STEP);
-        const wobble = 0.6 * (1 + roadNoise(b.x / 12, b.y / 12));
-        return step * (1 + wobble + (slope <= MAX_CLIMB ? slope : 25 * slope));
-      },
-      heuristic: (g) => distance(g, goal),
-      keyOf: key,
+  const routeRoad = (from: Camp, to: Camp) =>
+    route(level, from, to, (grade, at) => {
+      const wobble = 0.6 * (1 + roadNoise(at.x / ROAD_WOBBLE_SCALE, at.y / ROAD_WOBBLE_SCALE));
+      return wobble + (grade <= MAX_CLIMB ? grade : 25 * grade);
     });
-    return path?.map((g) => ({ x: g.x * ROAD_STEP, y: g.y * ROAD_STEP }));
-  };
 
   const roadsFromCell = memoize(
     ({ cx, cy }: Cell): Road[] => {
@@ -265,6 +238,47 @@ export const createWorldgen = (seed: number): Worldgen => {
     CELL_CACHE,
   );
 
+  const forestOf = memoize((cell: Cell) => traceForestTrails(seed, fields, cell.cx, cell.cy), cellKey, CELL_CACHE);
+
+  const mountainTrailOf = memoize(
+    (cell: Cell): Trail | undefined => {
+      const peak = findPeak(fields, cell.cx, cell.cy);
+      if (!peak) return undefined;
+      const anchor = cellsAround(cell, 1)
+        .flatMap((c) => campAtCell(c) ?? [])
+        .reduce<Camp | undefined>(
+          (best, camp) => (!best || distance(camp, peak) < distance(best, peak) ? camp : best),
+          undefined,
+        );
+      const nodes = anchor && route(level, anchor, peak, (grade) => grade * grade * TRAIL_GRADE_PENALTY);
+      return nodes && { nodes };
+    },
+    cellKey,
+    CELL_CACHE,
+  );
+
+  const trailsNearCell = memoize(
+    (cell: Cell) =>
+      cellsAround(cell, 2)
+        .flatMap((source) => {
+          const mountainTrail = mountainTrailOf(source);
+          return [...(forestOf(source)?.trails ?? []), ...(mountainTrail ? [mountainTrail] : [])];
+        })
+        .filter((trail) => overlaps(boundsOf(trail.nodes, 8), cellBounds(cell))),
+    cellKey,
+    CELL_CACHE,
+  );
+
+  const gladesNearCell = memoize(
+    (cell: Cell) =>
+      cellsAround(cell, 1).flatMap((source) => {
+        const glade = forestOf(source)?.glade;
+        return glade && overlaps(boundsOf([glade], glade.radius), cellBounds(cell)) ? [glade] : [];
+      }),
+    cellKey,
+    CELL_CACHE,
+  );
+
   return {
     seed,
     fields,
@@ -274,5 +288,7 @@ export const createWorldgen = (seed: number): Worldgen => {
     campAt,
     roadsFrom,
     roadsNear: (cx, cy) => roadsNearCell({ cx, cy }),
+    trailsNear: (cx, cy) => trailsNearCell({ cx, cy }),
+    gladesNear: (cx, cy) => gladesNearCell({ cx, cy }),
   };
 };

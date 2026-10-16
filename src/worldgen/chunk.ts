@@ -1,6 +1,6 @@
 import { Biome, Feature, Ground, Water } from "./terrain";
 import { type Point, createNoise, distance, floorDiv, hash, hashString, projectOntoSegment, unit } from "../lib";
-import { classifyBiome } from "./biome";
+import { biomeOf } from "./biome";
 import { CHUNK_SIZE, MACRO_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
 import type { RiverNode } from "./rivers";
 import type { Camp, Worldgen } from "./world";
@@ -20,6 +20,9 @@ export const tileIndex = (lx: number, ly: number): number => ly * CHUNK_SIZE + l
 const TILES = CHUNK_SIZE * CHUNK_SIZE;
 const BANK_WIDTH = 12;
 const ROAD_HALF_WIDTH = 1.1;
+const ROAD_CLEARANCE = 1.5;
+const TRAIL_HALF_WIDTH = 0.8;
+const TRAIL_CLEARANCE = 0.6;
 const CAMP_RADIUS = 12;
 const CAMP_YARD = 5;
 const SNOW_LEVEL = heightLevel(0.8125);
@@ -37,6 +40,14 @@ const COLD = 0.3;
 interface Channel {
   readonly a: RiverNode;
   readonly b: RiverNode;
+}
+
+interface WaySegment {
+  readonly a: Point;
+  readonly b: Point;
+  readonly ground: Ground;
+  readonly halfWidth: number;
+  readonly clearance: number;
 }
 
 interface Pool extends Point {
@@ -123,12 +134,23 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
   const pools: Pool[] = rivers.flatMap((river) =>
     river.lake && near(river.lake, river.lake.radius + BANK_WIDTH) ? [river.lake] : [],
   );
-  const roadSegments = world.roadsNear(cell.cx, cell.cy).flatMap((road) =>
-    road.nodes.flatMap((a, i) => {
-      const b = road.nodes[i + 1];
-      return b && segmentNear(a, b, reach) ? [{ a, b }] : [];
-    }),
-  );
+  const segmentsOf = (
+    ways: readonly { readonly nodes: readonly Point[] }[],
+    ground: Ground,
+    halfWidth: number,
+    clearance: number,
+  ): WaySegment[] =>
+    ways.flatMap((way) =>
+      way.nodes.flatMap((a, i) => {
+        const b = way.nodes[i + 1];
+        return b && segmentNear(a, b, reach) ? [{ a, b, ground, halfWidth, clearance }] : [];
+      }),
+    );
+  const waySegments = [
+    ...segmentsOf(world.roadsNear(cell.cx, cell.cy), Ground.Road, ROAD_HALF_WIDTH, ROAD_CLEARANCE),
+    ...segmentsOf(world.trailsNear(cell.cx, cell.cy), Ground.Path, TRAIL_HALF_WIDTH, TRAIL_CLEARANCE),
+  ];
+  const glades = world.gladesNear(cell.cx, cell.cy).filter((glade) => near(glade, glade.radius));
   const camps = nearbyCamps(world, cx, cy).filter((camp) => near(camp, CAMP_RADIUS));
   const groves = createNoise(seed, GROVE_SALT);
   const frostEdge = createNoise(seed, GROUND_SALT);
@@ -145,9 +167,9 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
       const x = originX + lx;
       const y = originY + ly;
       const center = { x: x + 0.5, y: y + 0.5 };
-      const elevation = fields.elevation(center.x, center.y);
-      const temperature = fields.temperature(center.x, center.y);
-      const tileBiome = classifyBiome(elevation, temperature, fields.moisture(center.x, center.y));
+      const climate = fields.climate(center.x, center.y);
+      const { elevation, temperature } = climate;
+      const tileBiome = biomeOf(climate);
       let level = heightLevel(elevation);
       let tileWater: Water = Water.None;
       let tileGround = groundFor(tileBiome, level, temperature + frostEdge(x / 7, y / 7) * 0.035);
@@ -180,25 +202,27 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
         tileWater === Water.None &&
         channels.some(({ a, b }) => projectOntoSegment(center, a, b).distance - b.halfWidth <= 1.5);
 
-      const onRoad = roadSegments.some(({ a, b }) => projectOntoSegment(center, a, b).distance <= ROAD_HALF_WIDTH);
-      const nearRoad =
-        onRoad || roadSegments.some(({ a, b }) => projectOntoSegment(center, a, b).distance <= ROAD_HALF_WIDTH + 1.5);
+      const wayDistance = (way: WaySegment) => projectOntoSegment(center, way.a, way.b).distance;
+      const way = waySegments.find((w) => wayDistance(w) <= w.halfWidth);
+      const nearWay = waySegments.some((w) => wayDistance(w) <= w.halfWidth + w.clearance);
+      const inGlade = glades.some((glade) => distance(center, glade) <= glade.radius);
 
       const camp = camps.find((c) => distance(center, { x: c.x + 0.5, y: c.y + 0.5 }) <= CAMP_RADIUS);
       if (camp) {
         const gap = distance(center, { x: camp.x + 0.5, y: camp.y + 0.5 });
         level = settleTowardCamp(level, heightLevel(fields.elevation(camp.x + 0.5, camp.y + 0.5)), gap);
         tileWater = Water.None;
-        if (onRoad) tileGround = Ground.Road;
+        if (way) tileGround = way.ground;
         else if (gap <= CAMP_YARD) tileGround = Ground.Dirt;
         if (x === camp.x && y === camp.y) tileFeature = Feature.Campfire;
         else if (TENT_OFFSETS.some((o) => x === camp.x + o.x && y === camp.y + o.y)) tileFeature = Feature.Tent;
-      } else if (onRoad) {
-        if (tileWater === Water.None) tileGround = Ground.Road;
+      } else if (way) {
+        if (tileWater === Water.None) tileGround = way.ground;
         else tileFeature = Feature.Bridge;
-      } else if (tileWater === Water.None && !nearWater && !nearRoad) {
+      } else if (tileWater === Water.None && !nearWater && !nearWay) {
         const roll = unit(hash(seed, VEGETATION_SALT, x, y));
-        if (roll < treeDensity(tileBiome, groves(x / 40, y / 40))) tileFeature = treeFor(tileBiome, temperature);
+        if (!inGlade && roll < treeDensity(tileBiome, groves(x / 40, y / 40)))
+          tileFeature = treeFor(tileBiome, temperature);
         else tileFeature = decorationFor(tileBiome, unit(hash(seed, DECORATION_SALT, x, y)));
       }
 

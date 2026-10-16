@@ -21,6 +21,7 @@ export const groundColor: Record<Ground, Rgb> = {
   [Ground.Rock]: [130, 120, 115],
   [Ground.Snow]: [235, 240, 245],
   [Ground.Road]: [175, 140, 95],
+  [Ground.Path]: [165, 135, 100],
 };
 
 export const waterColor: Record<Exclude<Water, typeof Water.None>, Rgb> = {

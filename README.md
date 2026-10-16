@@ -43,7 +43,7 @@ These are requirements, not designs. How to meet them is decided in the multipla
 | -------------- | ---------------------------------------------------------------------- |
 | `src/lib`      | Game-agnostic utilities: hashing, seeded noise, math, A\*, LRU memoize |
 | `src/worldgen` | World generation ([docs/worldgen.md](docs/worldgen.md))                |
-| `src/game`     | Rules independent of presentation: movement, input, tile access        |
+| `src/game`     | Game state and rules, independent of presentation                      |
 | `src/view`     | Canvas viewport, HTML HUD and map, palette shared with `tooling`       |
 | `tooling`      | Node scripts for development, e.g. the offline map renderer            |
 | `docs/phases`  | One doc per phase: goal, decisions, playtest log                       |
@@ -64,5 +64,5 @@ These are requirements, not designs. How to meet them is decided in the multipla
 - **TypeScript and Vite**, browser-only at runtime. Node is used only for tooling and tests.
 - **Determinism:** anything a peer must reproduce independently is a pure function of seed and coordinates. The rules are in [docs/worldgen.md](docs/worldgen.md#determinism).
 - **Single source of truth:** docs reference code rather than restating it. Keep this README short; add topical docs under `docs/` and link them here.
-- **Data-authoritative (preference):** game state never depends on rendering; the view only communicates state. Ideally the UI is swappable (GUI, CLI, test harness). Don't let this override phase goals.
+- **Data-authoritative:** game state is plain data advanced by pure functions (`playTurn` in `src/game/session.ts`); it never depends on rendering, and the view only communicates it, so the UI is swappable (GUI, CLI, test harness). This is what deterministic multiplayer needs. Don't let it override phase goals.
 - **Git:** solo project. Use short-lived branches merged into the main branch once green, with conventional commit messages.

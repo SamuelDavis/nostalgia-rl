@@ -1,6 +1,7 @@
 import "./index.css";
 import { createDirectionInput } from "./game/input";
-import { type Blocker, Direction, blockerBetween, stepToward } from "./game/movement";
+import { Direction } from "./game/movement";
+import { playTurn, startSession } from "./game/session";
 import { createTerrain } from "./game/terrain";
 import { createHud } from "./view/hud";
 import { createMap } from "./view/map";
@@ -31,18 +32,15 @@ const ctx = canvas.getContext("2d")!;
 const hud = createHud(document.body, world);
 const map = createMap(document.body, world);
 
-let position = {
+let session = startSession({
   x: Number(params.get("x") ?? world.spawn.x),
   y: Number(params.get("y") ?? world.spawn.y),
-};
-let facing: Direction = Direction.South;
-let blocked: Blocker | undefined;
+});
 let mode: HeightMode = HEIGHT_MODES[0];
-let turn = 0;
 
 const render = () => {
-  drawViewport(ctx, terrain, position, mode);
-  hud.update({ turn, turnMs, position, facing, tile: terrain(position.x, position.y), blocked, mode });
+  drawViewport(ctx, terrain, session.position, mode);
+  hud.update({ session, turnMs, tile: terrain(session.position.x, session.position.y), mode });
 };
 
 const resize = () => {
@@ -53,22 +51,11 @@ const resize = () => {
   render();
 };
 
-const playTurn = () => {
-  turn++;
-  const direction = input.take();
-  if (direction !== undefined) {
-    facing = direction;
-    const target = stepToward(position, direction);
-    blocked = blockerBetween(terrain(position.x, position.y), terrain(target.x, target.y));
-    if (!blocked) position = target;
-  }
-  render();
-};
-
 let nextTurn = performance.now() + turnMs;
 const frame = (now: number) => {
   if (now >= nextTurn) {
-    playTurn();
+    session = playTurn(session, terrain, input.take());
+    render();
     nextTurn = Math.max(nextTurn + turnMs, now);
   }
   requestAnimationFrame(frame);
@@ -77,7 +64,7 @@ const frame = (now: number) => {
 addEventListener("keydown", (event) => {
   const direction = KEY_DIRECTIONS[event.code];
   if (direction !== undefined && !event.repeat) input.press(direction);
-  if (event.code === "KeyM") map.toggle(position, mode);
+  if (event.code === "KeyM") map.toggle(session.position, mode);
   if (event.code === "KeyH") {
     mode = HEIGHT_MODES[(HEIGHT_MODES.indexOf(mode) + 1) % HEIGHT_MODES.length]!;
     render();

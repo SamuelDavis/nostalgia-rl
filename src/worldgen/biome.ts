@@ -1,9 +1,10 @@
 import { Biome } from "./terrain";
+import type { Climate } from "./fields";
 import { SEA_ELEVATION, SEA_LEVEL, heightLevel } from "./constants";
 
 const BEACH_ELEVATION = SEA_ELEVATION + 0.0125;
 
-const MOUNTAIN_LEVEL = heightLevel(0.6875);
+export const MOUNTAIN_LEVEL = heightLevel(0.6875);
 
 export const classifyBiome = (elevation: number, temperature: number, moisture: number): Biome => {
   const height = heightLevel(elevation);
@@ -14,3 +15,6 @@ export const classifyBiome = (elevation: number, temperature: number, moisture: 
   if (moisture > 0.56) return Biome.Forest;
   return Biome.Grassland;
 };
+
+export const biomeOf = ({ elevation, temperature, moisture }: Climate): Biome =>
+  classifyBiome(elevation, temperature, moisture);

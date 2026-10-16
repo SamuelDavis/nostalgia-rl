@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { Feature, MAX_CLIMB, Water } from "../worldgen";
-import { Direction, blockerBetween, stepToward } from "./movement";
+import { Feature, Ground, MAX_CLIMB, Water } from "../worldgen";
+import { Direction, blockerBetween, isSwimming, stepToward } from "./movement";
 
-const land = (height: number) => ({ height, water: Water.None, feature: Feature.None });
+const land = (height: number) => ({ height, ground: Ground.Grass, water: Water.None, feature: Feature.None });
+const path = (height: number) => ({ ...land(height), ground: Ground.Path });
 
 describe("stepToward", () => {
   it("moves one tile in a cardinal direction, y growing southward", () => {
@@ -24,12 +25,33 @@ describe("blockerBetween", () => {
     expect(blockerBetween(land(100), land(99 - MAX_CLIMB))).toBe("cliff");
   });
 
-  it("lets you wade shallow water but not deep water", () => {
-    expect(blockerBetween(land(64), { ...land(63), water: Water.Shallow })).toBeUndefined();
-    expect(blockerBetween(land(64), { ...land(63), water: Water.Deep })).toBe("deep water");
+  it("climbs any step by stairs between two trail tiles", () => {
+    expect(blockerBetween(path(100), path(116))).toBeUndefined();
+    expect(blockerBetween(path(100), { ...land(116), ground: Ground.Road })).toBeUndefined();
+    expect(blockerBetween(land(100), path(116))).toBe("cliff");
   });
 
-  it("lets you cross deep water by bridge", () => {
-    expect(blockerBetween(land(64), { height: 63, water: Water.Deep, feature: Feature.Bridge })).toBeUndefined();
+  it("lets you swim in deep water", () => {
+    expect(blockerBetween(land(64), { ...land(63), water: Water.Deep })).toBeUndefined();
+  });
+
+  it("is blocked by solid features", () => {
+    for (const feature of [Feature.Oak, Feature.Pine, Feature.Cactus, Feature.Boulder, Feature.Tent, Feature.Campfire])
+      expect(blockerBetween(land(100), { ...land(100), feature })).toBe("obstacle");
+  });
+
+  it("walks through low plants and over bridges", () => {
+    for (const feature of [Feature.Bush, Feature.Flowers, Feature.Tuft])
+      expect(blockerBetween(land(100), { ...land(100), feature })).toBeUndefined();
+    const bridge = { height: 63, ground: Ground.Sand, water: Water.Deep, feature: Feature.Bridge };
+    expect(blockerBetween({ ...land(64), ground: Ground.Road }, bridge)).toBeUndefined();
+  });
+});
+
+describe("isSwimming", () => {
+  it("is true in deep water off a bridge", () => {
+    expect(isSwimming({ ...land(63), water: Water.Deep })).toBe(true);
+    expect(isSwimming({ ...land(63), water: Water.Deep, feature: Feature.Bridge })).toBe(false);
+    expect(isSwimming({ ...land(63), water: Water.Shallow })).toBe(false);
   });
 });

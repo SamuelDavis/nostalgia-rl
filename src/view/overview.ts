@@ -1,5 +1,5 @@
 import type { Point } from "../lib";
-import { Biome, MACRO_SIZE, Water, type Worldgen, classifyBiome, heightLevel } from "../worldgen";
+import { Biome, MACRO_SIZE, Water, type Worldgen, biomeOf, heightLevel } from "../worldgen";
 import { type HeightMode, type Rgb, biomeColor, surfaceColor, waterColor } from "./palette";
 
 export interface Mark {
@@ -9,13 +9,15 @@ export interface Mark {
 
 const RIVER_MARK: Rgb = [70, 140, 230];
 const ROAD_MARK: Rgb = [120, 70, 30];
+const TRAIL_MARK: Rgb = [235, 215, 160];
 const CAMP_MARK: Rgb = [0, 0, 0];
 
 export const fieldColor = (world: Worldgen, mode: HeightMode, x: number, y: number): Rgb => {
-  const { elevation, temperature, moisture } = world.fields;
-  const e = elevation(x, y);
-  const biome = classifyBiome(e, temperature(x, y), moisture(x, y));
-  return biome === Biome.Ocean ? waterColor[Water.Deep] : surfaceColor(mode, biomeColor[biome], heightLevel(e));
+  const climate = world.fields.climate(x, y);
+  const biome = biomeOf(climate);
+  return biome === Biome.Ocean
+    ? waterColor[Water.Deep]
+    : surfaceColor(mode, biomeColor[biome], heightLevel(climate.elevation));
 };
 
 export const overviewMarks = (world: Worldgen, center: Point, radius: number): Mark[] => {
@@ -26,6 +28,8 @@ export const overviewMarks = (world: Worldgen, center: Point, radius: number): M
     for (let cx = middle.cx - span; cx <= middle.cx + span; cx++) {
       for (const river of world.riversNear(cx, cy))
         for (const point of river.nodes) marks.push({ point, color: RIVER_MARK });
+      for (const trail of world.trailsNear(cx, cy))
+        for (const point of trail.nodes) marks.push({ point, color: TRAIL_MARK });
       for (const road of world.roadsFrom(cx, cy))
         for (const point of road.nodes) marks.push({ point, color: ROAD_MARK });
       const camp = world.campAt(cx, cy);

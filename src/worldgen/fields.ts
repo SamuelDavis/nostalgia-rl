@@ -1,18 +1,24 @@
-import { type Field2, clamp, createNoise, fbm, hashString, lerp, smoothstep, terrace } from "../lib";
+import { type Field2, clamp, createNoise, fbm, hashString, lerp, smoothstep } from "../lib";
 import { HEIGHT_LEVELS } from "./constants";
+
+export interface Climate {
+  readonly elevation: number;
+  readonly temperature: number;
+  readonly moisture: number;
+}
 
 export interface Fields {
   readonly elevation: Field2;
   readonly drainage: Field2;
   readonly temperature: Field2;
   readonly moisture: Field2;
+  readonly climate: (x: number, y: number) => Climate;
 }
 
 const layer = (seed: number, name: string, octaves: number, frequency: number): Field2 =>
   fbm(createNoise(seed, hashString(name)), { octaves, frequency });
 
 const TERRACE_STEP = 16 / HEIGHT_LEVELS;
-const TERRACE_RISER = 0.3;
 
 const distanceFromOrigin = (x: number, y: number) => Math.sqrt(x * x + y * y);
 
@@ -43,13 +49,25 @@ export const createFields = (seed: number): Fields => {
     const smooth = drainage + hills(x, y) * 0.04;
     const terracing = smoothstep(0.05, 0.3, mountains);
     const phase = ledges(x, y) * TERRACE_STEP;
-    const terraced = terrace(smooth + phase, TERRACE_STEP, TERRACE_RISER) - phase;
+    const terraced = Math.floor((smooth + phase) / TERRACE_STEP) * TERRACE_STEP - phase;
     return clamp(lerp(smooth, terraced, terracing), 0, 0.999);
   };
 
-  const temperature: Field2 = (x, y) => clamp(0.5 + heat(x, y) * 0.8 - Math.max(0, elevation(x, y) - 0.55) * 1.2, 0, 1);
+  const temperatureAt = (x: number, y: number, e: number) =>
+    clamp(0.5 + heat(x, y) * 0.8 - Math.max(0, e - 0.55) * 1.2, 0, 1);
 
   const moisture: Field2 = (x, y) => clamp(0.5 + wetness(x, y) * 0.8, 0, 1);
 
-  return { elevation, drainage, temperature, moisture };
+  const climate = (x: number, y: number): Climate => {
+    const e = elevation(x, y);
+    return { elevation: e, temperature: temperatureAt(x, y, e), moisture: moisture(x, y) };
+  };
+
+  return {
+    elevation,
+    drainage,
+    temperature: (x, y) => temperatureAt(x, y, elevation(x, y)),
+    moisture,
+    climate,
+  };
 };
