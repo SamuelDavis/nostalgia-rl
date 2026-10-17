@@ -34,6 +34,10 @@ canvas {
   margin: 0;
 }
 
+.hud dl[hidden] {
+  display: none;
+}
+
 .hud dt {
   color: #888;
 }

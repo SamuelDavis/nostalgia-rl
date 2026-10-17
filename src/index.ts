@@ -159,6 +159,7 @@ addEventListener("keydown", (event) => {
   const direction = KEY_DIRECTIONS[event.code];
   if (direction !== undefined && !event.repeat) input.press(direction, performance.now());
   if (event.code === "KeyM") map.toggle(session.position, mode);
+  if (event.code === "KeyI") hud.toggle();
   if (event.code === "KeyH") {
     mode = HEIGHT_MODES[(HEIGHT_MODES.indexOf(mode) + 1) % HEIGHT_MODES.length]!;
     dirty = true;

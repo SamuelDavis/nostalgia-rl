@@ -23,8 +23,8 @@ const SETTLED_SPANS: Spread = { up: 14, level: 20, down: 64 };
 const FULL_DROP = metresToLevels(12);
 const PRACTICAL_SPANS: Spread = { up: 10, level: 14, down: 20 };
 const NOSE_SPAN = 6;
-const SPAN_PER_CLEAR_TILE = 4;
-export const SIGHT_REACH = 16;
+const SPAN_PER_CLEAR_TILE = 2.5;
+export const SIGHT_REACH = 24;
 const SIGHT_CONE = 90;
 const SIGHT_RAY_COUNT = 9;
 const SIGHT_STEP = 0.25;
@@ -93,10 +93,14 @@ const clearAlong = (terrain: Terrain, from: Point, direction: Point): number => 
   for (let t = SIGHT_STEP; t <= SIGHT_REACH; t += SIGHT_STEP) {
     const at = { x: Math.floor(from.x + 0.5 + direction.x * t), y: Math.floor(from.y + 0.5 + direction.y * t) };
     if (at.x === last.x && at.y === last.y) continue;
-    const [here, there] = [terrain(last.x, last.y), terrain(at.x, at.y)];
-    const blocker = blockerBetween(here, there);
-    if (blocker === "obstacle" || (blocker === "cliff" && there.height > here.height))
-      return Math.hypot(last.x - from.x, last.y - from.y);
+    const blocks = (to: Point) => {
+      const [here, there] = [terrain(last.x, last.y), terrain(to.x, to.y)];
+      const blocker = blockerBetween(here, there);
+      return blocker === "obstacle" || (blocker === "cliff" && there.height > here.height);
+    };
+    const isCorner = at.x !== last.x && at.y !== last.y;
+    const throughCorner = isCorner && blocks({ x: at.x, y: last.y }) && blocks({ x: last.x, y: at.y });
+    if (blocks(at) || throughCorner) return Math.hypot(last.x - from.x, last.y - from.y);
     last = at;
   }
   return SIGHT_REACH;
@@ -104,7 +108,8 @@ const clearAlong = (terrain: Terrain, from: Point, direction: Point): number => 
 
 export const sightAhead = (terrain: Terrain, from: Point, facing: Direction): number => {
   const ahead = stepToward({ x: 0, y: 0 }, facing);
-  return mean(SIGHT_RAYS.map((angle) => clearAlong(terrain, from, rotate(ahead, angle))));
+  const nearness = mean(SIGHT_RAYS.map((angle) => 1 / (1 + clearAlong(terrain, from, rotate(ahead, angle)))));
+  return 1 / nearness - 1;
 };
 
 interface Spans {

@@ -34,7 +34,7 @@ export const createHud = (parent: HTMLElement, world: Worldgen) => {
   panel.className = "hud";
   const table = document.createElement("dl");
   const help = document.createElement("p");
-  help.textContent = "WASD move · T tap mode · M map · H height mode · +/− or wheel zoom";
+  help.textContent = "WASD move · I info · T tap mode · M map · H height mode · +/− or wheel zoom";
   panel.append(table, help);
   parent.append(panel);
   const values = new Map<string, HTMLElement>();
@@ -88,5 +88,9 @@ export const createHud = (parent: HTMLElement, world: Worldgen) => {
     for (const [label, value] of rows) show(label, value);
   };
 
-  return { update };
+  const toggle = () => {
+    table.hidden = !table.hidden;
+  };
+
+  return { update, toggle };
 };
