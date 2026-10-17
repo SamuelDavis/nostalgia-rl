@@ -1,4 +1,5 @@
-import { Biome, Cover, Prop, Ground, HEIGHT_LEVELS, SEA_LEVEL, Water, Way } from "../worldgen";
+import { clamp } from "../lib";
+import { Biome, Cover, Prop, Ground, HEIGHT_LEVELS, SEA_LEVEL, Water, Way, metresToLevels } from "../worldgen";
 
 export type Rgb = readonly [number, number, number];
 
@@ -7,6 +8,8 @@ const INDEX_INTERVAL = CONTOUR_INTERVAL * 5;
 const RELIEF_EXAGGERATION = 1;
 const LIGHT = { x: -0.25 * Math.SQRT2, y: -0.25 * Math.SQRT2, z: 0.5 * Math.sqrt(3) };
 const DEEPEST_SHADOW = 0.6;
+const RELATIVE_REACH = metresToLevels(4);
+const RELATIVE_STRENGTH = 0.35;
 
 export const biomeColor: Record<Biome, Rgb> = {
   [Biome.Ocean]: [40, 70, 140],
@@ -93,13 +96,25 @@ export const hypsometricColor = (level: number): Rgb => {
   return mix(low, high, (elevation - lowStop) / (highStop - lowStop));
 };
 
-export const shadedByHeight = (color: Rgb, level: number): Rgb =>
-  shade(color, 0.5 + (0.6 * (level - SEA_LEVEL)) / (HEIGHT_LEVELS - SEA_LEVEL));
+export type HeightShade = (level: number) => number;
+
+export const absoluteHeightShade: HeightShade = (level) =>
+  0.5 + (0.6 * (level - SEA_LEVEL)) / (HEIGHT_LEVELS - SEA_LEVEL);
+
+export const relativeHeightShade =
+  (eyeLevel: number): HeightShade =>
+  (level) =>
+    1 + RELATIVE_STRENGTH * clamp((level - eyeLevel) / RELATIVE_REACH, -1, 1);
 
 export const css = ([r, g, b]: Rgb): string => `rgb(${r | 0} ${g | 0} ${b | 0})`;
 
 export const HEIGHT_MODES = ["shade", "tint"] as const;
 export type HeightMode = (typeof HEIGHT_MODES)[number];
 
-export const surfaceColor = (mode: HeightMode, base: Rgb, level: number, light: number): Rgb =>
-  shade(mode === "tint" ? hypsometricColor(level) : shadedByHeight(base, level), light);
+export const surfaceColor = (
+  mode: HeightMode,
+  base: Rgb,
+  level: number,
+  light: number,
+  heightShade: HeightShade = absoluteHeightShade,
+): Rgb => shade(mode === "tint" ? hypsometricColor(level) : shade(base, heightShade(level)), light);

@@ -1,4 +1,5 @@
 import { type Point, hash, hashString, unit } from "../lib";
+import type { View } from "./camera";
 import { isCliff, isStairs, isTrail } from "../game/movement";
 import type { Terrain, Tile } from "../game/terrain";
 import { Cover, Prop, Water, Way } from "../worldgen";
@@ -15,8 +16,10 @@ import {
 import {
   type Contour,
   type HeightMode,
+  type HeightShade,
   type Rgb,
   contourBetween,
+  relativeHeightShade,
   coverColor,
   css,
   hillshade,
@@ -28,7 +31,6 @@ import {
   wayColor,
 } from "./palette";
 
-export const CELL_PX = 18;
 const CLIFF_COLOR = "rgb(20 15 10 / 0.85)";
 const CLIFF_WIDTH = 3;
 const PLAYER_COLOR: Rgb = [255, 255, 255];
@@ -79,6 +81,18 @@ const hasStairs = (terrain: Terrain, x: number, y: number, tile: Tile): boolean 
 
 const isPathShown = (x: number, y: number) => unit(hash(PATH_SALT, x, y)) < PATH_VISIBILITY;
 
+const SNAPSHOT_MARGIN = SLOPE_REACH + 2;
+
+const snapshot = (terrain: Terrain, left: number, top: number, columns: number, rows: number): Terrain => {
+  const tiles = Array.from({ length: columns * rows }, (_, i) =>
+    terrain(left + (i % columns), top + Math.floor(i / columns)),
+  );
+  return (x, y) => {
+    const [i, j] = [x - left, y - top];
+    return i >= 0 && i < columns && j >= 0 && j < rows ? tiles[j * columns + i]! : terrain(x, y);
+  };
+};
+
 const createLighting = (terrain: Terrain, left: number, top: number, columns: number, rows: number) => {
   const originX = left - SLOPE_REACH;
   const originY = top - SLOPE_REACH;
@@ -105,9 +119,9 @@ const createLighting = (terrain: Terrain, left: number, top: number, columns: nu
     );
 };
 
-const lookOf = (tile: Tile, mode: HeightMode, light: number, x: number, y: number): Look => {
+const lookOf = (tile: Tile, mode: HeightMode, light: number, heightShade: HeightShade, x: number, y: number): Look => {
   const surface = tile.way === Way.Road ? wayColor[Way.Road] : groundColor[tile.ground];
-  const surfaceBackground = () => surfaceColor(mode, surface, tile.height, light);
+  const surfaceBackground = () => surfaceColor(mode, surface, tile.height, light, heightShade);
   if (tile.prop !== Prop.None) {
     const background = tile.water === Water.None ? surfaceBackground() : waterColor[tile.water];
     return { background, glyph: propGlyph[tile.prop], color: propColor[tile.prop] };
@@ -131,34 +145,43 @@ const coverLook = (cover: Exclude<Cover, typeof Cover.None>, light: number, x: n
 
 const underCover = (look: Look): Look => ({ ...look, background: shade(look.background, UNDER_COVER_SHADE) });
 
-export const drawViewport = (
+interface TileWindow {
+  readonly left: number;
+  readonly top: number;
+  readonly columns: number;
+  readonly rows: number;
+  readonly cellPx: number;
+}
+
+const drawTiles = (
   ctx: CanvasRenderingContext2D,
-  terrain: Terrain,
-  center: Point,
+  source: Terrain,
+  { left, top, columns, rows, cellPx }: TileWindow,
+  player: Point,
   mode: HeightMode,
 ): void => {
-  const columns = Math.ceil(ctx.canvas.clientWidth / CELL_PX) | 1;
-  const rows = Math.ceil(ctx.canvas.clientHeight / CELL_PX) | 1;
-  const left = center.x - (columns >> 1);
-  const top = center.y - (rows >> 1);
-  const originX = Math.floor((ctx.canvas.clientWidth - columns * CELL_PX) / 2);
-  const originY = Math.floor((ctx.canvas.clientHeight - rows * CELL_PX) / 2);
-  const screen = (x: number, y: number) => ({
-    px: originX + (x - left) * CELL_PX,
-    py: originY + (y - top) * CELL_PX,
-  });
+  const terrain = snapshot(
+    source,
+    left - SNAPSHOT_MARGIN,
+    top - SNAPSHOT_MARGIN,
+    columns + 2 * SNAPSHOT_MARGIN,
+    rows + 2 * SNAPSHOT_MARGIN,
+  );
+  const screen = (x: number, y: number) => ({ px: (x - left) * cellPx, py: (y - top) * cellPx });
 
-  ctx.font = `${CELL_PX - 3}px "DejaVu Sans Mono", Menlo, Consolas, monospace`;
+  ctx.font = `${cellPx - 3}px "DejaVu Sans Mono", Menlo, Consolas, monospace`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  const isInside = terrain(center.x, center.y).cover !== Cover.None;
+  const standing = terrain(player.x, player.y);
+  const isInside = standing.cover !== Cover.None;
+  const heightShade = relativeHeightShade(standing.height);
   const isHidden = (tile: Tile) => !isInside && tile.cover !== Cover.None;
   const lightAt = createLighting(terrain, left, top, columns, rows);
   const lookAt = (tile: Tile, x: number, y: number): Look => {
     if (tile.cover !== Cover.None && !isInside) return coverLook(tile.cover, lightAt(x, y), x, y);
     if (isThreshold(terrain, x, y, tile)) return THRESHOLD;
-    const look = isCliffFace(terrain, x, y, tile) ? CLIFF_FACE : lookOf(tile, mode, lightAt(x, y), x, y);
+    const look = isCliffFace(terrain, x, y, tile) ? CLIFF_FACE : lookOf(tile, mode, lightAt(x, y), heightShade, x, y);
     return tile.cover === Cover.None ? look : underCover(look);
   };
   for (let y = top; y < top + rows; y++)
@@ -167,12 +190,12 @@ export const drawViewport = (
       const tile = terrain(x, y);
       const look = lookAt(tile, x, y);
       ctx.fillStyle = css(look.background);
-      ctx.fillRect(px, py, CELL_PX, CELL_PX);
-      const isPlayer = x === center.x && y === center.y;
+      ctx.fillRect(px, py, cellPx, cellPx);
+      const isPlayer = x === player.x && y === player.y;
       const stairs = !isHidden(tile) && hasStairs(terrain, x, y, tile);
       const glyph = isPlayer ? PLAYER_GLYPH : stairs ? STAIRS_GLYPH : look.glyph;
       ctx.fillStyle = css(isPlayer ? PLAYER_COLOR : look.color);
-      ctx.fillText(glyph, px + CELL_PX / 2, py + CELL_PX / 2 + 1);
+      ctx.fillText(glyph, px + cellPx / 2, py + cellPx / 2 + 1);
     }
 
   const contourAt = (tile: Tile, next: Tile): Contour =>
@@ -188,11 +211,11 @@ export const drawViewport = (
         const tile = terrain(x, y);
         const { px, py } = screen(x + 1, y + 1);
         if (contourAt(tile, terrain(x + 1, y)) === contour) {
-          ctx.moveTo(px, py - CELL_PX);
+          ctx.moveTo(px, py - cellPx);
           ctx.lineTo(px, py);
         }
         if (contourAt(tile, terrain(x, y + 1)) === contour) {
-          ctx.moveTo(px - CELL_PX, py);
+          ctx.moveTo(px - cellPx, py);
           ctx.lineTo(px, py);
         }
       }
@@ -213,13 +236,43 @@ export const drawViewport = (
         return isCliff(tile, next) && !(face && isCliffFace(terrain, nx, ny, next));
       };
       if (edgeShown(x + 1, y)) {
-        ctx.moveTo(px, py - CELL_PX);
+        ctx.moveTo(px, py - cellPx);
         ctx.lineTo(px, py);
       }
       if (edgeShown(x, y + 1)) {
-        ctx.moveTo(px - CELL_PX, py);
+        ctx.moveTo(px - cellPx, py);
         ctx.lineTo(px, py);
       }
     }
   ctx.stroke();
+};
+
+const LAYER_SNAP = 8;
+const snapToLayer = (edge: number) => Math.floor(edge / LAYER_SNAP) * LAYER_SNAP;
+
+export const createViewport = (ctx: CanvasRenderingContext2D) => {
+  const layer = document.createElement("canvas").getContext("2d")!;
+  let drawn = "";
+  return (terrain: Terrain, { centre, cellPx }: View, player: Point, mode: HeightMode): void => {
+    const { clientWidth: width, clientHeight: height } = ctx.canvas;
+    const area: TileWindow = {
+      left: snapToLayer(centre.x - width / 2 / cellPx),
+      top: snapToLayer(centre.y - height / 2 / cellPx),
+      columns: Math.ceil(width / cellPx) + 1 + LAYER_SNAP,
+      rows: Math.ceil(height / cellPx) + 1 + LAYER_SNAP,
+      cellPx,
+    };
+    const [layerWidth, layerHeight] = [area.columns * cellPx, area.rows * cellPx];
+    const key = [...Object.values(area), devicePixelRatio, player.x, player.y, mode].join();
+    if (key !== drawn) {
+      layer.canvas.width = Math.round(layerWidth * devicePixelRatio);
+      layer.canvas.height = Math.round(layerHeight * devicePixelRatio);
+      layer.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+      drawTiles(layer, terrain, area, player, mode);
+      drawn = key;
+    }
+    const originX = Math.round(width / 2 - (centre.x - area.left) * cellPx);
+    const originY = Math.round(height / 2 - (centre.y - area.top) * cellPx);
+    ctx.drawImage(layer.canvas, originX, originY, layerWidth, layerHeight);
+  };
 };

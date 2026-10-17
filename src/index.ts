@@ -3,14 +3,16 @@ import { createDirectionInput } from "./game/input";
 import { Direction } from "./game/movement";
 import { playTurn, startSession } from "./game/session";
 import { createTerrain } from "./game/terrain";
+import { createCamera, modifierWithin, naturalSpan, prominence, spanOf } from "./view/camera";
 import { createHud } from "./view/hud";
 import { createMap } from "./view/map";
 import { HEIGHT_MODES, type HeightMode } from "./view/palette";
-import { drawViewport } from "./view/viewport";
+import { createViewport } from "./view/viewport";
 import { createWorldgen } from "./worldgen";
 
 const DEFAULT_TURN_MS = 100;
 const URL_SYNC_DELAY_MS = 300;
+const ZOOM_STEP = 4;
 
 const KEY_DIRECTIONS: Record<string, Direction> = {
   KeyW: Direction.North,
@@ -38,6 +40,11 @@ let session = startSession({
   y: Number(params.get("y") ?? world.spawn.y),
 });
 let mode: HeightMode = HEIGHT_MODES[0];
+let zoomModifier = 0;
+const naturalSpanAt = (p: typeof session.position) => naturalSpan(prominence((x, y) => terrain(x, y).height, p));
+let natural = naturalSpanAt(session.position);
+const camera = createCamera();
+const drawViewport = createViewport(ctx);
 
 let urlSync: ReturnType<typeof setTimeout> | undefined;
 const syncUrl = () => {
@@ -50,9 +57,33 @@ const syncUrl = () => {
   }, URL_SYNC_DELAY_MS);
 };
 
-const render = () => {
-  drawViewport(ctx, terrain, session.position, mode);
-  hud.update({ session, turnMs, tile: terrain(session.position.x, session.position.y), mode });
+let dirty = true;
+let drawn = "";
+let lastFrame = performance.now();
+const render = (now: number) => {
+  const view = camera(
+    { position: session.position, facing: session.facing, span: spanOf(natural, zoomModifier) },
+    { width: canvas.clientWidth, height: canvas.clientHeight },
+    now - lastFrame,
+  );
+  lastFrame = now;
+  const placement = [view.centre.x, view.centre.y].map((v) => Math.round(v * view.cellPx)).join() + `,${view.cellPx}`;
+  if (!dirty && placement === drawn) return;
+  drawViewport(terrain, view, session.position, mode);
+  hud.update({
+    session,
+    turnMs,
+    tile: terrain(session.position.x, session.position.y),
+    mode,
+    zoom: { natural, modifier: zoomModifier },
+  });
+  drawn = placement;
+  dirty = false;
+};
+
+const zoomBy = (delta: number) => {
+  zoomModifier = modifierWithin(natural, zoomModifier + delta);
+  dirty = true;
 };
 
 const resize = () => {
@@ -60,7 +91,7 @@ const resize = () => {
   canvas.width = Math.round(canvas.clientWidth * ratio);
   canvas.height = Math.round(canvas.clientHeight * ratio);
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-  render();
+  dirty = true;
 };
 
 let nextTurn = performance.now() + turnMs;
@@ -68,10 +99,14 @@ const frame = (now: number) => {
   if (now >= nextTurn) {
     const previous = session.position;
     session = playTurn(session, terrain, input.take());
-    if (session.position !== previous) syncUrl();
-    render();
+    if (session.position !== previous) {
+      natural = naturalSpanAt(session.position);
+      syncUrl();
+    }
+    dirty = true;
     nextTurn = Math.max(nextTurn + turnMs, now);
   }
+  render(now);
   requestAnimationFrame(frame);
 };
 
@@ -81,8 +116,10 @@ addEventListener("keydown", (event) => {
   if (event.code === "KeyM") map.toggle(session.position, mode);
   if (event.code === "KeyH") {
     mode = HEIGHT_MODES[(HEIGHT_MODES.indexOf(mode) + 1) % HEIGHT_MODES.length]!;
-    render();
+    dirty = true;
   }
+  if (event.code === "Equal" || event.code === "NumpadAdd") zoomBy(-ZOOM_STEP);
+  if (event.code === "Minus" || event.code === "NumpadSubtract") zoomBy(ZOOM_STEP);
 });
 addEventListener("keyup", (event) => {
   const direction = KEY_DIRECTIONS[event.code];
@@ -90,6 +127,7 @@ addEventListener("keyup", (event) => {
 });
 addEventListener("blur", () => Object.values(Direction).forEach(input.release));
 addEventListener("resize", resize);
+addEventListener("wheel", (event) => zoomBy(Math.sign(event.deltaY) * ZOOM_STEP));
 
 resize();
 requestAnimationFrame(frame);

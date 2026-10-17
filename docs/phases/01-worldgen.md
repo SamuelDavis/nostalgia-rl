@@ -10,6 +10,7 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 
 - **Exploration:** `@` moves one tile per turn with WASD. Turns default to 100 ms in this phase so exploring is quick; the real turn length is decided with movement smoothing (see [ideas](../ideas.md#smoothed-grid-movement)). A tap between turns is buffered and acts once (latest tap wins); a held key repeats every turn. No diagonals.
 - **Presentation:** glyphs on a canvas; HTML HUD on top showing position and worldgen debug data for the player's tile; M toggles an HTML map of the field-sampled overview (`src/view/overview.ts`).
+- **Camera:** close and overhead, leading a quarter of the view in the facing direction (last move) and easing after the player. Zoom follows prominence, the player's height above the mean of the ground 12 and 24 tiles around: hollows, plains and slopes stay close (24 tiles across the short side), summits open out (up to 64). The user's zoom modifier (+/−, wheel) adds tiles on top of that natural span. The tile layer redraws only when the player moves or the view leaves an 8-tile margin; easing frames just pan it.
 - **Deep forest:** the first bespoke feature; dense enough (85% trees at the core) that its own paths are the way through. A canopy hides its interior from outside; standing under it reveals the floor, darkened. See [worldgen](../worldgen.md).
 - **Scale:** 1 m tiles, 0.5 m levels, compressed relief; see [ADR 0002](../adr/0002-scale.md).
 - **Height resolution:** 256 levels (was 16). At 16, the steepest natural tile rose under half a level, so cliffs could not exist and height bands were ~60 tiles wide.
@@ -23,6 +24,7 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 - **Ways are a layer:** roads and paths are stored in `way`, not as ground, so the natural ground underneath is kept. Roads render solid; paths render on a stable 60% of their tiles (hashed by position) so they read as broken footpaths, purely in presentation.
 - **Map:** 256 px at 4 tiles/px (1024 tiles across); ~0.4 s to draw in headless Chromium.
 - **Height display:** two modes, toggled with H, to compare in playtest. `shade`: ground colour, lightness by height. `tint`: hypsometric colour ramp, ground shown by glyph colour. Both are hillshaded (lit from the northwest, slope averaged over a 7×7 window so single-level steps don't speckle) and drawn with contour lines every `CONTOUR_INTERVAL` (4) levels, darker every 5th (index contours). Replaced alternating shade bands, which showed neither direction nor size of change: a camp 2–3 levels below a gentle shoulder read as sitting in a ditch.
+- **Relative height:** in `shade` mode the viewport lightens ground above the player and darkens ground below, saturating 4 m away, instead of shading by absolute height, which barely varies across a close view. The map keeps absolute shading.
 - **HUD:** rows update in place, so text stays selectable; the URL tracks the player's position (debounced) for sharing locations.
 
 ## Playtest log

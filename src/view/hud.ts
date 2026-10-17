@@ -10,6 +10,7 @@ export interface HudState {
   readonly turnMs: number;
   readonly tile: Tile;
   readonly mode: HeightMode;
+  readonly zoom: { readonly natural: number; readonly modifier: number };
 }
 
 const nameOf = (values: Record<string, number>, value: number): string =>
@@ -22,7 +23,7 @@ export const createHud = (parent: HTMLElement, world: Worldgen) => {
   panel.className = "hud";
   const table = document.createElement("dl");
   const help = document.createElement("p");
-  help.textContent = "WASD move · M map · H height mode";
+  help.textContent = "WASD move · M map · H height mode · +/− or wheel zoom";
   panel.append(table, help);
   parent.append(panel);
   const values = new Map<string, HTMLElement>();
@@ -39,7 +40,7 @@ export const createHud = (parent: HTMLElement, world: Worldgen) => {
     if (dd.textContent !== value) dd.textContent = value;
   };
 
-  const update = ({ session, turnMs, tile, mode }: HudState) => {
+  const update = ({ session, turnMs, tile, mode, zoom }: HudState) => {
     const { turn, facing, blocked } = session;
     const { x, y } = session.position;
     const { elevation, temperature, moisture, drainage, landform } = world.fields;
@@ -67,6 +68,7 @@ export const createHud = (parent: HTMLElement, world: Worldgen) => {
       ["erosion", fixed(form.erosion)],
       ["peaks & valleys", fixed(form.peaksAndValleys)],
       ["height mode", mode],
+      ["view", `${zoom.natural} ${zoom.modifier < 0 ? "−" : "+"} ${Math.abs(zoom.modifier)} tiles`],
     ];
     for (const [label, value] of rows) show(label, value);
   };
