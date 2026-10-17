@@ -25,7 +25,7 @@ import { createViewport } from "./view/viewport";
 import { createWorldgen } from "./worldgen";
 
 const DEFAULT_TURN_MS = 100;
-const DEFAULT_REPEAT_DELAY_MS = 250;
+const DEFAULT_REPEAT_DELAY_MS = 50;
 const URL_SYNC_DELAY_MS = 300;
 const ZOOM_STEP = 4;
 const EYE_EASING_MS = 300;

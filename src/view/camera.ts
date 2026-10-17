@@ -79,7 +79,10 @@ export const clearanceAhead = (terrain: Terrain, from: Point, facing: Direction)
   let at = from;
   for (let clear = 0; clear < OBSTRUCTION_REACH; clear++) {
     const next = stepToward(at, facing);
-    if (blockerBetween(terrain(at.x, at.y), terrain(next.x, next.y))) return clear;
+    const [here, there] = [terrain(at.x, at.y), terrain(next.x, next.y)];
+    const blocker = blockerBetween(here, there);
+    if (blocker === "cliff" && there.height < here.height) return OBSTRUCTION_REACH;
+    if (blocker) return clear;
     at = next;
   }
   return OBSTRUCTION_REACH;

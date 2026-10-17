@@ -117,17 +117,18 @@ describe("clearanceAhead", () => {
     expect(clearanceAhead(treeAt(3), ORIGIN, Direction.East)).toBe(2);
   });
 
-  it("treats a cliff as an obstacle", () => {
-    expect(
-      clearanceAhead(
-        field(
-          () => Prop.None,
-          (x) => (x >= 2 ? 120 : 100),
-        ),
-        ORIGIN,
-        Direction.East,
-      ),
-    ).toBe(1);
+  const stepAt2 = (height: number) =>
+    field(
+      () => Prop.None,
+      (x) => (x >= 2 ? height : 100),
+    );
+
+  it("treats a cliff rising ahead as an obstacle", () => {
+    expect(clearanceAhead(stepAt2(120), ORIGIN, Direction.East)).toBe(1);
+  });
+
+  it("sees over a cliff dropping away ahead", () => {
+    expect(clearanceAhead(stepAt2(80), ORIGIN, Direction.East)).toBeGreaterThan(2);
   });
 
   it("only looks the way you face", () => {
