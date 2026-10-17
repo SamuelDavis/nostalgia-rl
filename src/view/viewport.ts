@@ -278,8 +278,11 @@ const drawTiles = (
   return reliefLevels;
 };
 
-const LAYER_MARGIN = 8;
+const LAYER_MARGIN_SHARE = 0.25;
+const MIN_LAYER_MARGIN = 2;
 const LAYER_RESOLUTIONS = [8, 11, 16, 23, 32, 45, 64, 91, 128];
+const MAX_UPSCALE = 1.5;
+const resolutionFor = (tilePx: number) => LAYER_RESOLUTIONS.find((px) => px >= tilePx) ?? tilePx;
 
 interface Drawn {
   readonly area: TileWindow;
@@ -318,17 +321,26 @@ export const createViewport = (ctx: CanvasRenderingContext2D) => {
     const visibleLeft = centre.x - width / 2 / tilePx;
     const visibleTop = centre.y - height / 2 / tilePx;
     const eye = terrain(player.position.x, player.position.y);
-    const cellPx = LAYER_RESOLUTIONS.find((px) => px >= restingTilePx) ?? restingTilePx;
-    const key = [cellPx, devicePixelRatio, eye.cover, mode].join();
+    const key = [devicePixelRatio, eye.cover, mode].join();
+    const isSharp = (cellPx: number) =>
+      (tilePx > restingTilePx || tilePx <= cellPx * MAX_UPSCALE) &&
+      (tilePx !== restingTilePx || cellPx === resolutionFor(restingTilePx));
     const isCurrent =
-      drawn?.key === key && covers(drawn.area, visibleLeft, visibleTop, width / tilePx, height / tilePx);
+      drawn?.key === key &&
+      isSharp(drawn.area.cellPx) &&
+      covers(drawn.area, visibleLeft, visibleTop, width / tilePx, height / tilePx);
     if (!isCurrent) {
       const widestTilePx = Math.min(tilePx, restingTilePx);
+      const cellPx = resolutionFor(widestTilePx);
+      const margin = Math.max(
+        MIN_LAYER_MARGIN,
+        Math.ceil((LAYER_MARGIN_SHARE * Math.min(width, height)) / widestTilePx),
+      );
       const area: TileWindow = {
-        left: Math.floor(visibleLeft) - LAYER_MARGIN,
-        top: Math.floor(visibleTop) - LAYER_MARGIN,
-        columns: Math.ceil(width / widestTilePx) + 1 + 2 * LAYER_MARGIN,
-        rows: Math.ceil(height / widestTilePx) + 1 + 2 * LAYER_MARGIN,
+        left: Math.floor(visibleLeft) - margin,
+        top: Math.floor(visibleTop) - margin,
+        columns: Math.ceil(width / widestTilePx) + 1 + 2 * margin,
+        rows: Math.ceil(height / widestTilePx) + 1 + 2 * margin,
         cellPx,
       };
       layer.canvas.width = Math.round(area.columns * cellPx * devicePixelRatio);
