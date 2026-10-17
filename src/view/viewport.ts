@@ -4,9 +4,12 @@ import type { Terrain, Tile } from "../game/terrain";
 import { Prop, Water, Way } from "../worldgen";
 import { PLAYER_GLYPH, STAIRS_GLYPH, propGlyph, groundGlyph, waterGlyph, wayGlyph } from "./glyphs";
 import {
+  type Contour,
   type HeightMode,
   type Rgb,
+  contourBetween,
   css,
+  hillshade,
   propColor,
   groundColor,
   shade,
@@ -22,6 +25,11 @@ const PLAYER_COLOR: Rgb = [255, 255, 255];
 const GROUND_GLYPH_SHADE = 0.8;
 const PATH_VISIBILITY = 0.6;
 const PATH_SALT = hashString("path glyphs");
+const SLOPE_REACH = 3;
+const CONTOUR_STYLE: Record<Exclude<Contour, "none">, { readonly color: string; readonly width: number }> = {
+  minor: { color: "rgb(20 15 10 / 0.18)", width: 1 },
+  index: { color: "rgb(20 15 10 / 0.5)", width: 1.5 },
+};
 
 interface Look {
   readonly background: Rgb;
@@ -47,17 +55,44 @@ const hasStairs = (terrain: Terrain, x: number, y: number, tile: Tile): boolean 
 
 const isPathShown = (x: number, y: number) => unit(hash(PATH_SALT, x, y)) < PATH_VISIBILITY;
 
-const lookOf = (tile: Tile, mode: HeightMode, x: number, y: number): Look => {
+const createLighting = (terrain: Terrain, left: number, top: number, columns: number, rows: number) => {
+  const originX = left - SLOPE_REACH;
+  const originY = top - SLOPE_REACH;
+  const width = columns + 2 * SLOPE_REACH + 1;
+  const stride = width + 1;
+  const sums = new Float64Array(stride * (rows + 2 * SLOPE_REACH + 2));
+  for (let j = 0; j < rows + 2 * SLOPE_REACH + 1; j++)
+    for (let i = 0; i < width; i++)
+      sums[(j + 1) * stride + i + 1] =
+        terrain(originX + i, originY + j).height +
+        sums[j * stride + i + 1]! +
+        sums[(j + 1) * stride + i]! -
+        sums[j * stride + i]!;
+  const meanHeight = (x0: number, y0: number, x1: number, y1: number) => {
+    const [i0, j0, i1, j1] = [x0 - originX, y0 - originY, x1 - originX + 1, y1 - originY + 1];
+    const total = sums[j1 * stride + i1]! - sums[j0 * stride + i1]! - sums[j1 * stride + i0]! + sums[j0 * stride + i0]!;
+    return total / ((i1 - i0) * (j1 - j0));
+  };
+  const r = SLOPE_REACH;
+  return (x: number, y: number): number =>
+    hillshade(
+      (meanHeight(x + 1, y - r, x + r, y + r) - meanHeight(x - r, y - r, x - 1, y + r)) / (r + 1),
+      (meanHeight(x - r, y + 1, x + r, y + r) - meanHeight(x - r, y - r, x + r, y - 1)) / (r + 1),
+    );
+};
+
+const lookOf = (tile: Tile, mode: HeightMode, light: number, x: number, y: number): Look => {
   const surface = tile.way === Way.Road ? wayColor[Way.Road] : groundColor[tile.ground];
+  const surfaceBackground = () => surfaceColor(mode, surface, tile.height, light);
   if (tile.prop !== Prop.None) {
-    const background = tile.water === Water.None ? surfaceColor(mode, surface, tile.height) : waterColor[tile.water];
+    const background = tile.water === Water.None ? surfaceBackground() : waterColor[tile.water];
     return { background, glyph: propGlyph[tile.prop], color: propColor[tile.prop] };
   }
   if (tile.water !== Water.None) {
     const background = waterColor[tile.water];
     return { background, glyph: waterGlyph[tile.water], color: shade(background, 1.4) };
   }
-  const background = surfaceColor(mode, surface, tile.height);
+  const background = surfaceBackground();
   if (tile.way === Way.Road || (tile.way === Way.Path && isPathShown(x, y)))
     return { background, glyph: wayGlyph[tile.way], color: wayColor[tile.way] };
   const color = mode === "tint" ? groundColor[tile.ground] : shade(background, GROUND_GLYPH_SHADE);
@@ -85,11 +120,12 @@ export const drawViewport = (
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
+  const lightAt = createLighting(terrain, left, top, columns, rows);
   for (let y = top; y < top + rows; y++)
     for (let x = left; x < left + columns; x++) {
       const { px, py } = screen(x, y);
       const tile = terrain(x, y);
-      const look = isCliffFace(terrain, x, y, tile) ? CLIFF_FACE : lookOf(tile, mode, x, y);
+      const look = isCliffFace(terrain, x, y, tile) ? CLIFF_FACE : lookOf(tile, mode, lightAt(x, y), x, y);
       ctx.fillStyle = css(look.background);
       ctx.fillRect(px, py, CELL_PX, CELL_PX);
       const isPlayer = x === center.x && y === center.y;
@@ -97,6 +133,30 @@ export const drawViewport = (
       ctx.fillStyle = css(isPlayer ? PLAYER_COLOR : look.color);
       ctx.fillText(glyph, px + CELL_PX / 2, py + CELL_PX / 2 + 1);
     }
+
+  const contourAt = (tile: Tile, next: Tile): Contour =>
+    tile.water !== Water.None || next.water !== Water.None || isCliff(tile, next)
+      ? "none"
+      : contourBetween(tile.height, next.height);
+  for (const [contour, style] of Object.entries(CONTOUR_STYLE)) {
+    ctx.strokeStyle = style.color;
+    ctx.lineWidth = style.width;
+    ctx.beginPath();
+    for (let y = top - 1; y < top + rows; y++)
+      for (let x = left - 1; x < left + columns; x++) {
+        const tile = terrain(x, y);
+        const { px, py } = screen(x + 1, y + 1);
+        if (contourAt(tile, terrain(x + 1, y)) === contour) {
+          ctx.moveTo(px, py - CELL_PX);
+          ctx.lineTo(px, py);
+        }
+        if (contourAt(tile, terrain(x, y + 1)) === contour) {
+          ctx.moveTo(px - CELL_PX, py);
+          ctx.lineTo(px, py);
+        }
+      }
+    ctx.stroke();
+  }
 
   ctx.strokeStyle = CLIFF_COLOR;
   ctx.lineWidth = CLIFF_WIDTH;

@@ -10,6 +10,7 @@ import { drawViewport } from "./view/viewport";
 import { createWorldgen } from "./worldgen";
 
 const DEFAULT_TURN_MS = 100;
+const URL_SYNC_DELAY_MS = 300;
 
 const KEY_DIRECTIONS: Record<string, Direction> = {
   KeyW: Direction.North,
@@ -38,6 +39,17 @@ let session = startSession({
 });
 let mode: HeightMode = HEIGHT_MODES[0];
 
+let urlSync: ReturnType<typeof setTimeout> | undefined;
+const syncUrl = () => {
+  clearTimeout(urlSync);
+  urlSync = setTimeout(() => {
+    params.set("seed", String(seed));
+    params.set("x", String(session.position.x));
+    params.set("y", String(session.position.y));
+    history.replaceState(null, "", `?${params}`);
+  }, URL_SYNC_DELAY_MS);
+};
+
 const render = () => {
   drawViewport(ctx, terrain, session.position, mode);
   hud.update({ session, turnMs, tile: terrain(session.position.x, session.position.y), mode });
@@ -54,7 +66,9 @@ const resize = () => {
 let nextTurn = performance.now() + turnMs;
 const frame = (now: number) => {
   if (now >= nextTurn) {
+    const previous = session.position;
     session = playTurn(session, terrain, input.take());
+    if (session.position !== previous) syncUrl();
     render();
     nextTurn = Math.max(nextTurn + turnMs, now);
   }

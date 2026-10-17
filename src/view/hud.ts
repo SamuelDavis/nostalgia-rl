@@ -25,6 +25,19 @@ export const createHud = (parent: HTMLElement, world: Worldgen) => {
   help.textContent = "WASD move · M map · H height mode";
   panel.append(table, help);
   parent.append(panel);
+  const values = new Map<string, HTMLElement>();
+
+  const show = (label: string, value: string) => {
+    let dd = values.get(label);
+    if (!dd) {
+      const dt = document.createElement("dt");
+      dt.textContent = label;
+      dd = document.createElement("dd");
+      values.set(label, dd);
+      table.append(dt, dd);
+    }
+    if (dd.textContent !== value) dd.textContent = value;
+  };
 
   const update = ({ session, turnMs, tile, mode }: HudState) => {
     const { turn, facing, blocked } = session;
@@ -54,15 +67,7 @@ export const createHud = (parent: HTMLElement, world: Worldgen) => {
       ["peaks & valleys", fixed(form.peaksAndValleys)],
       ["height mode", mode],
     ];
-    table.replaceChildren(
-      ...rows.flatMap(([label, value]) => {
-        const dt = document.createElement("dt");
-        const dd = document.createElement("dd");
-        dt.textContent = label;
-        dd.textContent = value;
-        return [dt, dd];
-      }),
-    );
+    for (const [label, value] of rows) show(label, value);
   };
 
   return { update };

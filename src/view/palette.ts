@@ -3,7 +3,10 @@ import { Biome, Prop, Ground, HEIGHT_LEVELS, SEA_LEVEL, Water, Way } from "../wo
 export type Rgb = readonly [number, number, number];
 
 export const CONTOUR_INTERVAL = 4;
-const CONTOUR_SHADE = 0.88;
+const INDEX_INTERVAL = CONTOUR_INTERVAL * 5;
+const RELIEF_EXAGGERATION = 1;
+const LIGHT = { x: -0.25 * Math.SQRT2, y: -0.25 * Math.SQRT2, z: 0.5 * Math.sqrt(3) };
+const DEEPEST_SHADOW = 0.6;
 
 export const biomeColor: Record<Biome, Rgb> = {
   [Biome.Ocean]: [40, 70, 140],
@@ -63,25 +66,36 @@ const mix = (a: Rgb, b: Rgb, t: number): Rgb => [
   a[2] + (b[2] - a[2]) * t,
 ];
 
-const contour = (color: Rgb, level: number): Rgb =>
-  Math.floor(level / CONTOUR_INTERVAL) % 2 === 0 ? color : shade(color, CONTOUR_SHADE);
+export type Contour = "none" | "minor" | "index";
+
+const crosses = (a: number, b: number, interval: number) => Math.floor(a / interval) !== Math.floor(b / interval);
+
+export const contourBetween = (a: number, b: number): Contour =>
+  crosses(a, b, INDEX_INTERVAL) ? "index" : crosses(a, b, CONTOUR_INTERVAL) ? "minor" : "none";
+
+export const hillshade = (eastwardRise: number, southwardRise: number): number => {
+  const nx = -eastwardRise * RELIEF_EXAGGERATION;
+  const ny = -southwardRise * RELIEF_EXAGGERATION;
+  const lit = (nx * LIGHT.x + ny * LIGHT.y + LIGHT.z) / Math.sqrt(nx * nx + ny * ny + 1);
+  return Math.max(DEEPEST_SHADOW, lit / LIGHT.z);
+};
 
 export const hypsometricColor = (level: number): Rgb => {
   const elevation = level / HEIGHT_LEVELS;
   const upper = HYPSOMETRIC_STOPS.findIndex(([stop]) => stop >= elevation);
-  if (upper <= 0) return contour(HYPSOMETRIC_STOPS[0]![1], level);
+  if (upper <= 0) return HYPSOMETRIC_STOPS[0]![1];
   const [lowStop, low] = HYPSOMETRIC_STOPS[upper - 1]!;
   const [highStop, high] = HYPSOMETRIC_STOPS[upper]!;
-  return contour(mix(low, high, (elevation - lowStop) / (highStop - lowStop)), level);
+  return mix(low, high, (elevation - lowStop) / (highStop - lowStop));
 };
 
 export const shadedByHeight = (color: Rgb, level: number): Rgb =>
-  contour(shade(color, 0.5 + (0.6 * (level - SEA_LEVEL)) / (HEIGHT_LEVELS - SEA_LEVEL)), level);
+  shade(color, 0.5 + (0.6 * (level - SEA_LEVEL)) / (HEIGHT_LEVELS - SEA_LEVEL));
 
 export const css = ([r, g, b]: Rgb): string => `rgb(${r | 0} ${g | 0} ${b | 0})`;
 
 export const HEIGHT_MODES = ["shade", "tint"] as const;
 export type HeightMode = (typeof HEIGHT_MODES)[number];
 
-export const surfaceColor = (mode: HeightMode, base: Rgb, level: number): Rgb =>
-  mode === "tint" ? hypsometricColor(level) : shadedByHeight(base, level);
+export const surfaceColor = (mode: HeightMode, base: Rgb, level: number, light: number): Rgb =>
+  shade(mode === "tint" ? hypsometricColor(level) : shadedByHeight(base, level), light);

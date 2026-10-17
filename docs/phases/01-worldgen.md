@@ -20,11 +20,22 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 - **Trails:** one route network instead of per-kind walkers, following the [research](../research/worldgen-techniques.md): a relative neighbourhood graph picks links, and weighted A\* routes them over a cost field, discounting tiles already walked so trails merge. Each glade or peak gets 1–5 trails (weights 5:4:3:2:1, as the user suggested). Replaced random-walk forest trails, which crossed into tangles, and random road links. Earlier measurement on seed 1 (before the network): cliffs in multi-tile bands 0.1%, summit reachable, 90% of mountain tiles reachable.
 - **Ways are a layer:** roads and paths are stored in `way`, not as ground, so the natural ground underneath is kept. Roads render solid; paths render on a stable 60% of their tiles (hashed by position) so they read as broken footpaths, purely in presentation.
 - **Map:** 256 px at 4 tiles/px (1024 tiles across); ~0.4 s to draw in headless Chromium.
-- **Height display:** two modes, toggled with H, to compare in playtest. `shade`: ground colour, lightness by height. `tint`: hypsometric colour ramp, ground shown by glyph colour. Both alternate shade every `CONTOUR_INTERVAL` (4) levels.
+- **Height display:** two modes, toggled with H, to compare in playtest. `shade`: ground colour, lightness by height. `tint`: hypsometric colour ramp, ground shown by glyph colour. Both are hillshaded (lit from the northwest, slope averaged over a 7×7 window so single-level steps don't speckle) and drawn with contour lines every `CONTOUR_INTERVAL` (4) levels, darker every 5th (index contours). Replaced alternating shade bands, which showed neither direction nor size of change: a camp 2–3 levels below a gentle shoulder read as sitting in a ditch.
+- **HUD:** rows update in place, so text stays selectable; the URL tracks the player's position (debounced) for sharing locations.
 
 ## Playtest log
 
 _Record user feedback verbatim, newest first, with the commit it refers to._
+
+### 4d51948: feature system, camps
+
+> Looking at `?seed=1&x=20304&y=118`, that camp is lower than the surrounding terrain. But I suppose this is me misinterpreting just how much the height difference is? I guess I don't have a very good understanding of what the relative shading bands mean; is it a big elevation difference or small? That's a problem worth sorting out.
+
+> I do want to sort out scale and it should probably be sorted out sooner rather than later. I'm tempted to say each tile is 1 meter square (a reasonable approximation of the space a person takes up) Or, as you suggeset now: 0.5 meters; I'm not sure what factors go into choosing the scale? I'm happy to go more fine-grained unless that's going to cause problems later.
+> I also want to mention: the hud appears to be redrawing entirely every tick so I can't highlight and copy things. I'd like it if the UI were stable and could be interacted with like a normal web page.
+> Also, it would be extremely useful if there were either a "copy" button on the position or if the url itself would update the x/y coordinates as I move around.
+
+The camp is 3 levels below the shoulder over ~15 tiles. Fixed presentation with hillshading and index contours; HUD and URL fixed. Scale pending.
 
 ### 25f0920: spline terrain
 

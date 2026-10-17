@@ -1,11 +1,22 @@
 import { parseArgs } from "node:util";
 import { floorDiv } from "../src/lib";
-import { CHUNK_SIZE, Prop, Ground, Water, Way, createWorldgen, generateChunk, tileIndex } from "../src/worldgen";
+import {
+  CHUNK_SIZE,
+  Prop,
+  Ground,
+  Water,
+  Way,
+  createWorldgen,
+  generateChunk,
+  heightLevel,
+  tileIndex,
+} from "../src/worldgen";
 import { fieldColor, overviewMarks } from "../src/view/overview";
 import {
   HEIGHT_MODES,
   type HeightMode,
   type Rgb,
+  hillshade,
   propColor,
   groundColor,
   surfaceColor,
@@ -40,6 +51,11 @@ const worldAt = (px: number, py: number) => ({
   y: centerY + (py - size / 2) * scale,
 });
 
+const heightAt = (x: number, y: number) => {
+  const chunk = generateChunk(world, floorDiv(x, CHUNK_SIZE), floorDiv(y, CHUNK_SIZE));
+  return chunk.height[tileIndex(x - chunk.cx * CHUNK_SIZE, y - chunk.cy * CHUNK_SIZE)]!;
+};
+
 const tileColor = (x: number, y: number): Rgb => {
   const chunk = generateChunk(world, floorDiv(x, CHUNK_SIZE), floorDiv(y, CHUNK_SIZE));
   const i = tileIndex(x - chunk.cx * CHUNK_SIZE, y - chunk.cy * CHUNK_SIZE);
@@ -49,7 +65,9 @@ const tileColor = (x: number, y: number): Rgb => {
   if (water !== Water.None) return waterColor[water];
   const way = chunk.way[i] as Way;
   if (way !== Way.None) return wayColor[way];
-  return surfaceColor(mode, groundColor[chunk.ground[i] as Ground], chunk.height[i]!);
+  const height = chunk.height[i]!;
+  const light = hillshade(height - heightAt(x - 1, y), height - heightAt(x, y - 1));
+  return surfaceColor(mode, groundColor[chunk.ground[i] as Ground], height, light);
 };
 
 const overlay = new Map<string, Rgb>();
@@ -64,6 +82,11 @@ writePng(values.out!, size, size, (px, py) => {
   const { x, y } = worldAt(px, py);
   return values.layer === "tiles"
     ? tileColor(Math.floor(x), Math.floor(y))
-    : (overlay.get(`${px},${py}`) ?? fieldColor(world, mode, x, y));
+    : (overlay.get(`${px},${py}`) ??
+        fieldColor(mode, world.fields.climate(x, y), {
+          westLevel: heightLevel(world.fields.elevation(x - scale, y)),
+          northLevel: heightLevel(world.fields.elevation(x, y - scale)),
+          spacing: scale,
+        }));
 });
 console.log(`wrote ${values.out}`);

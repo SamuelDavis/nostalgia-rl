@@ -1,5 +1,5 @@
 import type { Point } from "../lib";
-import type { Worldgen } from "../worldgen";
+import { type Worldgen, heightLevel } from "../worldgen";
 import { fieldColor, overviewMarks } from "./overview";
 import { type HeightMode, css } from "./palette";
 
@@ -37,18 +37,27 @@ export const createMap = (parent: HTMLElement, world: Worldgen) => {
     const id = ++render;
     const image = ctx.createImageData(MAP_PX, MAP_PX);
     let row = 0;
+    let previous: number[] = [];
     const step = () => {
       if (id !== render) return;
-      for (const end = Math.min(MAP_PX, row + ROWS_PER_FRAME); row < end; row++)
+      for (const end = Math.min(MAP_PX, row + ROWS_PER_FRAME); row < end; row++) {
+        const levels: number[] = [];
         for (let col = 0; col < MAP_PX; col++) {
-          const [r, g, b] = fieldColor(
-            world,
-            mode,
+          const climate = world.fields.climate(
             center.x + (col - MAP_PX / 2) * TILES_PER_PX,
             center.y + (row - MAP_PX / 2) * TILES_PER_PX,
           );
+          const level = heightLevel(climate.elevation);
+          levels.push(level);
+          const [r, g, b] = fieldColor(mode, climate, {
+            westLevel: levels[col - 1] ?? level,
+            northLevel: previous[col] ?? level,
+            spacing: TILES_PER_PX,
+          });
           image.data.set([r, g, b, 255], (row * MAP_PX + col) * 4);
         }
+        previous = levels;
+      }
       ctx.putImageData(image, 0, 0);
       if (row < MAP_PX) requestAnimationFrame(step);
       else drawMarks(center);

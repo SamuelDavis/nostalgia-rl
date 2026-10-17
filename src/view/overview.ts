@@ -1,6 +1,15 @@
 import type { Point } from "../lib";
-import { Biome, REGION_SIZE, Water, type Worldgen, biomeOf, heightLevel } from "../worldgen";
-import { type HeightMode, type Rgb, biomeColor, surfaceColor, waterColor } from "./palette";
+import { Biome, type Climate, REGION_SIZE, Water, type Worldgen, biomeOf, heightLevel } from "../worldgen";
+import {
+  type HeightMode,
+  type Rgb,
+  biomeColor,
+  contourBetween,
+  hillshade,
+  shade,
+  surfaceColor,
+  waterColor,
+} from "./palette";
 
 export interface Mark {
   readonly point: Point;
@@ -11,13 +20,26 @@ const RIVER_MARK: Rgb = [70, 140, 230];
 const ROAD_MARK: Rgb = [120, 70, 30];
 const TRAIL_MARK: Rgb = [235, 215, 160];
 const CAMP_MARK: Rgb = [0, 0, 0];
+const INDEX_CONTOUR_SHADE = 0.7;
 
-export const fieldColor = (world: Worldgen, mode: HeightMode, x: number, y: number): Rgb => {
-  const climate = world.fields.climate(x, y);
+export interface FieldNeighbours {
+  readonly westLevel: number;
+  readonly northLevel: number;
+  readonly spacing: number;
+}
+
+export const fieldColor = (
+  mode: HeightMode,
+  climate: Climate,
+  { westLevel, northLevel, spacing }: FieldNeighbours,
+): Rgb => {
   const biome = biomeOf(climate);
-  return biome === Biome.Ocean
-    ? waterColor[Water.Deep]
-    : surfaceColor(mode, biomeColor[biome], heightLevel(climate.elevation));
+  if (biome === Biome.Ocean) return waterColor[Water.Deep];
+  const level = heightLevel(climate.elevation);
+  const light = hillshade((level - westLevel) / spacing, (level - northLevel) / spacing);
+  const color = surfaceColor(mode, biomeColor[biome], level, light);
+  const onIndex = contourBetween(level, westLevel) === "index" || contourBetween(level, northLevel) === "index";
+  return onIndex ? shade(color, INDEX_CONTOUR_SHADE) : color;
 };
 
 export const overviewMarks = (world: Worldgen, center: Point, radius: number): Mark[] => {
