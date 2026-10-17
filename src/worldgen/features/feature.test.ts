@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Ground, Prop, Water, Way } from "../terrain";
+import { Biome, Ground, Prop, Water, Way } from "../terrain";
 import { type FeatureType, type TileDraft, paintInOrder, place } from "./feature";
 
 const draft = (): TileDraft => ({
@@ -8,6 +8,7 @@ const draft = (): TileDraft => ({
   water: Water.None,
   prop: Prop.None,
   way: Way.None,
+  biome: Biome.Grassland,
 });
 
 const stamping = (

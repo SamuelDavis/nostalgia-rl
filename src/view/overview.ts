@@ -20,6 +20,7 @@ const RIVER_MARK: Rgb = [70, 140, 230];
 const ROAD_MARK: Rgb = [120, 70, 30];
 const TRAIL_MARK: Rgb = [235, 215, 160];
 const CAMP_MARK: Rgb = [0, 0, 0];
+const DEEP_FOREST_MARK: Rgb = [10, 45, 20];
 const INDEX_CONTOUR_SHADE = 0.7;
 
 export interface FieldNeighbours {
@@ -56,6 +57,8 @@ export const overviewMarks = (world: Worldgen, center: Point, radius: number): M
         for (const point of road.nodes) marks.push({ point, color: ROAD_MARK });
       const camp = world.campAt(cx, cy);
       if (camp) marks.push({ point: camp, color: CAMP_MARK });
+      const forest = world.deepForestAt(cx, cy);
+      if (forest) marks.push({ point: forest.anchor, color: DEEP_FOREST_MARK });
     }
   return marks;
 };

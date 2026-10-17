@@ -1,5 +1,5 @@
 import type { Point } from "../../lib";
-import type { Ground, Prop, Water, Way } from "../terrain";
+import type { Biome, Ground, Prop, Water, Way } from "../terrain";
 
 export interface Anchor extends Point {
   readonly id: number;
@@ -10,7 +10,8 @@ export interface TileDraft {
   ground: Ground;
   water: Water;
   prop: Prop;
-  readonly way: Way;
+  way: Way;
+  readonly biome: Biome;
 }
 
 export interface FeatureType<A extends Anchor, L> {
@@ -21,17 +22,19 @@ export interface FeatureType<A extends Anchor, L> {
   readonly paint: (layout: L, draft: TileDraft, x: number, y: number) => boolean;
 }
 
-export interface PlacedFeature {
+export interface PlacedFeature<L = unknown> {
   readonly anchor: Anchor;
+  readonly layout: L;
   readonly priority: number;
   readonly reach: number;
   readonly paint: (draft: TileDraft, x: number, y: number) => boolean;
 }
 
-export const place = <A extends Anchor, L>(type: FeatureType<A, L>, anchor: A): PlacedFeature => {
+export const place = <A extends Anchor, L>(type: FeatureType<A, L>, anchor: A): PlacedFeature<L> => {
   const layout = type.build(anchor);
   return {
     anchor,
+    layout,
     priority: type.priority,
     reach: type.reach,
     paint: (draft, x, y) => type.paint(layout, draft, x, y),

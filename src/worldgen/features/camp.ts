@@ -128,7 +128,7 @@ export const createCamps = ({ seed, level, biomeAt, riversNear }: CampSiting) =>
 
   const type: FeatureType<Camp, CampLayout> = {
     name: "camp",
-    priority: 0,
+    priority: 1,
     reach: CAMP_RADIUS,
     build: (camp) => ({ camp, level: campLevel(camp) }),
     paint: ({ camp, level: campLevel }, draft, x, y) => {

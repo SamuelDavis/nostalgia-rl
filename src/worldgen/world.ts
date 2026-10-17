@@ -12,11 +12,12 @@ import { biomeOf } from "./biome";
 import { type Camp, createCamps } from "./features/camp";
 
 export type { Camp } from "./features/camp";
-import { type PlacedFeature, place } from "./features/feature";
-import { REGION_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
+import { type DeepForestLayout, createDeepForests, gladeOf as deepForestGlade } from "./features/deep-forest";
+import { type Anchor, type FeatureType, type PlacedFeature, place } from "./features/feature";
+import { REGION_SIZE, SEA_LEVEL, heightLevel } from "./constants";
 import { type Fields, createFields } from "./fields";
 import { MAX_RIVER_REACH, type River, traceRiver } from "./rivers";
-import { route } from "./routing";
+import { climbCost, route } from "./routing";
 import { type Region, boundsOf, overlaps, regionBounds, regionKey, regionOf, regionsAround } from "./region";
 import { type Glade, type Trail, findGlade, findPeak } from "./trails";
 
@@ -37,6 +38,7 @@ export interface Worldgen {
   readonly roadsNear: (cx: number, cy: number) => readonly Road[];
   readonly trailsNear: (cx: number, cy: number) => readonly Trail[];
   readonly gladesNear: (cx: number, cy: number) => readonly Glade[];
+  readonly deepForestAt: (cx: number, cy: number) => PlacedFeature<DeepForestLayout> | undefined;
   readonly featuresNear: (cx: number, cy: number) => readonly PlacedFeature[];
 }
 
@@ -51,15 +53,12 @@ const TRAIL_DIFFICULTY = 1.2;
 const TRAIL_DIFFICULTY_SCALE = 60;
 const TRAIL_REUSE = 0.35;
 const TRAIL_TYPICAL_COST = 2.5;
-const STEEP_PENALTY = 25;
 
 const RIVER_REGION_RADIUS = Math.ceil(MAX_RIVER_REACH / REGION_SIZE) + 1;
 
 const pointKey = ({ x, y }: Point) => `${x},${y}`;
 
 const isForward = (from: Region, to: Region) => to.cy > from.cy || (to.cy === from.cy && to.cx > from.cx);
-
-const climbCost = (grade: number) => (grade <= MAX_CLIMB ? grade : STEEP_PENALTY * grade);
 
 const LandmarkKind = { Camp: 0, Glade: 1, Peak: 2 } as const;
 type LandmarkKind = (typeof LandmarkKind)[keyof typeof LandmarkKind];
@@ -112,19 +111,39 @@ export const createWorldgen = (seed: number): Worldgen => {
   const { spawn } = camps;
   const campAtRegion = camps.at;
 
-  const placedCamp = memoize(
-    (camp: Camp) => place(camps.type, camp),
-    (camp) => `${camp.x},${camp.y}`,
-    REGION_CACHE,
-  );
+  const placer = <A extends Anchor, L>(type: FeatureType<A, L>, at: (region: Region) => A | undefined) => {
+    const placed = memoize(
+      (anchor: A) => place(type, anchor),
+      (anchor) => `${anchor.x},${anchor.y}`,
+      REGION_CACHE,
+    );
+    return {
+      reach: type.reach,
+      placedIn: (region: Region): PlacedFeature<L> | undefined => {
+        const anchor = at(region);
+        return anchor && placed(anchor);
+      },
+    };
+  };
+
+  const deepForests = createDeepForests({
+    seed,
+    level,
+    biomeAt,
+    moisture: (p) => fields.moisture(p.x, p.y),
+    campAt: campAtRegion,
+    waysNear: (region) => [...roadsNearRegion(region), ...trailsNearRegion(region)],
+  });
+  const campPlacer = placer(camps.type, campAtRegion);
+  const deepForestPlacer = placer(deepForests.type, deepForests.at);
+  const placers = [deepForestPlacer, campPlacer];
 
   const featuresNearRegion = memoize(
     (region: Region): PlacedFeature[] =>
-      regionsAround(region, Math.ceil(camps.type.reach / REGION_SIZE))
-        .flatMap((source) => {
-          const camp = campAtRegion(source);
-          return camp ? [placedCamp(camp)] : [];
-        })
+      placers
+        .flatMap(({ reach, placedIn }) =>
+          regionsAround(region, Math.ceil(reach / REGION_SIZE)).flatMap((source) => placedIn(source) ?? []),
+        )
         .filter((feature) => overlaps(boundsOf([feature.anchor], feature.reach), regionBounds(region)))
         .sort((a, b) => a.priority - b.priority),
     regionKey,
@@ -173,7 +192,14 @@ export const createWorldgen = (seed: number): Worldgen => {
     REGION_CACHE,
   );
 
-  const gladeOf = memoize((region: Region) => findGlade(seed, fields, region.cx, region.cy), regionKey, REGION_CACHE);
+  const gladeOf = memoize(
+    (region: Region) => {
+      const forest = deepForests.at(region);
+      return forest ? deepForestGlade(forest) : findGlade(seed, fields, region.cx, region.cy);
+    },
+    regionKey,
+    REGION_CACHE,
+  );
   const peakOf = memoize((region: Region) => findPeak(fields, region.cx, region.cy), regionKey, REGION_CACHE);
 
   const landmarksIn = (region: Region): Landmark[] =>
@@ -253,6 +279,7 @@ export const createWorldgen = (seed: number): Worldgen => {
     roadsNear: (cx, cy) => roadsNearRegion({ cx, cy }),
     trailsNear: (cx, cy) => trailsNearRegion({ cx, cy }),
     gladesNear: (cx, cy) => gladesNearRegion({ cx, cy }),
+    deepForestAt: (cx, cy) => deepForestPlacer.placedIn({ cx, cy }),
     featuresNear: (cx, cy) => featuresNearRegion({ cx, cy }),
   };
 };

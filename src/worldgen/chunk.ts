@@ -199,6 +199,7 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
         water: tileWater,
         prop: way && tileWater !== Water.None ? Prop.Bridge : Prop.None,
         way: way?.kind ?? Way.None,
+        biome: tileBiome,
       };
       const claimed = paintInOrder(features, draft, x, y);
       if (!claimed && !way && draft.water === Water.None && !nearWater && !nearWay) {

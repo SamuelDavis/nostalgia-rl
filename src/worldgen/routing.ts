@@ -1,8 +1,13 @@
 import { type Point, distance, findPath } from "../lib";
+import { MAX_CLIMB } from "./constants";
 
 const STEP = 4;
 const MARGIN = 96;
 const MAX_EXPANSIONS = 6000;
+
+const STEEP_PENALTY = 25;
+
+export const climbCost = (grade: number) => (grade <= MAX_CLIMB ? grade : STEEP_PENALTY * grade);
 
 export type UnitCost = (grade: number, at: Point) => number;
 

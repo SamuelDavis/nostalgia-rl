@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type Point, projectOntoSegment } from "../lib";
-import { type Trail, createWorldgen, findPeak } from "../worldgen";
+import { type Trail, type Worldgen, createWorldgen, findPeak } from "../worldgen";
 import { blockerBetween } from "./movement";
 import { type Terrain, createTerrain } from "./terrain";
 
@@ -21,7 +21,12 @@ const nearTrail = (trail: Trail, p: Point): boolean =>
     return projectOntoSegment({ x: p.x + 0.5, y: p.y + 0.5 }, a, b).distance <= CORRIDOR;
   });
 
-const walksAlong = (terrain: Terrain, trail: Trail): boolean => {
+const deepForestPaths = (world: Worldgen, cx: number, cy: number): ReadonlySet<string>[] =>
+  Array.from({ length: 25 }, (_, i) => world.deepForestAt(cx + (i % 5) - 2, cy + Math.floor(i / 5) - 2)).flatMap(
+    (forest) => (forest ? [forest.layout.paths] : []),
+  );
+
+const walksAlong = (terrain: Terrain, trail: Trail, forestPaths: readonly ReadonlySet<string>[]): boolean => {
   const start = tileOf(trail.nodes[0]!);
   const goal = tileOf(trail.nodes.at(-1)!);
   const key = (p: Point) => `${p.x},${p.y}`;
@@ -33,7 +38,8 @@ const walksAlong = (terrain: Terrain, trail: Trail): boolean => {
     for (const o of NEIGHBOURS) {
       const n = { x: p.x + o.x, y: p.y + o.y };
       const to = terrain(n.x, n.y);
-      if (seen.has(key(n)) || !nearTrail(trail, n) || blockerBetween(terrain(p.x, p.y), to)) continue;
+      const onWay = nearTrail(trail, n) || forestPaths.some((paths) => paths.has(key(n)));
+      if (seen.has(key(n)) || !onWay || blockerBetween(terrain(p.x, p.y), to)) continue;
       seen.add(key(n));
       frontier.push(n);
     }
@@ -56,9 +62,10 @@ describe("trails", () => {
     for (const { seed, region } of cases) {
       const world = createWorldgen(seed);
       const terrain = createTerrain(world);
+      const forestPaths = deepForestPaths(world, region.cx, region.cy);
       for (const trail of world.trailsNear(region.cx, region.cy)) {
         const { x, y } = tileOf(trail.nodes[0]!);
-        expect(walksAlong(terrain, trail), `seed ${seed}, trail from ${x},${y}`).toBe(true);
+        expect(walksAlong(terrain, trail, forestPaths), `seed ${seed}, trail from ${x},${y}`).toBe(true);
         walked++;
       }
     }
