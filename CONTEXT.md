@@ -54,6 +54,12 @@ One vertical layer of a feature, at the same world coordinates as the feature's 
 **Cover**:
 What a feature shows from outside, such as a roof, parapets, a canopy or a mineshaft head, hiding its interior until a player is inside.
 
+**Cave**:
+A natural feature inside a mountain: winding passages and caverns on several floors.
+
+**Mine**:
+A feature dug by people inside a cave: tunnels, shafts and worked rooms. A cave's child feature.
+
 **Opening**:
 A place where a feature's enclosed parts meet the world, such as a cave mouth or a door.
 
