@@ -11,7 +11,7 @@ import {
   projectOntoSegment,
   unit,
 } from "../../lib";
-import { REGION_SIZE } from "../constants";
+import { MAX_CLIMB, REGION_SIZE, SEA_LEVEL } from "../constants";
 import { type Region, regionKey, regionOf, regionsAround } from "../region";
 import { climbCost, route } from "../routing";
 import { Biome, Cover, Ground, Prop, Water, Way } from "../terrain";
@@ -60,6 +60,7 @@ const MIN_FOREST_RING = 6;
 const GUARANTEED_OPENINGS = 2;
 const OPENING_STEP = 2;
 const GLADE_RADII = [5, 8] as const;
+const NOTCH_NODES = 2;
 const SEAM = 10;
 const EDGE_DENSITY = 0.45;
 const CORE_DENSITY = 0.85;
@@ -70,6 +71,13 @@ const PATH_WOBBLE_SCALE = 12;
 const PATH_REUSE = 0.35;
 const PATH_TYPICAL_COST = 2;
 const REGION_CACHE = 4096;
+
+const NEIGHBOURS: readonly Point[] = [
+  { x: 1, y: 0 },
+  { x: -1, y: 0 },
+  { x: 0, y: 1 },
+  { x: 0, y: -1 },
+];
 
 const DIRECTIONS: readonly Point[] = [
   { x: 1, y: 0 },
@@ -200,7 +208,7 @@ export const createDeepForests = ({ seed, level, biomeAt, moisture, campAt, ways
       }) ?? [glade];
       nodes.forEach((node) => walked.add(tileKey(node.x, node.y)));
       rasterize([opening.outside, opening.inside, ...nodes, glade], paths);
-      rasterize([opening.outside, opening.inside], mouths);
+      rasterize([opening.outside, opening.inside, ...nodes.slice(0, NOTCH_NODES)], mouths);
     }
     return { forest, glade, openings, contains, paths, mouths };
   };
@@ -213,6 +221,13 @@ export const createDeepForests = ({ seed, level, biomeAt, moisture, campAt, ways
     paint: ({ forest, glade, paths, mouths }, draft, x, y) => {
       const centre = { x: x + 0.5, y: y + 0.5 };
       const key = tileKey(x, y);
+      const isCoastal = draft.height <= SEA_LEVEL + MAX_CLIMB;
+      const isWall = () =>
+        NEIGHBOURS.some((o) => {
+          const next = { x: centre.x + o.x, y: centre.y + o.y };
+          if (mouths.has(tileKey(x + o.x, y + o.y)) || depthIn(forest, next) <= 0) return true;
+          return isCoastal && biomeAt(next) === Biome.Ocean;
+        });
       const inside = draft.biome !== Biome.Ocean && depthIn(forest, centre) > 0;
       if (paths.has(key)) {
         draft.way = Way.Path;
@@ -227,6 +242,7 @@ export const createDeepForests = ({ seed, level, biomeAt, moisture, campAt, ways
       const roll = unit(hash(seed, SALT, x, y));
       if (draft.water !== Water.None) draft.prop = Prop.None;
       else if (distance(centre, glade) <= glade.radius) draft.prop = roll < 0.2 ? Prop.Flowers : Prop.Tuft;
+      else if (isWall()) draft.prop = draft.ground === Ground.Snow || roll < 1 / 3 ? Prop.Pine : Prop.Oak;
       else {
         const density = lerp(EDGE_DENSITY, CORE_DENSITY, clamp(depthIn(forest, centre) / SEAM, 0, 1));
         const tree = draft.ground === Ground.Snow || roll < density / 3 ? Prop.Pine : Prop.Oak;

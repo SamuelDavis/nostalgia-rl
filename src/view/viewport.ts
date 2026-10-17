@@ -2,7 +2,16 @@ import { type Point, hash, hashString, unit } from "../lib";
 import { isCliff, isStairs, isTrail } from "../game/movement";
 import type { Terrain, Tile } from "../game/terrain";
 import { Cover, Prop, Water, Way } from "../worldgen";
-import { PLAYER_GLYPH, STAIRS_GLYPH, coverGlyph, propGlyph, groundGlyph, waterGlyph, wayGlyph } from "./glyphs";
+import {
+  PLAYER_GLYPH,
+  STAIRS_GLYPH,
+  THRESHOLD_GLYPH,
+  coverGlyph,
+  propGlyph,
+  groundGlyph,
+  waterGlyph,
+  wayGlyph,
+} from "./glyphs";
 import {
   type Contour,
   type HeightMode,
@@ -48,6 +57,16 @@ const NEIGHBOURS: readonly Point[] = [
   { x: 0, y: 1 },
   { x: 0, y: -1 },
 ];
+
+const THRESHOLD: Look = { background: [55, 38, 20], glyph: THRESHOLD_GLYPH, color: [255, 215, 130] };
+
+const isThreshold = (terrain: Terrain, x: number, y: number, tile: Tile): boolean =>
+  isTrail(tile) &&
+  tile.cover === Cover.None &&
+  NEIGHBOURS.some((o) => {
+    const next = terrain(x + o.x, y + o.y);
+    return isTrail(next) && next.cover !== Cover.None;
+  });
 
 const CLIFF_FACE: Look = { background: [72, 64, 60], glyph: "", color: [0, 0, 0] };
 const FACE_MIN_CLIFF_SIDES = 3;
@@ -138,6 +157,7 @@ export const drawViewport = (
   const lightAt = createLighting(terrain, left, top, columns, rows);
   const lookAt = (tile: Tile, x: number, y: number): Look => {
     if (tile.cover !== Cover.None && !isInside) return coverLook(tile.cover, lightAt(x, y), x, y);
+    if (isThreshold(terrain, x, y, tile)) return THRESHOLD;
     const look = isCliffFace(terrain, x, y, tile) ? CLIFF_FACE : lookOf(tile, mode, lightAt(x, y), x, y);
     return tile.cover === Cover.None ? look : underCover(look);
   };

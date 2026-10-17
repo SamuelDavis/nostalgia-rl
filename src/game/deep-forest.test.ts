@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type Point, distance } from "../lib";
-import { Cover, Way, createWorldgen } from "../worldgen";
+import { Cover, Water, Way, createWorldgen } from "../worldgen";
 import { blockerBetween } from "./movement";
 import { createTerrain } from "./terrain";
 
@@ -78,5 +78,19 @@ describe("deep forests", () => {
         expect(terrain(x, y).cover, `opening at ${x},${y}`).toBe(Cover.None);
       }
     }
+  });
+
+  it("can only be entered along their paths and rivers", () => {
+    for (const { anchor, reach } of forests.slice(0, 4))
+      for (let y = anchor.y - reach; y <= anchor.y + reach; y++)
+        for (let x = anchor.x - reach; x <= anchor.x + reach; x++) {
+          const tile = terrain(x, y);
+          if (tile.cover === Cover.None || tile.way !== Way.None || tile.water !== Water.None) continue;
+          for (const o of NEIGHBOURS) {
+            const outside = terrain(x + o.x, y + o.y);
+            if (outside.cover !== Cover.None) continue;
+            expect(blockerBetween(outside, tile), `entering ${x},${y}`).toBeDefined();
+          }
+        }
   });
 });

@@ -2,6 +2,7 @@ import { Cover, Prop, Ground, Water, Way } from "../worldgen";
 
 export const PLAYER_GLYPH = "@";
 export const STAIRS_GLYPH = "≡";
+export const THRESHOLD_GLYPH = "∩";
 
 export const propGlyph: Record<Prop, string> = {
   [Prop.None]: "",
