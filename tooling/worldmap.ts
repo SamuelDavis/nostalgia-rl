@@ -1,5 +1,5 @@
 import { parseArgs } from "node:util";
-import { floorDiv } from "../src/lib";
+import { floorDiv, memoize } from "../src/lib";
 import {
   CHUNK_SIZE,
   Prop,
@@ -51,13 +51,22 @@ const worldAt = (px: number, py: number) => ({
   y: centerY + (py - size / 2) * scale,
 });
 
+const CHUNK_CACHE = 4096;
+const generatedChunk = memoize(
+  ({ cx, cy }: { cx: number; cy: number }) => generateChunk(world, cx, cy),
+  ({ cx, cy }) => `${cx},${cy}`,
+  CHUNK_CACHE,
+);
+const chunkAt = (x: number, y: number) =>
+  generatedChunk({ cx: floorDiv(x, CHUNK_SIZE), cy: floorDiv(y, CHUNK_SIZE) });
+
 const heightAt = (x: number, y: number) => {
-  const chunk = generateChunk(world, floorDiv(x, CHUNK_SIZE), floorDiv(y, CHUNK_SIZE));
+  const chunk = chunkAt(x, y);
   return chunk.height[tileIndex(x - chunk.cx * CHUNK_SIZE, y - chunk.cy * CHUNK_SIZE)]!;
 };
 
 const tileColor = (x: number, y: number): Rgb => {
-  const chunk = generateChunk(world, floorDiv(x, CHUNK_SIZE), floorDiv(y, CHUNK_SIZE));
+  const chunk = chunkAt(x, y);
   const i = tileIndex(x - chunk.cx * CHUNK_SIZE, y - chunk.cy * CHUNK_SIZE);
   const prop = chunk.prop[i] as Prop;
   const water = chunk.water[i] as Water;
