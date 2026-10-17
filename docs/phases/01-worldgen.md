@@ -29,6 +29,14 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 
 _Record user feedback verbatim, newest first, with the commit it refers to._
 
+### 5ffd697: deep forest canopy
+
+> The openings need to be much more obvious. In the same way the door to a house will need to have a unique visual queue, or a mineshaft would be obvious, there needs to be a clear "here is where you can enter the trees"
+> Look at `?seed=1&x=517&y=1660`, there is no visual indicator that at `?seed=1&x=517&y=1659` I'll be under the canopy. In contrast, the notch at `?seed=1&x=528&y=1668` is very cool, but there still needs to be a very obvious opening.
+> I'd recommend a distinct tile, but I could also believe: deeper and more obvious notches guaranteed whereever a path and the forest meet
+
+The forest edge was 45% trees, so the canopy could be entered almost anywhere. Fixed in a308842: a tree wall along the edge, notches running deeper along the path, and a threshold tile (`∩`) where a way passes under cover.
+
 ### 2a23ea7: hillshading, contours
 
 > Interestingly there's a black line showing at `?seed=1&x=-5&y=0` and a pale one at `?seed=1&x=-34&y=1`; what's causing those? They appear to be height/cliff bands, but they're passable. The mountain at `?seed=1&x=-159&y=-16` has a lot of very visible lines. I think they must be banding lines?
