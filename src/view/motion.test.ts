@@ -23,7 +23,16 @@ describe("createGlide", () => {
     const glide = createGlide(DURATION, { x: 0, y: 0 });
     glide.moveTo({ x: 1, y: 0 }, 0);
     glide.moveTo({ x: 2, y: 0 }, 100);
-    expect(glide.shownAt(116)).toEqual({ x: 1.16, y: 0 });
+    expect(glide.shownAt(150)).toEqual({ x: 1.5, y: 0 });
+  });
+
+  it("slows at the start and end of each step, like footsteps", () => {
+    const glide = createGlide(DURATION, { x: 0, y: 0 });
+    glide.moveTo({ x: 1, y: 0 }, 0);
+    const covered = (from: number, to: number) => glide.shownAt(to).x - glide.shownAt(from).x;
+    expect(covered(0, 10)).toBeLessThan(covered(45, 55) / 2);
+    expect(covered(90, 100)).toBeLessThan(covered(45, 55) / 2);
+    expect(covered(0, 10)).toBeGreaterThan(0);
   });
 
   it("turns mid-glide from where it is shown, without jumping", () => {

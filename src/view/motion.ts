@@ -1,10 +1,14 @@
 import { Direction } from "../game/movement";
 import { type Point, clamp, lerp, mod } from "../lib";
 
-const between = (from: Point, to: Point, progress: number): Point => ({
-  x: lerp(from.x, to.x, clamp(progress, 0, 1)),
-  y: lerp(from.y, to.y, clamp(progress, 0, 1)),
-});
+const STRIDE = 0.5;
+
+const footstep = (progress: number): number => progress - (STRIDE * Math.sin(2 * Math.PI * progress)) / (2 * Math.PI);
+
+const between = (from: Point, to: Point, progress: number): Point => {
+  const t = footstep(clamp(progress, 0, 1));
+  return { x: lerp(from.x, to.x, t), y: lerp(from.y, to.y, t) };
+};
 
 export const createGlide = (durationMs: number, start: Point) => {
   let from = start;
