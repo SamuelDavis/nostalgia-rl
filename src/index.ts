@@ -19,6 +19,7 @@ import {
 } from "./view/camera";
 import { createHud } from "./view/hud";
 import { createGlide, facingAngle, turnToward } from "./view/motion";
+import { directionAt } from "./view/tap";
 import { createMap } from "./view/map";
 import { HEIGHT_MODES, type HeightMode } from "./view/palette";
 import { createViewport } from "./view/viewport";
@@ -175,7 +176,34 @@ addEventListener("keyup", (event) => {
   const direction = KEY_DIRECTIONS[event.code];
   if (direction !== undefined) input.release(direction);
 });
-addEventListener("blur", () => Object.values(Direction).forEach(input.release));
+let tapped: Direction | undefined;
+const tapAt = (event: PointerEvent) => {
+  const direction = directionAt(
+    { x: event.offsetX, y: event.offsetY },
+    { width: canvas.clientWidth, height: canvas.clientHeight },
+  );
+  if (direction === tapped) return;
+  if (tapped !== undefined) input.release(tapped);
+  tapped = direction;
+  input.press(direction, performance.now());
+};
+const untap = () => {
+  if (tapped !== undefined) input.release(tapped);
+  tapped = undefined;
+};
+canvas.addEventListener("pointerdown", (event) => {
+  canvas.setPointerCapture(event.pointerId);
+  tapAt(event);
+});
+canvas.addEventListener("pointermove", (event) => {
+  if (tapped !== undefined) tapAt(event);
+});
+canvas.addEventListener("pointerup", untap);
+canvas.addEventListener("pointercancel", untap);
+addEventListener("blur", () => {
+  untap();
+  Object.values(Direction).forEach(input.release);
+});
 addEventListener("resize", resize);
 addEventListener("wheel", (event) => zoomBy(Math.sign(event.deltaY) * ZOOM_STEP));
 
