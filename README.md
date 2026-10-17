@@ -35,7 +35,7 @@ These are requirements, not designs. How to meet them is decided in the multipla
 
 - **Phase 1, world generation:** in progress. See [docs/phases/01-worldgen.md](docs/phases/01-worldgen.md).
 - A deterministic, seeded world generator exists in `src/worldgen`. It was carried over from an earlier prototype as a starting point; treat it as a draft that playtests will reshape, not a settled design. How it works: [docs/worldgen.md](docs/worldgen.md).
-- `npm run dev` gives a walkable world: `@` on the turn clock, glyph canvas with a camera that leads the facing direction and zooms out on high ground, debug HUD (I collapses it), M map, H height mode, +/− or wheel zoom. URL params: `seed`, `turn` (ms), `repeat` (ms a key is held before it repeats), `x`, `y` (start tile); the URL follows the player.
+- `npm run dev` gives a walkable world: `@` on the turn clock (WASD, or press a screen triangle), glyph canvas with a camera that leads the facing direction and zooms out on high ground, debug HUD with a button for each toggle (I collapses it), M map, H height mode, +/− or wheel zoom. URL params: `seed`, `turn` (ms), `repeat` (ms a key is held before it repeats), `x`, `y` (start tile); the URL follows the player.
 
 ## Layout
 

@@ -17,7 +17,7 @@ import {
   spanOf,
   steer,
 } from "./view/camera";
-import { createHud } from "./view/hud";
+import { type Control, createHud } from "./view/hud";
 import { createGlide, facingAngle, turnToward } from "./view/motion";
 import { directionAt } from "./view/tap";
 import { createMap } from "./view/map";
@@ -51,8 +51,6 @@ const input = createDirectionInput(repeatDelayMs);
 const canvas = document.createElement("canvas");
 document.querySelector<HTMLDivElement>("#placeholder")!.replaceWith(canvas);
 const ctx = canvas.getContext("2d")!;
-const hud = createHud(document.body, world);
-const map = createMap(document.body, world);
 
 let session = startSession({
   x: Number(params.get("x") ?? world.spawn.x),
@@ -123,6 +121,31 @@ const zoomBy = (delta: number) => {
   dirty = true;
 };
 
+const controls: readonly Control[] = [
+  { keys: ["KeyI"], label: "I info", run: () => hud.toggle() },
+  {
+    keys: ["KeyT"],
+    label: "T tap mode",
+    run: () => {
+      tapTurnsFirst = !tapTurnsFirst;
+      dirty = true;
+    },
+  },
+  { keys: ["KeyM"], label: "M map", run: () => map.toggle(session.position, mode) },
+  {
+    keys: ["KeyH"],
+    label: "H height mode",
+    run: () => {
+      mode = HEIGHT_MODES[(HEIGHT_MODES.indexOf(mode) + 1) % HEIGHT_MODES.length]!;
+      dirty = true;
+    },
+  },
+  { keys: ["Equal", "NumpadAdd"], label: "+ zoom in", run: () => zoomBy(-ZOOM_STEP) },
+  { keys: ["Minus", "NumpadSubtract"], label: "− zoom out", run: () => zoomBy(ZOOM_STEP) },
+];
+const hud = createHud(document.body, world, controls);
+const map = createMap(document.body, world);
+
 const resize = () => {
   const ratio = devicePixelRatio;
   canvas.width = Math.round(canvas.clientWidth * ratio);
@@ -159,18 +182,7 @@ const frame = (now: number) => {
 addEventListener("keydown", (event) => {
   const direction = KEY_DIRECTIONS[event.code];
   if (direction !== undefined && !event.repeat) input.press(direction, performance.now());
-  if (event.code === "KeyM") map.toggle(session.position, mode);
-  if (event.code === "KeyI") hud.toggle();
-  if (event.code === "KeyH") {
-    mode = HEIGHT_MODES[(HEIGHT_MODES.indexOf(mode) + 1) % HEIGHT_MODES.length]!;
-    dirty = true;
-  }
-  if (event.code === "KeyT") {
-    tapTurnsFirst = !tapTurnsFirst;
-    dirty = true;
-  }
-  if (event.code === "Equal" || event.code === "NumpadAdd") zoomBy(-ZOOM_STEP);
-  if (event.code === "Minus" || event.code === "NumpadSubtract") zoomBy(ZOOM_STEP);
+  for (const control of controls) if (control.keys.includes(event.code)) control.run();
 });
 addEventListener("keyup", (event) => {
   const direction = KEY_DIRECTIONS[event.code];

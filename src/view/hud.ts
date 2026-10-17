@@ -27,15 +27,30 @@ export interface HudState {
 const nameOf = (values: Record<string, number>, value: number): string =>
   Object.keys(values).find((key) => values[key] === value) ?? String(value);
 
+export interface Control {
+  readonly keys: readonly string[];
+  readonly label: string;
+  readonly run: () => void;
+}
+
 const fixed = (value: number) => value.toFixed(3);
 
-export const createHud = (parent: HTMLElement, world: Worldgen) => {
+export const createHud = (parent: HTMLElement, world: Worldgen, controls: readonly Control[]) => {
   const panel = document.createElement("aside");
   panel.className = "hud";
   const table = document.createElement("dl");
   const help = document.createElement("p");
-  help.textContent = "WASD or tap move · I info · T tap mode · M map · H height mode · +/− or wheel zoom";
-  panel.append(table, help);
+  help.textContent = "WASD or tap move · wheel zoom";
+  const buttons = document.createElement("menu");
+  buttons.append(
+    ...controls.map(({ label, run }) => {
+      const button = document.createElement("button");
+      button.textContent = label;
+      button.addEventListener("click", run);
+      return button;
+    }),
+  );
+  panel.append(buttons, table, help);
   parent.append(panel);
   const values = new Map<string, HTMLElement>();
 
@@ -90,6 +105,7 @@ export const createHud = (parent: HTMLElement, world: Worldgen) => {
 
   const toggle = () => {
     table.hidden = !table.hidden;
+    help.hidden = table.hidden;
   };
 
   return { update, toggle };
