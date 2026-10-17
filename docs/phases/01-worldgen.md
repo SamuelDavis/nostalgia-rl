@@ -32,6 +32,10 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 
 _Record user feedback verbatim, newest first, with the commit it refers to._
 
+### 9337f0b: deeper forests, glades only in deep forests
+
+> This is awesome
+
 ### c0b5c4f: river network
 
 > So far, I'm pretty happy
