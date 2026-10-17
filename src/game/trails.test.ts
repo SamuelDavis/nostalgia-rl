@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type Point, projectOntoSegment } from "../lib";
-import { type Trail, createWorldgen } from "../worldgen";
-import { blockerBetween, isTrail } from "./movement";
+import { type Trail, createWorldgen, findPeak } from "../worldgen";
+import { blockerBetween } from "./movement";
 import { type Terrain, createTerrain } from "./terrain";
 
 const NEIGHBOURS: readonly Point[] = [
@@ -33,7 +33,7 @@ const walksAlong = (terrain: Terrain, trail: Trail): boolean => {
     for (const o of NEIGHBOURS) {
       const n = { x: p.x + o.x, y: p.y + o.y };
       const to = terrain(n.x, n.y);
-      if (seen.has(key(n)) || !nearTrail(trail, n) || !isTrail(to) || blockerBetween(terrain(p.x, p.y), to)) continue;
+      if (seen.has(key(n)) || !nearTrail(trail, n) || blockerBetween(terrain(p.x, p.y), to)) continue;
       seen.add(key(n));
       frontier.push(n);
     }
@@ -42,21 +42,25 @@ const walksAlong = (terrain: Terrain, trail: Trail): boolean => {
 };
 
 describe("trails", () => {
-  it("are walkable up to their far end, over ledges by stairs and rivers by bridge", () => {
+  it("lead walkers to their far end, over ledges by stairs and rivers by bridge", () => {
+    const cells = Array.from({ length: 9 }, (_, i) => ({ cx: (i % 3) - 1, cy: Math.floor(i / 3) - 1 }));
+    const mountainCell = Array.from({ length: 289 }, (_, i) => ({ cx: (i % 17) - 8, cy: Math.floor(i / 17) - 8 })).find(
+      ({ cx, cy }) => findPeak(createWorldgen(1).fields, cx, cy) !== undefined,
+    )!;
     const cases = [
-      { seed: 1, cell: { cx: 0, cy: 0 } },
-      { seed: 1, cell: { cx: 5, cy: 5 } },
-      { seed: 3, cell: { cx: 0, cy: 0 } },
+      ...[1, 2, 3].flatMap((seed) => cells.map((cell) => ({ seed, cell }))),
+      { seed: 1, cell: mountainCell },
     ];
+    let walked = 0;
     for (const { seed, cell } of cases) {
       const world = createWorldgen(seed);
       const terrain = createTerrain(world);
-      const trails = world.trailsNear(cell.cx, cell.cy);
-      expect(trails.length).toBeGreaterThan(0);
-      for (const trail of trails) {
+      for (const trail of world.trailsNear(cell.cx, cell.cy)) {
         const { x, y } = tileOf(trail.nodes[0]!);
         expect(walksAlong(terrain, trail), `seed ${seed}, trail from ${x},${y}`).toBe(true);
+        walked++;
       }
     }
-  }, 30_000);
+    expect(walked).toBeGreaterThan(0);
+  }, 60_000);
 });

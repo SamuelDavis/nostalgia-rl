@@ -19,7 +19,7 @@ export interface River {
 
 const SALT = hashString("rivers");
 const SOURCE_CHANCE = 0.7;
-const MIN_SOURCE_LEVEL = heightLevel(0.5);
+const MIN_SOURCE_LEVEL = heightLevel(0.42);
 const STEP = 4;
 const MAX_DESCENT = (MAX_CLIMB / 2) * STEP;
 const MAX_STEPS = 300;

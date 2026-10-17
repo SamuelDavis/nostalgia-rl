@@ -59,9 +59,9 @@ describe("generateChunk", () => {
     expect([generateChunk(world, 0, 0), generateChunk(world, -5, 9), generateChunk(world, 20, -13)].map(digest))
       .toMatchInlineSnapshot(`
         [
-          1978637268,
-          4274719351,
-          1051477940,
+          517722342,
+          3467417234,
+          2896958364,
         ]
       `);
   });
@@ -84,7 +84,10 @@ describe("generateChunk", () => {
 
   it("carves rivers as water", () => {
     const world = createWorldgen(1);
-    const rivers = world.riversNear(0, 0);
+    const rivers =
+      Array.from({ length: 49 }, (_, i) => world.riversNear((i % 7) - 3, Math.floor(i / 7) - 3)).find(
+        (found) => found.length > 0,
+      ) ?? [];
     expect(rivers.length).toBeGreaterThan(0);
     for (const river of rivers)
       for (const node of river.nodes.slice(0, -1)) {

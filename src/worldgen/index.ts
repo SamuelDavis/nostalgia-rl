@@ -6,3 +6,4 @@ export * from "./rivers";
 export * from "./terrain";
 export * from "./world";
 export * from "./trails";
+export * from "./landform";

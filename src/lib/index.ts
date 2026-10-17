@@ -5,3 +5,4 @@ export * from "./hash";
 export * from "./heap";
 export * from "./math";
 export * from "./noise";
+export * from "./spline";

@@ -36,6 +36,12 @@ const NEIGHBOURS: readonly Point[] = [
   { x: 0, y: -1 },
 ];
 
+const CLIFF_FACE: Look = { background: [72, 64, 60], glyph: "", color: [0, 0, 0] };
+const FACE_MIN_CLIFF_SIDES = 3;
+
+const isCliffFace = (terrain: Terrain, x: number, y: number, tile: Tile): boolean =>
+  NEIGHBOURS.filter((o) => isCliff(tile, terrain(x + o.x, y + o.y))).length >= FACE_MIN_CLIFF_SIDES;
+
 const hasStairs = (terrain: Terrain, x: number, y: number, tile: Tile): boolean =>
   isTrail(tile) && NEIGHBOURS.some((o) => isStairs(tile, terrain(x + o.x, y + o.y)));
 
@@ -83,7 +89,7 @@ export const drawViewport = (
     for (let x = left; x < left + columns; x++) {
       const { px, py } = screen(x, y);
       const tile = terrain(x, y);
-      const look = lookOf(tile, mode, x, y);
+      const look = isCliffFace(terrain, x, y, tile) ? CLIFF_FACE : lookOf(tile, mode, x, y);
       ctx.fillStyle = css(look.background);
       ctx.fillRect(px, py, CELL_PX, CELL_PX);
       const isPlayer = x === center.x && y === center.y;
@@ -99,11 +105,16 @@ export const drawViewport = (
     for (let x = left - 1; x < left + columns; x++) {
       const tile = terrain(x, y);
       const { px, py } = screen(x + 1, y + 1);
-      if (isCliff(tile, terrain(x + 1, y))) {
+      const face = isCliffFace(terrain, x, y, tile);
+      const edgeShown = (nx: number, ny: number) => {
+        const next = terrain(nx, ny);
+        return isCliff(tile, next) && !(face && isCliffFace(terrain, nx, ny, next));
+      };
+      if (edgeShown(x + 1, y)) {
         ctx.moveTo(px, py - CELL_PX);
         ctx.lineTo(px, py);
       }
-      if (isCliff(tile, terrain(x, y + 1))) {
+      if (edgeShown(x, y + 1)) {
         ctx.moveTo(px - CELL_PX, py);
         ctx.lineTo(px, py);
       }

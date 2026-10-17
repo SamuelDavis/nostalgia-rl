@@ -1,6 +1,7 @@
 import { Biome, Feature, Ground, Water, Way } from "./terrain";
 import { type Point, createNoise, distance, floorDiv, hash, hashString, projectOntoSegment, unit } from "../lib";
 import { biomeOf } from "./biome";
+import { CAMP_RADIUS, CAMP_YARD, TENT_OFFSETS, settleTowardCamp } from "./camp";
 import { CHUNK_SIZE, MACRO_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
 import type { RiverNode } from "./rivers";
 import type { Camp, Worldgen } from "./world";
@@ -24,14 +25,7 @@ const ROAD_HALF_WIDTH = 1.1;
 const ROAD_CLEARANCE = 1.5;
 const TRAIL_HALF_WIDTH = 0.8;
 const TRAIL_CLEARANCE = 0.6;
-const CAMP_RADIUS = 12;
-const CAMP_YARD = 5;
 const SNOW_LEVEL = heightLevel(0.8125);
-const TENT_OFFSETS: readonly Point[] = [
-  { x: -4, y: -2 },
-  { x: 3, y: -3 },
-  { x: 2, y: 4 },
-];
 const VEGETATION_SALT = hashString("vegetation");
 const DECORATION_SALT = hashString("decoration");
 const GROVE_SALT = hashString("groves");
@@ -97,11 +91,6 @@ const decorationFor = (biome: Biome, roll: number): Feature => {
 };
 
 const bankRise = (gap: number): number => Math.ceil(gap) * MAX_CLIMB;
-
-const settleTowardCamp = (level: number, campLevel: number, gap: number): number => {
-  const slack = Math.ceil(Math.max(0, gap - CAMP_YARD)) * MAX_CLIMB;
-  return Math.min(campLevel + slack, Math.max(campLevel - slack, level));
-};
 
 const nearbyCamps = (world: Worldgen, cx: number, cy: number): Camp[] => {
   const cell = world.cellOf({ x: cx * CHUNK_SIZE, y: cy * CHUNK_SIZE });

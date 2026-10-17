@@ -13,6 +13,7 @@ import {
   unit,
 } from "../lib";
 import { biomeOf } from "./biome";
+import { seamFits } from "./camp";
 import { MACRO_SIZE, MAX_CLIMB, heightLevel } from "./constants";
 import { type Fields, createFields } from "./fields";
 import { MAX_RIVER_REACH, type River, traceRiver } from "./rivers";
@@ -186,6 +187,7 @@ export const createWorldgen = (seed: number): Worldgen => {
     if (biome === Biome.Ocean || biome === Biome.Beach || biome === Biome.Mountain) return false;
     if (FLATNESS_PROBES.some((o) => Math.abs(level({ x: p.x + o.x, y: p.y + o.y }) - center) > CAMP_FLATNESS))
       return false;
+    if (!seamFits(level, p)) return false;
     return riversNearCell(cellOf(p)).every((river) => riverDistance(river, p) > RIVER_CLEARANCE);
   };
 

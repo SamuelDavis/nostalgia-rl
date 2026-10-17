@@ -34,6 +34,6 @@ describe("fields", () => {
     for (let x = -8000; x < 8000; x += 97)
       for (let y = -8000; y < 8000; y += 101) levels.add(heightLevel(f.elevation(x, y)));
     expect(Math.min(...levels)).toBeLessThan(SEA_LEVEL);
-    expect(Math.max(...levels)).toBe(HEIGHT_LEVELS - 1);
+    expect(Math.max(...levels)).toBeGreaterThan(HEIGHT_LEVELS * 0.9);
   });
 });

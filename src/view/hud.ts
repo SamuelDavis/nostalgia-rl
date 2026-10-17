@@ -29,7 +29,8 @@ export const createHud = (parent: HTMLElement, world: Worldgen) => {
   const update = ({ session, turnMs, tile, mode }: HudState) => {
     const { turn, facing, blocked } = session;
     const { x, y } = session.position;
-    const { elevation, temperature, moisture, drainage } = world.fields;
+    const { elevation, temperature, moisture, drainage, landform } = world.fields;
+    const form = landform(x + 0.5, y + 0.5);
     const cell = world.cellOf({ x, y });
     const rows: [string, string][] = [
       ["seed", String(world.seed)],
@@ -48,6 +49,9 @@ export const createHud = (parent: HTMLElement, world: Worldgen) => {
       ["temperature", fixed(temperature(x + 0.5, y + 0.5))],
       ["moisture", fixed(moisture(x + 0.5, y + 0.5))],
       ["drainage", fixed(drainage(x + 0.5, y + 0.5))],
+      ["continentalness", fixed(form.continentalness)],
+      ["erosion", fixed(form.erosion)],
+      ["peaks & valleys", fixed(form.peaksAndValleys)],
       ["height mode", mode],
     ];
     table.replaceChildren(
