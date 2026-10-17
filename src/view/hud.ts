@@ -2,7 +2,7 @@ import { floorDiv } from "../lib";
 import { Direction, isSwimming } from "../game/movement";
 import type { Session } from "../game/session";
 import type { Tile } from "../game/terrain";
-import { Biome, CHUNK_SIZE, Feature, Ground, Water, type Worldgen } from "../worldgen";
+import { Biome, CHUNK_SIZE, Prop, Ground, Water, type Worldgen } from "../worldgen";
 import type { HeightMode } from "./palette";
 
 export interface HudState {
@@ -31,13 +31,13 @@ export const createHud = (parent: HTMLElement, world: Worldgen) => {
     const { x, y } = session.position;
     const { elevation, temperature, moisture, drainage, landform } = world.fields;
     const form = landform(x + 0.5, y + 0.5);
-    const cell = world.cellOf({ x, y });
+    const region = world.regionOf({ x, y });
     const rows: [string, string][] = [
       ["seed", String(world.seed)],
       ["turn", `${turn} @ ${turnMs} ms`],
       ["position", `${x}, ${y}`],
       ["chunk", `${floorDiv(x, CHUNK_SIZE)}, ${floorDiv(y, CHUNK_SIZE)}`],
-      ["macro cell", `${cell.cx}, ${cell.cy}`],
+      ["region", `${region.cx}, ${region.cy}`],
       ["facing", nameOf(Direction, facing)],
       ["blocked", blocked ?? "—"],
       ["swimming", isSwimming(tile) ? "yes" : "no"],
@@ -45,7 +45,7 @@ export const createHud = (parent: HTMLElement, world: Worldgen) => {
       ["biome", nameOf(Biome, tile.biome)],
       ["ground", nameOf(Ground, tile.ground)],
       ["water", nameOf(Water, tile.water)],
-      ["feature", nameOf(Feature, tile.feature)],
+      ["prop", nameOf(Prop, tile.prop)],
       ["temperature", fixed(temperature(x + 0.5, y + 0.5))],
       ["moisture", fixed(moisture(x + 0.5, y + 0.5))],
       ["drainage", fixed(drainage(x + 0.5, y + 0.5))],

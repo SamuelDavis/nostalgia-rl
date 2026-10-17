@@ -1,4 +1,4 @@
-import { Feature, Water, Way } from "./terrain";
+import { Prop, Water, Way } from "./terrain";
 import { distance, floorDiv, hash, memoize } from "../lib";
 import { describe, expect, it } from "vitest";
 import { type Chunk, generateChunk, tileIndex } from "./chunk";
@@ -19,7 +19,7 @@ const tileAt = (world: ReturnType<typeof createWorldgen>, x: number, y: number) 
 };
 
 const digest = (chunk: Chunk) =>
-  [chunk.height, chunk.ground, chunk.water, chunk.feature, chunk.biome].reduce(
+  [chunk.height, chunk.ground, chunk.water, chunk.prop, chunk.biome].reduce(
     (h, layer) => layer.reduce((acc, v) => hash(acc, v), h),
     0,
   );
@@ -98,7 +98,7 @@ describe("generateChunk", () => {
 
   it("paves roads and bridges rivers", () => {
     const world = createWorldgen(1);
-    const { cx, cy } = world.cellOf(world.spawn);
+    const { cx, cy } = world.regionOf(world.spawn);
     const roads = world.roadsNear(cx, cy);
     expect(roads.length).toBeGreaterThan(0);
     for (const road of roads)
@@ -106,7 +106,7 @@ describe("generateChunk", () => {
         if (distance(node, road.from) < 9 || distance(node, road.to) < 9) continue;
         const { chunk, i } = tileAt(world, Math.floor(node.x), Math.floor(node.y));
         const water = chunk.water[i] !== Water.None;
-        if (water) expect(chunk.feature[i]).toBe(Feature.Bridge);
+        if (water) expect(chunk.prop[i]).toBe(Prop.Bridge);
         else expect(chunk.way[i]).toBe(Way.Road);
       }
   });
@@ -114,12 +114,12 @@ describe("generateChunk", () => {
   it("lights a campfire at the world spawn", () => {
     const world = createWorldgen(1);
     const { chunk, i } = tileAt(world, world.spawn.x, world.spawn.y);
-    expect(chunk.feature[i]).toBe(Feature.Campfire);
+    expect(chunk.prop[i]).toBe(Prop.Campfire);
   });
 
   it("grows trees", () => {
     const world = createWorldgen(1);
-    const trees = generateChunk(world, 2, 2).feature.filter((f) => f === Feature.Oak || f === Feature.Pine);
+    const trees = generateChunk(world, 2, 2).prop.filter((f) => f === Prop.Oak || f === Prop.Pine);
     expect(trees.length).toBeGreaterThan(0);
   });
 
@@ -136,7 +136,7 @@ describe("generateChunk", () => {
   it("carves rivers without cliffs", () => {
     for (const seed of [1, 2, 3]) {
       const world = createWorldgen(seed);
-      const { cx, cy } = world.cellOf(world.spawn);
+      const { cx, cy } = world.regionOf(world.spawn);
       for (const river of world.riversNear(cx, cy))
         for (const node of river.nodes.slice(1, -1)) {
           const x = Math.floor(node.x);

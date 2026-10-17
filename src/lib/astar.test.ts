@@ -2,20 +2,20 @@ import { describe, expect, it } from "vitest";
 import { findPath } from "./astar";
 
 const grid = ["....", ".##.", "...."];
-type Cell = readonly [number, number];
-const walkable = ([x, y]: Cell) => grid[y]?.[x] === ".";
-const neighbors = ([x, y]: Cell): Cell[] =>
+type Region = readonly [number, number];
+const walkable = ([x, y]: Region) => grid[y]?.[x] === ".";
+const neighbors = ([x, y]: Region): Region[] =>
   (
     [
       [x + 1, y],
       [x - 1, y],
       [x, y + 1],
       [x, y - 1],
-    ] as Cell[]
+    ] as Region[]
   ).filter(walkable);
 
-const search = (start: Cell, goal: Cell) =>
-  findPath<Cell>({
+const search = (start: Region, goal: Region) =>
+  findPath<Region>({
     start,
     isGoal: ([x, y]) => x === goal[0] && y === goal[1],
     neighbors,

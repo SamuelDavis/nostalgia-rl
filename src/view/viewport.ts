@@ -1,13 +1,13 @@
 import { type Point, hash, hashString, unit } from "../lib";
 import { isCliff, isStairs, isTrail } from "../game/movement";
 import type { Terrain, Tile } from "../game/terrain";
-import { Feature, Water, Way } from "../worldgen";
-import { PLAYER_GLYPH, STAIRS_GLYPH, featureGlyph, groundGlyph, waterGlyph, wayGlyph } from "./glyphs";
+import { Prop, Water, Way } from "../worldgen";
+import { PLAYER_GLYPH, STAIRS_GLYPH, propGlyph, groundGlyph, waterGlyph, wayGlyph } from "./glyphs";
 import {
   type HeightMode,
   type Rgb,
   css,
-  featureColor,
+  propColor,
   groundColor,
   shade,
   surfaceColor,
@@ -49,9 +49,9 @@ const isPathShown = (x: number, y: number) => unit(hash(PATH_SALT, x, y)) < PATH
 
 const lookOf = (tile: Tile, mode: HeightMode, x: number, y: number): Look => {
   const surface = tile.way === Way.Road ? wayColor[Way.Road] : groundColor[tile.ground];
-  if (tile.feature !== Feature.None) {
+  if (tile.prop !== Prop.None) {
     const background = tile.water === Water.None ? surfaceColor(mode, surface, tile.height) : waterColor[tile.water];
-    return { background, glyph: featureGlyph[tile.feature], color: featureColor[tile.feature] };
+    return { background, glyph: propGlyph[tile.prop], color: propColor[tile.prop] };
   }
   if (tile.water !== Water.None) {
     const background = waterColor[tile.water];

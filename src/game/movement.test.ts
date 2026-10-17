@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { Feature, MAX_CLIMB, Water, Way } from "../worldgen";
+import { Prop, MAX_CLIMB, Water, Way } from "../worldgen";
 import { Direction, blockerBetween, isSwimming, stepToward } from "./movement";
 
-const land = (height: number) => ({ height, way: Way.None, water: Water.None, feature: Feature.None });
+const land = (height: number) => ({ height, way: Way.None, water: Water.None, prop: Prop.None });
 const path = (height: number) => ({ ...land(height), way: Way.Path });
 
 describe("stepToward", () => {
@@ -35,15 +35,15 @@ describe("blockerBetween", () => {
     expect(blockerBetween(land(64), { ...land(63), water: Water.Deep })).toBeUndefined();
   });
 
-  it("is blocked by solid features", () => {
-    for (const feature of [Feature.Oak, Feature.Pine, Feature.Cactus, Feature.Boulder, Feature.Tent, Feature.Campfire])
-      expect(blockerBetween(land(100), { ...land(100), feature })).toBe("obstacle");
+  it("is blocked by solid props", () => {
+    for (const prop of [Prop.Oak, Prop.Pine, Prop.Cactus, Prop.Boulder, Prop.Tent, Prop.Campfire])
+      expect(blockerBetween(land(100), { ...land(100), prop })).toBe("obstacle");
   });
 
   it("walks through low plants and over bridges", () => {
-    for (const feature of [Feature.Bush, Feature.Flowers, Feature.Tuft])
-      expect(blockerBetween(land(100), { ...land(100), feature })).toBeUndefined();
-    const bridge = { height: 63, way: Way.Road, water: Water.Deep, feature: Feature.Bridge };
+    for (const prop of [Prop.Bush, Prop.Flowers, Prop.Tuft])
+      expect(blockerBetween(land(100), { ...land(100), prop })).toBeUndefined();
+    const bridge = { height: 63, way: Way.Road, water: Water.Deep, prop: Prop.Bridge };
     expect(blockerBetween({ ...land(64), way: Way.Road }, bridge)).toBeUndefined();
   });
 });
@@ -51,7 +51,7 @@ describe("blockerBetween", () => {
 describe("isSwimming", () => {
   it("is true in deep water off a bridge", () => {
     expect(isSwimming({ ...land(63), water: Water.Deep })).toBe(true);
-    expect(isSwimming({ ...land(63), water: Water.Deep, feature: Feature.Bridge })).toBe(false);
+    expect(isSwimming({ ...land(63), water: Water.Deep, prop: Prop.Bridge })).toBe(false);
     expect(isSwimming({ ...land(63), water: Water.Shallow })).toBe(false);
   });
 });

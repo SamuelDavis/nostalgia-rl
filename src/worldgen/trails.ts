@@ -1,6 +1,6 @@
 import { type Point, hash, hashString, intBetween } from "../lib";
 import { MOUNTAIN_LEVEL, biomeOf } from "./biome";
-import { MACRO_SIZE, heightLevel } from "./constants";
+import { REGION_SIZE, heightLevel } from "./constants";
 import type { Fields } from "./fields";
 import { Biome } from "./terrain";
 
@@ -18,7 +18,7 @@ export interface Peak extends Point {
 
 const SALT = hashString("glades");
 const PROBE = 16;
-const PROBES_PER_SIDE = MACRO_SIZE / PROBE;
+const PROBES_PER_SIDE = REGION_SIZE / PROBE;
 const MIN_FOREST_PROBES = 48;
 const PROBE_NEIGHBOURS: readonly Point[] = [
   { x: PROBE, y: 0 },
@@ -29,8 +29,8 @@ const PROBE_NEIGHBOURS: readonly Point[] = [
 
 const probesIn = (cx: number, cy: number): Point[] =>
   Array.from({ length: PROBES_PER_SIDE * PROBES_PER_SIDE }, (_, i) => ({
-    x: cx * MACRO_SIZE + (i % PROBES_PER_SIDE) * PROBE + PROBE / 2,
-    y: cy * MACRO_SIZE + Math.floor(i / PROBES_PER_SIDE) * PROBE + PROBE / 2,
+    x: cx * REGION_SIZE + (i % PROBES_PER_SIDE) * PROBE + PROBE / 2,
+    y: cy * REGION_SIZE + Math.floor(i / PROBES_PER_SIDE) * PROBE + PROBE / 2,
   }));
 
 export const findPeak = (fields: Fields, cx: number, cy: number): Peak | undefined => {

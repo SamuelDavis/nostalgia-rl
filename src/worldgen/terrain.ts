@@ -23,7 +23,7 @@ export type Way = (typeof Way)[keyof typeof Way];
 export const Water = { None: 0, Shallow: 1, Deep: 2 } as const;
 export type Water = (typeof Water)[keyof typeof Water];
 
-export const Feature = {
+export const Prop = {
   None: 0,
   Oak: 1,
   Pine: 2,
@@ -36,4 +36,4 @@ export const Feature = {
   Campfire: 9,
   Bridge: 10,
 } as const;
-export type Feature = (typeof Feature)[keyof typeof Feature];
+export type Prop = (typeof Prop)[keyof typeof Prop];

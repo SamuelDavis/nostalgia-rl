@@ -1,5 +1,5 @@
 import type { Point } from "../lib";
-import { Feature, MAX_CLIMB, Water, Way } from "../worldgen";
+import { Prop, MAX_CLIMB, Water, Way } from "../worldgen";
 
 export const Direction = { North: 0, East: 1, South: 2, West: 3 } as const;
 export type Direction = (typeof Direction)[keyof typeof Direction];
@@ -22,17 +22,10 @@ interface Footing {
   readonly height: number;
   readonly way: Way;
   readonly water: Water;
-  readonly feature: Feature;
+  readonly prop: Prop;
 }
 
-const SOLID: ReadonlySet<Feature> = new Set([
-  Feature.Oak,
-  Feature.Pine,
-  Feature.Cactus,
-  Feature.Boulder,
-  Feature.Tent,
-  Feature.Campfire,
-]);
+const SOLID: ReadonlySet<Prop> = new Set([Prop.Oak, Prop.Pine, Prop.Cactus, Prop.Boulder, Prop.Tent, Prop.Campfire]);
 
 export const isTrail = ({ way }: Footing): boolean => way !== Way.None;
 
@@ -42,10 +35,10 @@ export const isStairs = (from: Footing, to: Footing): boolean =>
 export const isCliff = (from: Footing, to: Footing): boolean =>
   Math.abs(to.height - from.height) > MAX_CLIMB && !isStairs(from, to);
 
-export const isSwimming = ({ water, feature }: Footing): boolean => water === Water.Deep && feature !== Feature.Bridge;
+export const isSwimming = ({ water, prop }: Footing): boolean => water === Water.Deep && prop !== Prop.Bridge;
 
 export const blockerBetween = (from: Footing, to: Footing): Blocker | undefined => {
-  if (SOLID.has(to.feature)) return "obstacle";
+  if (SOLID.has(to.prop)) return "obstacle";
   if (isCliff(from, to)) return "cliff";
   return undefined;
 };

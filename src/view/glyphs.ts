@@ -1,20 +1,20 @@
-import { Feature, Ground, Water, Way } from "../worldgen";
+import { Prop, Ground, Water, Way } from "../worldgen";
 
 export const PLAYER_GLYPH = "@";
 export const STAIRS_GLYPH = "≡";
 
-export const featureGlyph: Record<Feature, string> = {
-  [Feature.None]: "",
-  [Feature.Oak]: "♣",
-  [Feature.Pine]: "♠",
-  [Feature.Cactus]: "¥",
-  [Feature.Bush]: "♦",
-  [Feature.Boulder]: "●",
-  [Feature.Flowers]: "*",
-  [Feature.Tuft]: '"',
-  [Feature.Tent]: "▲",
-  [Feature.Campfire]: "☼",
-  [Feature.Bridge]: "#",
+export const propGlyph: Record<Prop, string> = {
+  [Prop.None]: "",
+  [Prop.Oak]: "♣",
+  [Prop.Pine]: "♠",
+  [Prop.Cactus]: "¥",
+  [Prop.Bush]: "♦",
+  [Prop.Boulder]: "●",
+  [Prop.Flowers]: "*",
+  [Prop.Tuft]: '"',
+  [Prop.Tent]: "▲",
+  [Prop.Campfire]: "☼",
+  [Prop.Bridge]: "#",
 };
 
 export const groundGlyph: Record<Ground, string> = {

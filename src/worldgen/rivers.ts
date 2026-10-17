@@ -1,5 +1,5 @@
 import { type Point, createNoise, hash, hashString, intBetween, unit } from "../lib";
-import { MACRO_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
+import { REGION_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
 import type { Fields } from "./fields";
 
 export interface RiverNode extends Point {
@@ -55,8 +55,8 @@ const downhill = ({ drainage }: Fields, p: Point): Point =>
 const sourceOf = (seed: number, cx: number, cy: number): Point | undefined => {
   if (unit(hash(seed, SALT, cx, cy)) > SOURCE_CHANCE) return undefined;
   return {
-    x: cx * MACRO_SIZE + intBetween(MARGIN, MACRO_SIZE - MARGIN, hash(seed, SALT, cx, cy, 1)),
-    y: cy * MACRO_SIZE + intBetween(MARGIN, MACRO_SIZE - MARGIN, hash(seed, SALT, cx, cy, 2)),
+    x: cx * REGION_SIZE + intBetween(MARGIN, REGION_SIZE - MARGIN, hash(seed, SALT, cx, cy, 1)),
+    y: cy * REGION_SIZE + intBetween(MARGIN, REGION_SIZE - MARGIN, hash(seed, SALT, cx, cy, 2)),
   };
 };
 

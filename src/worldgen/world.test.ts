@@ -4,7 +4,7 @@ import { SEA_LEVEL, heightLevel } from "./constants";
 import { createWorldgen } from "./world";
 
 const seeds = [1, 2, 3, 4, 5];
-const cells = Array.from({ length: 25 }, (_, i) => ({
+const regions = Array.from({ length: 25 }, (_, i) => ({
   cx: (i % 5) - 2,
   cy: Math.floor(i / 5) - 2,
 }));
@@ -19,10 +19,10 @@ describe("createWorldgen", () => {
     }
   });
 
-  it("puts the world spawn camp in its macro cell", () => {
+  it("puts the world spawn camp in its macro region", () => {
     for (const seed of seeds) {
       const world = createWorldgen(seed);
-      const { cx, cy } = world.cellOf(world.spawn);
+      const { cx, cy } = world.regionOf(world.spawn);
       expect(world.campAt(cx, cy)).toMatchObject(world.spawn);
     }
   });
@@ -30,7 +30,7 @@ describe("createWorldgen", () => {
   it("links the world spawn by road", () => {
     for (const seed of seeds) {
       const world = createWorldgen(seed);
-      const { cx, cy } = world.cellOf(world.spawn);
+      const { cx, cy } = world.regionOf(world.spawn);
       const roads = world.roadsNear(cx, cy).filter((r) => r.from === world.spawn || r.to === world.spawn);
       expect(roads.length).toBeGreaterThan(0);
     }
@@ -39,7 +39,7 @@ describe("createWorldgen", () => {
   it("connects roads between camps over land", () => {
     for (const seed of seeds) {
       const world = createWorldgen(seed);
-      const roads = cells.flatMap(({ cx, cy }) => world.roadsFrom(cx, cy));
+      const roads = regions.flatMap(({ cx, cy }) => world.roadsFrom(cx, cy));
       expect(roads.length).toBeGreaterThan(0);
       for (const road of roads) {
         expect(distance(road.nodes[0]!, road.from)).toBeLessThan(4);

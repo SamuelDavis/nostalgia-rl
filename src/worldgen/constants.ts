@@ -1,5 +1,5 @@
 export const CHUNK_SIZE = 32;
-export const MACRO_SIZE = 256;
+export const REGION_SIZE = 256;
 export const HEIGHT_LEVELS = 256;
 export const SEA_ELEVATION = 0.25;
 export const MAX_CLIMB = 2;

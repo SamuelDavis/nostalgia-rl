@@ -1,4 +1,4 @@
-import { Biome, Feature, Ground, HEIGHT_LEVELS, SEA_LEVEL, Water, Way } from "../worldgen";
+import { Biome, Prop, Ground, HEIGHT_LEVELS, SEA_LEVEL, Water, Way } from "../worldgen";
 
 export type Rgb = readonly [number, number, number];
 
@@ -32,18 +32,18 @@ export const waterColor: Record<Exclude<Water, typeof Water.None>, Rgb> = {
   [Water.Deep]: [30, 60, 130],
 };
 
-export const featureColor: Record<Feature, Rgb> = {
-  [Feature.None]: [0, 0, 0],
-  [Feature.Oak]: [30, 90, 35],
-  [Feature.Pine]: [20, 70, 50],
-  [Feature.Cactus]: [60, 130, 60],
-  [Feature.Bush]: [60, 120, 50],
-  [Feature.Boulder]: [90, 85, 80],
-  [Feature.Flowers]: [230, 200, 90],
-  [Feature.Tuft]: [70, 130, 55],
-  [Feature.Tent]: [200, 60, 40],
-  [Feature.Campfire]: [255, 160, 0],
-  [Feature.Bridge]: [120, 80, 40],
+export const propColor: Record<Prop, Rgb> = {
+  [Prop.None]: [0, 0, 0],
+  [Prop.Oak]: [30, 90, 35],
+  [Prop.Pine]: [20, 70, 50],
+  [Prop.Cactus]: [60, 130, 60],
+  [Prop.Bush]: [60, 120, 50],
+  [Prop.Boulder]: [90, 85, 80],
+  [Prop.Flowers]: [230, 200, 90],
+  [Prop.Tuft]: [70, 130, 55],
+  [Prop.Tent]: [200, 60, 40],
+  [Prop.Campfire]: [255, 160, 0],
+  [Prop.Bridge]: [120, 80, 40],
 };
 
 const HYPSOMETRIC_STOPS: readonly (readonly [elevation: number, color: Rgb])[] = [

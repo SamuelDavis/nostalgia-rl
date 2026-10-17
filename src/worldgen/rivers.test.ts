@@ -4,14 +4,14 @@ import { createFields } from "./fields";
 import { traceRiver } from "./rivers";
 
 const seeds = [1, 2, 3];
-const cells = Array.from({ length: 81 }, (_, i) => ({
+const regions = Array.from({ length: 81 }, (_, i) => ({
   cx: (i % 9) - 4,
   cy: Math.floor(i / 9) - 4,
 }));
 
 const riversFor = (seed: number) => {
   const fields = createFields(seed);
-  return cells.flatMap(({ cx, cy }) => traceRiver(seed, fields, cx, cy) ?? []);
+  return regions.flatMap(({ cx, cy }) => traceRiver(seed, fields, cx, cy) ?? []);
 };
 
 describe("traceRiver", () => {
@@ -21,8 +21,8 @@ describe("traceRiver", () => {
 
   it("is deterministic", () => {
     const fields = createFields(1);
-    const a = cells.map(({ cx, cy }) => traceRiver(1, fields, cx, cy));
-    const b = cells.map(({ cx, cy }) => traceRiver(1, createFields(1), cx, cy));
+    const a = regions.map(({ cx, cy }) => traceRiver(1, fields, cx, cy));
+    const b = regions.map(({ cx, cy }) => traceRiver(1, createFields(1), cx, cy));
     expect(a).toEqual(b);
   });
 

@@ -1,5 +1,5 @@
 import type { Point } from "../lib";
-import { Biome, MACRO_SIZE, Water, type Worldgen, biomeOf, heightLevel } from "../worldgen";
+import { Biome, REGION_SIZE, Water, type Worldgen, biomeOf, heightLevel } from "../worldgen";
 import { type HeightMode, type Rgb, biomeColor, surfaceColor, waterColor } from "./palette";
 
 export interface Mark {
@@ -21,8 +21,8 @@ export const fieldColor = (world: Worldgen, mode: HeightMode, x: number, y: numb
 };
 
 export const overviewMarks = (world: Worldgen, center: Point, radius: number): Mark[] => {
-  const span = Math.ceil(radius / MACRO_SIZE);
-  const middle = world.cellOf(center);
+  const span = Math.ceil(radius / REGION_SIZE);
+  const middle = world.regionOf(center);
   const marks: Mark[] = [];
   for (let cy = middle.cy - span; cy <= middle.cy + span; cy++)
     for (let cx = middle.cx - span; cx <= middle.cx + span; cx++) {

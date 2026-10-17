@@ -43,19 +43,20 @@ const walksAlong = (terrain: Terrain, trail: Trail): boolean => {
 
 describe("trails", () => {
   it("lead walkers to their far end, over ledges by stairs and rivers by bridge", () => {
-    const cells = Array.from({ length: 9 }, (_, i) => ({ cx: (i % 3) - 1, cy: Math.floor(i / 3) - 1 }));
-    const mountainCell = Array.from({ length: 289 }, (_, i) => ({ cx: (i % 17) - 8, cy: Math.floor(i / 17) - 8 })).find(
-      ({ cx, cy }) => findPeak(createWorldgen(1).fields, cx, cy) !== undefined,
-    )!;
+    const regions = Array.from({ length: 9 }, (_, i) => ({ cx: (i % 3) - 1, cy: Math.floor(i / 3) - 1 }));
+    const mountainRegion = Array.from({ length: 289 }, (_, i) => ({
+      cx: (i % 17) - 8,
+      cy: Math.floor(i / 17) - 8,
+    })).find(({ cx, cy }) => findPeak(createWorldgen(1).fields, cx, cy) !== undefined)!;
     const cases = [
-      ...[1, 2, 3].flatMap((seed) => cells.map((cell) => ({ seed, cell }))),
-      { seed: 1, cell: mountainCell },
+      ...[1, 2, 3].flatMap((seed) => regions.map((region) => ({ seed, region }))),
+      { seed: 1, region: mountainRegion },
     ];
     let walked = 0;
-    for (const { seed, cell } of cases) {
+    for (const { seed, region } of cases) {
       const world = createWorldgen(seed);
       const terrain = createTerrain(world);
-      for (const trail of world.trailsNear(cell.cx, cell.cy)) {
+      for (const trail of world.trailsNear(region.cx, region.cy)) {
         const { x, y } = tileOf(trail.nodes[0]!);
         expect(walksAlong(terrain, trail), `seed ${seed}, trail from ${x},${y}`).toBe(true);
         walked++;

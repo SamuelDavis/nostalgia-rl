@@ -3,7 +3,7 @@ import {
   type Biome,
   CHUNK_SIZE,
   type Chunk,
-  type Feature,
+  type Prop,
   type Ground,
   type Water,
   type Way,
@@ -16,7 +16,7 @@ export interface Tile {
   readonly height: number;
   readonly ground: Ground;
   readonly water: Water;
-  readonly feature: Feature;
+  readonly prop: Prop;
   readonly biome: Biome;
   readonly way: Way;
 }
@@ -38,7 +38,7 @@ export const createTerrain = (world: Worldgen): Terrain => {
       height: chunk.height[i]!,
       ground: chunk.ground[i] as Ground,
       water: chunk.water[i] as Water,
-      feature: chunk.feature[i] as Feature,
+      prop: chunk.prop[i] as Prop,
       biome: chunk.biome[i] as Biome,
       way: chunk.way[i] as Way,
     };
