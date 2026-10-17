@@ -24,7 +24,7 @@ import {
 } from "../region";
 import { climbCost, route } from "../routing";
 import { Biome, Cover, Ground, Prop, Water, Way } from "../terrain";
-import type { Glade } from "../trails";
+import type { Glade } from "../landmarks";
 import { CAMP_RADIUS } from "./camp";
 import type { Anchor, FeatureType } from "./feature";
 
@@ -302,6 +302,26 @@ export const createDeepForests = ({ seed, level, forestness, campAt, waysNear }:
       }),
     );
 
+  const guaranteedOpeningsOf = memoize(
+    (forest: DeepForest): Opening[] => {
+      const contains = (p: Point) => isUnder(forest, tileCentre(p));
+      const glade = gladeOf(forest);
+      return Array.from({ length: DIRECTIONS.length }, (_, i) => {
+        const direction = DIRECTIONS[(hash(forest.id, 2) + i * 3) % DIRECTIONS.length]!;
+        let length = glade.radius;
+        while (contains(along(forest, direction, length + OPENING_STEP))) length += OPENING_STEP;
+        const outside = along(forest, direction, length + OPENING_STEP);
+        return isCovered(tileCentre(outside), forest)
+          ? undefined
+          : { inside: along(forest, direction, length), outside };
+      })
+        .filter((opening) => opening !== undefined)
+        .slice(0, GUARANTEED_OPENINGS);
+    },
+    (forest) => String(forest.id),
+    REGION_CACHE,
+  );
+
   const build = (forest: DeepForest): DeepForestLayout => {
     const contains = (p: Point) => isUnder(forest, tileCentre(p));
     const glade = gladeOf(forest);
@@ -363,14 +383,7 @@ export const createDeepForests = ({ seed, level, forestness, campAt, waysNear }:
         rasterize(through, mouths);
       }
     }
-    const guaranteed = Array.from({ length: DIRECTIONS.length }, (_, i) => {
-      const direction = DIRECTIONS[(hash(forest.id, 2) + i * 3) % DIRECTIONS.length]!;
-      let length = glade.radius;
-      while (contains(along(forest, direction, length + OPENING_STEP))) length += OPENING_STEP;
-      const outside = along(forest, direction, length + OPENING_STEP);
-      return isCovered(tileCentre(outside), forest) ? undefined : { inside: along(forest, direction, length), outside };
-    }).filter((opening) => opening !== undefined);
-    for (const opening of guaranteed.slice(0, GUARANTEED_OPENINGS)) {
+    for (const opening of guaranteedOpeningsOf(forest)) {
       const nodes = routeToGlade(opening.inside);
       if (!nodes) continue;
       openings.push(opening);
@@ -425,5 +438,5 @@ export const createDeepForests = ({ seed, level, forestness, campAt, waysNear }:
     },
   };
 
-  return { partsIn, type };
+  return { partsIn, guaranteedOpeningsOf, type };
 };

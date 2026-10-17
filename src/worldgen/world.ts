@@ -1,32 +1,17 @@
-import {
-  type Point,
-  countBiasedLow,
-  createNoise,
-  distance,
-  hash,
-  hashString,
-  memoize,
-  relativeNeighbours,
-} from "../lib";
+import { type Point, memoize } from "../lib";
 import { biomeOf } from "./biome";
 import { type Camp, createCamps } from "./features/camp";
 
 export type { Camp } from "./features/camp";
 export type { DeepForestLayout } from "./features/deep-forest";
-import { type DeepForestLayout, createDeepForests, gladeOf as deepForestGlade } from "./features/deep-forest";
+import { type DeepForestLayout, createDeepForests } from "./features/deep-forest";
 import { type Anchor, type FeatureType, type PlacedFeature, place } from "./features/feature";
-import { REGION_SIZE, SEA_LEVEL, heightLevel } from "./constants";
+import { REGION_SIZE, heightLevel } from "./constants";
 import { type Fields, createFields } from "./fields";
 import { type River, createRivers } from "./rivers";
-import { climbCost, route } from "./routing";
-import { type Bounds, type Region, boundsOf, overlaps, regionBounds, regionKey, regionsAround } from "./region";
-import { type Trail, findPeak } from "./trails";
-
-export interface Road {
-  readonly from: Camp;
-  readonly to: Camp;
-  readonly nodes: readonly Point[];
-}
+import { type Bounds, type Region, overlaps, regionBounds, regionKey, regionsAround } from "./region";
+import { findPeak } from "./landmarks";
+import { type WayLink, createWays } from "./ways";
 
 export interface Worldgen {
   readonly seed: number;
@@ -34,50 +19,15 @@ export interface Worldgen {
   readonly spawn: Camp;
   readonly riversNear: (region: Region) => readonly River[];
   readonly campAt: (region: Region) => Camp | undefined;
-  readonly roadsFrom: (region: Region) => readonly Road[];
-  readonly roadsNear: (region: Region) => readonly Road[];
-  readonly trailsNear: (region: Region) => readonly Trail[];
+  readonly waysNear: (region: Region) => readonly WayLink[];
   readonly deepForestsIn: (region: Region) => readonly PlacedFeature<DeepForestLayout>[];
   readonly featuresNear: (region: Region) => readonly PlacedFeature[];
 }
 
-const ROAD_SALT = hashString("roads");
-const LINK_REGION_RADIUS = 2;
-const ROAD_WOBBLE_SCALE = 48;
-const ROAD_TYPICAL_COST = 2;
 const REGION_CACHE = 4096;
-const TRAIL_SALT = hashString("trails");
-const MAX_TRAILS_PER_LANDMARK = 5;
-const TRAIL_DIFFICULTY = 1.2;
-const TRAIL_DIFFICULTY_SCALE = 60;
-const TRAIL_REUSE = 0.35;
-const TRAIL_TYPICAL_COST = 2.5;
-
-const pointKey = ({ x, y }: Point) => `${x},${y}`;
-
-const isForward = (from: Region, to: Region) => to.ry > from.ry || (to.ry === from.ry && to.rx > from.rx);
-
-const LandmarkKind = { Camp: 0, Glade: 1, Peak: 2 } as const;
-type LandmarkKind = (typeof LandmarkKind)[keyof typeof LandmarkKind];
-
-interface Landmark extends Point {
-  readonly region: Region;
-  readonly kind: LandmarkKind;
-}
-
-const isTrailhead = (l: Landmark) => l.kind !== LandmarkKind.Camp;
-
-const ownsLink = (head: Landmark, target: Landmark) =>
-  !isTrailhead(target) ||
-  isForward(head.region, target.region) ||
-  (head.region.rx === target.region.rx && head.region.ry === target.region.ry && target.kind > head.kind);
-
 export const createWorldgen = (seed: number): Worldgen => {
   const fields = createFields(seed);
-  const roadNoise = createNoise(seed, ROAD_SALT);
-  const trailNoise = createNoise(seed, TRAIL_SALT);
   const level = (p: Point) => heightLevel(fields.elevation(p.x, p.y));
-  const isDry = (p: Point) => level(p) > SEA_LEVEL;
   const biomeAt = (p: Point) => biomeOf(fields.conditions(p.x, p.y));
 
   const rivers = createRivers(seed, fields);
@@ -103,13 +53,20 @@ export const createWorldgen = (seed: number): Worldgen => {
   };
 
   const peakOf = memoize((region: Region) => findPeak(fields, region), regionKey, REGION_CACHE);
+  const ways = createWays({
+    seed,
+    fields,
+    campAt: campAtRegion,
+    peakOf,
+    openingsIn: (region) => deepForests.partsIn(region).flatMap(deepForests.guaranteedOpeningsOf),
+  });
 
   const deepForests = createDeepForests({
     seed,
     level,
     forestness: (p) => fields.forestness(p.x, p.y),
     campAt: campAtRegion,
-    waysNear: (region) => [...roadsNearRegion(region), ...trailsNearRegion(region)],
+    waysNear: (region) => ways.near(region),
   });
   const campPlacer = placer(camps.type, (region) => {
     const camp = campAtRegion(region);
@@ -134,119 +91,13 @@ export const createWorldgen = (seed: number): Worldgen => {
     REGION_CACHE,
   );
 
-  const routeRoad = (from: Camp, to: Camp) =>
-    route(from, to, {
-      gradeLevel: level,
-      isOpen: isDry,
-      unitCost: (grade, at) => {
-        const wobble = 0.6 * (1 + roadNoise(at.x / ROAD_WOBBLE_SCALE, at.y / ROAD_WOBBLE_SCALE));
-        return 1 + wobble + climbCost(grade);
-      },
-      typicalUnitCost: ROAD_TYPICAL_COST,
-    });
-
-  const roadsFromRegion = memoize(
-    (region: Region): Road[] => {
-      const from = campAtRegion(region);
-      if (!from) return [];
-      const camps = regionsAround(region, LINK_REGION_RADIUS).flatMap((c) => {
-        const camp = campAtRegion(c);
-        return camp ? [{ x: camp.x, y: camp.y, camp, region: c }] : [];
-      });
-      return relativeNeighbours(from, camps)
-        .filter((candidate) => isForward(region, candidate.region))
-        .flatMap(({ camp: to }) => {
-          const nodes = routeRoad(from, to);
-          return nodes ? [{ from, to, nodes }] : [];
-        });
-    },
-    regionKey,
-    REGION_CACHE,
-  );
-
-  const roadsNearRegion = memoize(
-    (region: Region) =>
-      regionsAround(region, LINK_REGION_RADIUS)
-        .flatMap(roadsFromRegion)
-        .filter((road) => overlaps(boundsOf(road.nodes, 8), regionBounds(region))),
-    regionKey,
-    REGION_CACHE,
-  );
-
-  const gladeOf = memoize(
-    (region: Region) => {
-      const [forest] = deepForests.partsIn(region);
-      return forest && deepForestGlade(forest);
-    },
-    regionKey,
-    REGION_CACHE,
-  );
-
-  const landmarksIn = (region: Region): Landmark[] =>
-    (
-      [
-        [campAtRegion(region), LandmarkKind.Camp],
-        [gladeOf(region), LandmarkKind.Glade],
-        [peakOf(region), LandmarkKind.Peak],
-      ] as const
-    ).flatMap(([p, kind]) => (p ? [{ x: p.x, y: p.y, region, kind }] : []));
-
-  const trailLevel = (p: Point) => heightLevel(fields.elevationBeforeLedges(p.x, p.y));
-
-  const trailsFromRegion = memoize(
-    (region: Region): Trail[] => {
-      const candidates = regionsAround(region, 1).flatMap(landmarksIn);
-      const walked = new Set(roadsNearRegion(region).flatMap((road) => road.nodes.map(pointKey)));
-      const unitCost = (grade: number, at: Point) => {
-        const difficulty =
-          TRAIL_DIFFICULTY * (1 + trailNoise(at.x / TRAIL_DIFFICULTY_SCALE, at.y / TRAIL_DIFFICULTY_SCALE));
-        return (1 + difficulty + climbCost(grade)) * (walked.has(pointKey(at)) ? TRAIL_REUSE : 1);
-      };
-      return landmarksIn(region)
-        .filter(isTrailhead)
-        .flatMap((head) => {
-          const count = countBiasedLow(
-            MAX_TRAILS_PER_LANDMARK,
-            hash(seed, TRAIL_SALT, region.rx, region.ry, head.kind),
-          );
-          return relativeNeighbours(head, candidates)
-            .filter((target) => ownsLink(head, target))
-            .sort((a, b) => distance(head, a) - distance(head, b))
-            .slice(0, count)
-            .flatMap((target) => {
-              const nodes = route(head, target, {
-                gradeLevel: trailLevel,
-                isOpen: isDry,
-                unitCost,
-                typicalUnitCost: TRAIL_TYPICAL_COST,
-              });
-              nodes?.forEach((node) => walked.add(pointKey(node)));
-              return nodes ? [{ nodes }] : [];
-            });
-        });
-    },
-    regionKey,
-    REGION_CACHE,
-  );
-
-  const trailsNearRegion = memoize(
-    (region: Region) =>
-      regionsAround(region, 2)
-        .flatMap(trailsFromRegion)
-        .filter((trail) => overlaps(boundsOf(trail.nodes, 8), regionBounds(region))),
-    regionKey,
-    REGION_CACHE,
-  );
-
   return {
     seed,
     fields,
     spawn,
     riversNear: riversNearRegion,
     campAt: campAtRegion,
-    roadsFrom: roadsFromRegion,
-    roadsNear: roadsNearRegion,
-    trailsNear: trailsNearRegion,
+    waysNear: ways.near,
     deepForestsIn: (region) => deepForestPlacer.placedIn(region),
     featuresNear: featuresNearRegion,
   };

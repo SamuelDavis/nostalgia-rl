@@ -1,7 +1,7 @@
 import { Prop, Water, Way } from "./terrain";
 import { distance, floorDiv, hash, memoize } from "../lib";
 import { describe, expect, it } from "vitest";
-import { type Chunk, generateChunk, tileIndex } from "./chunk";
+import { type Chunk, FADE_LENGTH, generateChunk, tileIndex } from "./chunk";
 import { CHUNK_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
 import { regionOf, regionsAround } from "./region";
 import { createWorldgen } from "./world";
@@ -72,7 +72,7 @@ describe("generateChunk", () => {
       [
         517722342,
         3467417234,
-        2461489062,
+        2706048685,
         410932772,
       ]
     `);
@@ -110,11 +110,12 @@ describe("generateChunk", () => {
 
   it("paves roads and bridges rivers", () => {
     const world = worldOf(1);
-    const roads = world.roadsNear(regionOf(world.spawn));
+    const roads = world.waysNear(regionOf(world.spawn)).filter((link) => link.way === Way.Road);
     expect(roads.length).toBeGreaterThan(0);
     for (const road of roads)
       for (const node of road.nodes) {
-        if (distance(node, road.from) < 9 || distance(node, road.to) < 9) continue;
+        if (distance(node, road.nodes[0]!) < 9 || distance(node, road.nodes.at(-1)!) < 9) continue;
+        if (road.fades.some((end) => distance(node, end) < FADE_LENGTH)) continue;
         const { chunk, i } = tileAt(world, Math.floor(node.x), Math.floor(node.y));
         const water = chunk.water[i] !== Water.None;
         if (water) expect(chunk.prop[i]).toBe(Prop.Bridge);

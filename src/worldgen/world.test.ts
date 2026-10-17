@@ -2,6 +2,7 @@ import { distance, memoize } from "../lib";
 import { describe, expect, it } from "vitest";
 import { SEA_LEVEL, heightLevel } from "./constants";
 import { regionOf, regionsAround } from "./region";
+import { Way } from "./terrain";
 import { createWorldgen } from "./world";
 
 const worldOf = memoize(createWorldgen, String, 8);
@@ -31,23 +32,24 @@ describe("createWorldgen", () => {
     for (const seed of seeds) {
       const world = worldOf(seed);
       const roads = world
-        .roadsNear(regionOf(world.spawn))
-        .filter((r) => r.from === world.spawn || r.to === world.spawn);
+        .waysNear(regionOf(world.spawn))
+        .filter(
+          (link) =>
+            link.way === Way.Road &&
+            [link.nodes[0], link.nodes.at(-1)].some((end) => distance(end!, world.spawn) === 0),
+        );
       expect(roads.length).toBeGreaterThan(0);
     }
   });
 
-  it("connects roads between camps over land", () => {
+  it("lays ways over land", () => {
     for (const seed of seeds) {
       const world = worldOf(seed);
-      const roads = regions.flatMap(world.roadsFrom);
-      expect(roads.length).toBeGreaterThan(0);
-      for (const road of roads) {
-        expect(distance(road.nodes[0]!, road.from)).toBeLessThan(4);
-        expect(distance(road.nodes.at(-1)!, road.to)).toBeLessThan(4);
-        for (const node of road.nodes)
+      const links = regions.flatMap(world.waysNear);
+      expect(links.length).toBeGreaterThan(0);
+      for (const link of links)
+        for (const node of link.nodes)
           expect(heightLevel(world.fields.elevation(node.x, node.y))).toBeGreaterThanOrEqual(SEA_LEVEL);
-      }
     }
   });
 
@@ -56,6 +58,6 @@ describe("createWorldgen", () => {
     const b = createWorldgen(9);
     expect(a.spawn).toEqual(b.spawn);
     expect(a.campAt({ rx: 1, ry: 1 })).toEqual(b.campAt({ rx: 1, ry: 1 }));
-    expect(a.roadsFrom(ORIGIN)).toEqual(b.roadsFrom(ORIGIN));
+    expect(a.waysNear(ORIGIN)).toEqual(b.waysNear(ORIGIN));
   });
 });

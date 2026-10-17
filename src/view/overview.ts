@@ -4,6 +4,7 @@ import {
   type Conditions,
   REGION_SIZE,
   Water,
+  Way,
   type Worldgen,
   type Bounds,
   biomeOf,
@@ -91,8 +92,7 @@ export const overviewFeatureMarks = (world: Worldgen, center: Point, radius: num
 export const overviewMarks = (world: Worldgen, center: Point, radius: number): Mark[] => [
   ...regionsWithin(center, radius).flatMap((region) => [
     ...lineMarks(world.riversNear(region), RIVER_MARK),
-    ...lineMarks(world.trailsNear(region), TRAIL_MARK),
-    ...lineMarks(world.roadsFrom(region), ROAD_MARK),
+    ...world.waysNear(region).flatMap((link) => lineMarks([link], link.way === Way.Road ? ROAD_MARK : TRAIL_MARK)),
   ]),
   ...overviewFeatureMarks(world, center, radius),
 ];

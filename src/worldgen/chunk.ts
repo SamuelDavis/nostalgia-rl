@@ -5,6 +5,7 @@ import { type TileDraft, paintInOrder } from "./features/feature";
 import { CHUNK_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
 import type { RiverNode } from "./rivers";
 import { overlaps, regionOf } from "./region";
+import type { LinkedWay } from "./ways";
 import type { Worldgen } from "./world";
 
 export interface Chunk {
@@ -24,10 +25,12 @@ export const tileIndex = (lx: number, ly: number): number => ly * CHUNK_SIZE + l
 const TILES = CHUNK_SIZE * CHUNK_SIZE;
 const BANK_WIDTH = 12;
 const BANK_SLOPE = MAX_CLIMB * 0.75;
-const ROAD_HALF_WIDTH = 1.1;
-const ROAD_CLEARANCE = 1.5;
-const TRAIL_HALF_WIDTH = 0.8;
-const TRAIL_CLEARANCE = 0.6;
+const WAY_SHAPES: Record<LinkedWay, { readonly halfWidth: number; readonly clearance: number }> = {
+  [Way.Road]: { halfWidth: 1.1, clearance: 1.5 },
+  [Way.Path]: { halfWidth: 0.8, clearance: 0.6 },
+};
+export const FADE_LENGTH = 24;
+const FADE_SALT = hashString("way fades");
 const VEGETATION_SALT = hashString("vegetation");
 const DECORATION_SALT = hashString("decoration");
 
@@ -42,6 +45,7 @@ interface WaySegment {
   readonly kind: Way;
   readonly halfWidth: number;
   readonly clearance: number;
+  readonly fades: readonly Point[];
 }
 
 interface Pool extends Point {
@@ -75,22 +79,12 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
   const pools: Pool[] = rivers.flatMap((river) =>
     river.lake && near(river.lake, river.lake.radius + BANK_WIDTH) ? [river.lake] : [],
   );
-  const segmentsOf = (
-    ways: readonly { readonly nodes: readonly Point[] }[],
-    kind: Way,
-    halfWidth: number,
-    clearance: number,
-  ): WaySegment[] =>
-    ways.flatMap((way) =>
-      way.nodes.flatMap((a, i) => {
-        const b = way.nodes[i + 1];
-        return b && segmentNear(a, b, reach) ? [{ a, b, kind, halfWidth, clearance }] : [];
-      }),
-    );
-  const waySegments = [
-    ...segmentsOf(world.roadsNear(region), Way.Road, ROAD_HALF_WIDTH, ROAD_CLEARANCE),
-    ...segmentsOf(world.trailsNear(region), Way.Path, TRAIL_HALF_WIDTH, TRAIL_CLEARANCE),
-  ];
+  const waySegments: WaySegment[] = world.waysNear(region).flatMap(({ nodes, way, fades }) =>
+    nodes.flatMap((a, i) => {
+      const b = nodes[i + 1];
+      return b && segmentNear(a, b, reach) ? [{ a, b, kind: way, fades, ...WAY_SHAPES[way] }] : [];
+    }),
+  );
   const features = world
     .featuresNear(region)
     .filter(({ bounds }) =>
@@ -148,7 +142,9 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
         channels.some(({ a, b }) => projectOntoSegment(center, a, b).distance - b.halfWidth <= 1.5);
 
       const wayDistance = (way: WaySegment) => projectOntoSegment(center, way.a, way.b).distance;
-      const way = isSea ? undefined : waySegments.find((w) => wayDistance(w) <= w.halfWidth);
+      const fadeRoll = unit(hash(seed, FADE_SALT, x, y));
+      const isFaded = (w: WaySegment) => w.fades.some((end) => fadeRoll * FADE_LENGTH > distance(center, end));
+      const way = isSea ? undefined : waySegments.find((w) => wayDistance(w) <= w.halfWidth && !isFaded(w));
       const nearWay = waySegments.some((w) => wayDistance(w) <= w.halfWidth + w.clearance);
 
       const draft: TileDraft = {

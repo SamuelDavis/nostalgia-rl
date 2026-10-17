@@ -21,21 +21,23 @@ Each stage depends only on coarser stages within a bounded neighbourhood. That i
 4. **Features** (`features/`): see [CONTEXT.md](../CONTEXT.md) for the vocabulary and [ADR 0001](adr/0001-contiguous-world-with-features.md) for the model. A `FeatureType` (`features/feature.ts`) has a priority, a maximum reach from its anchor, the bounds of an anchor's footprint (checked before building), a `build` step run once per anchor (cached), and a `paint` step that rewrites each tile of its footprint over the terrain. Chunks paint the features whose bounds overlap them in priority order; claimed tiles get no vegetation.
    - **Deep forest** (`features/deep-forest.ts`). Grows wherever forestness is deep: each connected blob of deep forest in a region is one part, with its own glade. Parts in neighbouring regions meet at the seam and are joined by a link that both sides pick from a hash of both parts, so one forest can span many regions. It is dense enough that its paths and rivers are the only ways in. Every opening, link and way ending inside connects to the glade within the forest; a way that can't be connected passes through uncovered instead. A canopy covers it, notched at each opening. The glade of a region's largest part is its trailhead. The view hides covered tiles unless the player stands under cover, and marks a threshold (`∩`) where a way passes under it.
    - **Camp** (`features/camp.ts`). Siting rule: flat, dry, non-mountain land away from rivers, where the settled seam can blend into the surrounding terrain. The world spawn is the nearest valid site to the origin, and regions around the spawn always get camps. Paint: a flat dirt yard at the median level of the ground around it (not its centre tile, which may be a bump or dip), surroundings settled within `MAX_CLIMB` per tile, tents (never on a way) and a campfire.
-5. **Route network** (`world.ts`, `routing.ts`, `trails.ts`): which places connect comes from the relative neighbourhood graph, and how comes from weighted A\* over a cost field with 16 move directions. See [research](research/worldgen-techniques.md).
-   - Routes stay on dry land: real height is checked at each node and step midpoint, and chunks never lay a way on sea. Bridges are only for rivers and lakes.
-   - **Roads** link each camp to its relative neighbours within two cells, each pair owned by one side. Cost: slope, with steps steeper than `MAX_CLIMB` heavily penalised, plus wobble noise.
-   - **Trails** start at landmarks: the glade of a region's largest deep forest part and a peak in each mountainous one. Each links to its nearest 1–5 relative neighbours among nearby camps, glades and peaks, with the count biased toward 1. Cost: grade on elevation before ledges (ledges are crossed by stairs, see `src/game/movement.ts`), plus difficulty noise. Tiles already on a road or an earlier trail are discounted, so trails merge instead of crossing.
+5. **Way network** (`ways.ts`, `routing.ts`, [ADR 0004](adr/0004-ways-and-rivers-on-a-node-lattice.md)): nodes on a lattice of 128-tile cells, linked only to nodes within their reach.
+   - A cell holds a lattice node with probability equal to its wayness: a base per biome (grassland highest, desert lowest) raised near camps. Camps and peaks are nodes too.
+   - Each node links to its relative neighbours within its reach (camps reach furthest, so they almost always join), a lattice node to 1–3 of them, biased toward 1; each link is owned by one side. Links are routed by A\* over a short box: slope, steps steeper than `MAX_CLIMB` heavily penalised, wobble noise; routes stay on dry land.
+   - A link is a road if it touches a camp or both ends have high wayness, so roads radiate from camps and become paths in emptier country. Paths are graded on elevation before ledges, which they cross by stairs (`src/game/movement.ts`).
+   - A lattice node with a single link is a dead end: the way fades out over its last tiles there.
+   - Each deep forest's guaranteed openings attach to the nearest node within one cell that isn't a dead end; with none in reach, a short path leads out from the opening and fades.
 6. **Chunk** (`chunk.ts`), per tile:
    - classify the biome;
    - flood the ocean;
    - carve rivers and lakes, with beds interpolated between nodes and banks that rise `MAX_CLIMB` per tile;
-   - lay roads and trails into the `way` layer, placing bridges over water;
+   - lay ways into the `way` layer, placing bridges over water and thinning faded ends;
    - paint features in priority order;
    - grow vegetation from biome density plus a grove noise layer (forests with clearings, groves in grassland);
    - add decorations.
      Snow appears in cold areas, with a noise-dithered edge.
 
-Results for a region (rivers, anchors, placed features, roads, trails) are memoized in an LRU cache inside the world object. The first chunk in a new region pays for routing every road and trail its features read: trails reuse roads within two regions of their own, so one cold chunk routes roads from 9×9 regions and trails from 5×5. On the author's machine an isolated cold region takes about 600 ms, and a warm chunk about 4 ms (`npm run bench`).
+Results for a region (rivers, anchors, placed features, ways) are memoized in an LRU cache inside the world object. The first chunk in a new region pays for the links and features near it. On the author's machine an isolated cold region takes about 220 ms, and a warm chunk about 4 ms (`npm run bench`).
 
 ## Determinism
 
@@ -50,7 +52,7 @@ Peers will generate terrain independently, so results must be bit-identical acro
 - `*.test.ts` files sit next to their sources. They check:
   - **determinism:** generation order and world instance don't affect results;
   - **golden digests** of four chunks, one crossed by a river (`chunk.test.ts`): update them deliberately, with `-u`, whenever generation is meant to change;
-  - **invariants across seeds:** rivers never flow uphill, never narrow downstream, and flow on into another river, the sea or a lake; roads cross land, the spawn is dry and near the origin, and carving (rivers, camps) never makes a step steeper than `max(MAX_CLIMB, natural step)`; trails are walkable up to their far end under the game's movement rules (`src/game/trails.test.ts`).
+  - **invariants across seeds:** rivers never flow uphill, never narrow downstream, and flow on into another river, the sea or a lake; ways cross land, neighbouring regions agree on the links they share, few ways fade and almost every camp has a road, the spawn is dry and near the origin, and carving (rivers, camps) never makes a step steeper than `max(MAX_CLIMB, natural step)`; ways are walkable up to their far end, or to where they fade, under the game's movement rules (`src/game/ways.test.ts`).
 - Tests tagged `slow` sweep many seeds or regions; `npm test` skips them; `npm run test:all` and `npm run verify` run them. Tests share one world per seed within a file, since a cold region costs far more than a warm one.
 - `chunk.bench.ts` asserts a time budget for a warm chunk.
 
@@ -61,7 +63,7 @@ Peers will generate terrain independently, so results must be bit-identical acro
 - `--seed N`: the world seed.
 - `--x X --y Y`: the centre, in tiles.
 - `--size PX`: the image size in pixels.
-- `--scale S`: tiles per pixel. The default biome layer samples the fields directly and overlays rivers, roads, trails and features (deep forests tinted, camps and glades marked); it's good for overviews at scale 4–32.
+- `--scale S`: tiles per pixel. The default biome layer samples the fields directly and overlays rivers, roads, paths and features (deep forests tinted, camps and glades marked); it's good for overviews at scale 4–32.
 - `--layer tiles`: renders real chunk output (ground, water, props, ways, canopy shaded) with features marked, and needs `--scale 1`.
 - `--height shade|tint`: height rendering, as in the game's height modes (`src/view/palette.ts`).
 

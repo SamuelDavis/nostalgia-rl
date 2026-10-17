@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { type Point, projectOntoSegment, memoize } from "../lib";
-import { type Trail, Way, createWorldgen, findPeak, regionsAround } from "../worldgen";
+import { type Point, distance, projectOntoSegment, memoize } from "../lib";
+import {
+  type Bounds,
+  Cover,
+  FADE_LENGTH,
+  Way,
+  type WayLink,
+  boundsOf,
+  createWorldgen,
+  findPeak,
+  regionsAround,
+} from "../worldgen";
 import { blockerBetween } from "./movement";
 import { type Terrain, createTerrain } from "./terrain";
 
@@ -14,19 +24,27 @@ const NEIGHBOURS: readonly Point[] = [
 ];
 
 const CORRIDOR = 3;
+const DETOUR = 48;
+
+const isWithin = (p: Point, { minX, minY, maxX, maxY }: Bounds) =>
+  p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY;
 const ORIGIN = { rx: 0, ry: 0 };
 
 const tileOf = (p: Point): Point => ({ x: Math.floor(p.x), y: Math.floor(p.y) });
 
-const nearTrail = (trail: Trail, p: Point): boolean =>
-  trail.nodes.some((a, i) => {
-    const b = trail.nodes[i + 1] ?? a;
+const nearLink = (link: WayLink, p: Point): boolean =>
+  link.nodes.some((a, i) => {
+    const b = link.nodes[i + 1] ?? a;
     return projectOntoSegment({ x: p.x + 0.5, y: p.y + 0.5 }, a, b).distance <= CORRIDOR;
   });
 
-const walksAlong = (terrain: Terrain, trail: Trail): boolean => {
-  const start = tileOf(trail.nodes[0]!);
-  const goal = tileOf(trail.nodes.at(-1)!);
+const unfaded = (link: WayLink) =>
+  link.nodes.filter((node) => link.fades.every((end) => distance(node, end) >= FADE_LENGTH));
+
+const walksAlong = (terrain: Terrain, link: WayLink, from: Point, to: Point): boolean => {
+  const area = boundsOf(link.nodes, DETOUR);
+  const start = tileOf(from);
+  const goal = tileOf(to);
   const key = (p: Point) => `${p.x},${p.y}`;
   const seen = new Set([key(start)]);
   const frontier = [start];
@@ -36,7 +54,7 @@ const walksAlong = (terrain: Terrain, trail: Trail): boolean => {
     for (const o of NEIGHBOURS) {
       const n = { x: p.x + o.x, y: p.y + o.y };
       const to = terrain(n.x, n.y);
-      const onWay = to.way === Way.Path || nearTrail(trail, n);
+      const onWay = (to.way !== Way.None && (to.cover !== Cover.None || isWithin(n, area))) || nearLink(link, n);
       if (seen.has(key(n)) || !onWay || blockerBetween(terrain(p.x, p.y), to)) continue;
       seen.add(key(n));
       frontier.push(n);
@@ -45,7 +63,7 @@ const walksAlong = (terrain: Terrain, trail: Trail): boolean => {
   return false;
 };
 
-describe("trails", () => {
+describe("ways", () => {
   it("lead walkers to their far end, over ledges by stairs and rivers by bridge", { tags: "slow" }, () => {
     const regions = regionsAround(ORIGIN, 1);
     const mountainRegion = regionsAround(ORIGIN, 8).find(
@@ -59,9 +77,11 @@ describe("trails", () => {
     for (const { seed, region } of cases) {
       const world = worldOf(seed);
       const terrain = createTerrain(world);
-      for (const trail of world.trailsNear(region)) {
-        const { x, y } = tileOf(trail.nodes[0]!);
-        expect(walksAlong(terrain, trail), `seed ${seed}, trail from ${x},${y}`).toBe(true);
+      for (const link of world.waysNear(region)) {
+        const ends = unfaded(link);
+        if (ends.length < 2) continue;
+        const { x, y } = tileOf(ends[0]!);
+        expect(walksAlong(terrain, link, ends[0]!, ends.at(-1)!), `seed ${seed}, way from ${x},${y}`).toBe(true);
         walked++;
       }
     }

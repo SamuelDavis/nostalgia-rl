@@ -4,10 +4,6 @@ import { REGION_SIZE, heightLevel } from "./constants";
 import type { Fields } from "./fields";
 import type { Region } from "./region";
 
-export interface Trail {
-  readonly nodes: readonly Point[];
-}
-
 export interface Glade extends Point {
   readonly radius: number;
 }
