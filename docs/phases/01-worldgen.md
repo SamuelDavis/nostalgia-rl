@@ -10,7 +10,7 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 
 - **Exploration:** `@` moves one tile per turn with WASD. Turns default to 100 ms in this phase so exploring is quick; the real turn length is decided with movement smoothing (see [ideas](../ideas.md#smoothed-grid-movement)). A tap between turns is buffered and acts once (latest tap wins); a held key repeats every turn. No diagonals.
 - **Presentation:** glyphs on a canvas; HTML HUD on top showing position and worldgen debug data for the player's tile; M toggles an HTML map of the field-sampled overview (`src/view/overview.ts`).
-- **Camera:** close and overhead, standing in for what you'd see first-person. It leads the heading, which each turn tick steers toward the facing (about 3 ticks to swing round; zig-zags settle diagonal), so single turns don't jerk it; zoom is recomputed every tick too, so it follows turning on the spot. Zoom follows how far the ground drops away in the heading's direction (8 compass directions, sampled 12 and 24 tiles out): looking up a slope or across a plain stays close (24 tiles across the short side), looking down a slope or off a summit opens out (up to 64). The camera also leans toward open, lower ground. While the player acts, zoom holds near the close view and takes only a quarter of that widening, so navigating stays agile; after 1.5 s idle it settles to the full view. The user's zoom modifier (+/−, wheel) adds tiles on top. The tile layer is drawn at the resting zoom and redraws only when the player moves, the resting zoom changes, or the view leaves an 8-tile margin; easing frames pan and scale it (zoom eases over ~600 ms), so zoom changes are continuous rather than whole-pixel steps.
+- **Camera:** close and overhead, standing in for what you'd see first-person. It leads the heading, which each turn tick steers toward the facing (about 3 ticks to swing round; zig-zags settle diagonal), so single turns don't jerk it; zoom is recomputed every tick too, so it follows turning on the spot. Zoom follows how far the ground drops away in the heading's direction (8 compass directions, sampled 12 and 24 tiles out): looking up a slope or across a plain stays close (24 tiles across the short side), looking down a slope or off a summit opens out (up to 64). The camera also leans toward open, lower ground. That is the settled view. While the player acts, zoom holds a practical 10–20 tiles by the same measure, so navigating stays agile; after 1.5 s idle it settles. An obstacle or cliff within 3 tiles in the facing direction caps both, from 6 tiles with your nose against it, so a blocked line of sight reads as one. The user's zoom modifier (+/−, wheel) adds tiles on top. The tile layer is drawn at the resting zoom and redraws only when the player moves, the resting zoom changes, or the view leaves an 8-tile margin; easing frames pan and scale it (zoom eases over ~600 ms), so zoom changes are continuous rather than whole-pixel steps.
 - **Deep forest:** the first bespoke feature; dense enough (85% trees at the core) that its own paths are the way through. A canopy hides its interior from outside; standing under it reveals the floor, darkened. See [worldgen](../worldgen.md).
 - **Scale:** 1 m tiles, 0.5 m levels, compressed relief; see [ADR 0002](../adr/0002-scale.md).
 - **Height resolution:** 256 levels (was 16). At 16, the steepest natural tile rose under half a level, so cliffs could not exist and height bands were ~60 tiles wide.
@@ -30,6 +30,17 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 ## Playtest log
 
 _Record user feedback verbatim, newest first, with the commit it refers to._
+
+### b1442f0: practical zoom while acting
+
+> no it was entirely the zoom: the path was a stair through a cliff and I was struggling to get myself right on that square because I was so zoomed out I couldn't quite see it. I think the paths and the stairs look great.
+>
+> a couple things:
+>
+> - `?seed=1&x=84&y=-420`, facing east, my face is against a tree, and yet I have a huge range of vision; arguably with my face right against an obsticle it should be zoomed into like 12 or even 6
+> - I think a practical view range would be 10-20, so as you're moving down elevations it can sink to 10 and as you're going up it can raise to 20, all while the settles value is whatever we calculated before so that after some idleness the camera is then, gently, going to zoom to that level. Apply on top of that: when you're nose up against an obstacle like a tree or a cliff then the camera dynamically zooming in to below the "practical" view drives home the impractical reality that your first-person line of sight is taken up by this obstacle
+
+Practical span 10–20 while acting, by the same directional drop as the settled span; obstacles within 3 tiles ahead cap both (6, 10, 14 tiles).
 
 ### 1d68d09: continuous zoom
 

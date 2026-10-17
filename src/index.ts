@@ -6,11 +6,13 @@ import { playTurn, startSession } from "./game/session";
 import { createTerrain } from "./game/terrain";
 import {
   attentiveSpan,
+  clearanceAhead,
   createCamera,
   lookOffset,
   modifierWithin,
   naturalSpan,
   openness,
+  practicalSpan,
   spanOf,
   steer,
 } from "./view/camera";
@@ -55,6 +57,8 @@ const opennessAt = (p: Point) => openness((x, y) => terrain(x, y).height, p);
 let open = opennessAt(session.position);
 let heading: Point = { x: 0, y: 0 };
 let natural = naturalSpan(open, heading);
+let practical = practicalSpan(open, heading);
+let clearance = clearanceAhead(terrain, session.position, session.facing);
 let lastActionAt = performance.now();
 const camera = createCamera();
 const drawViewport = createViewport(ctx);
@@ -74,7 +78,7 @@ let dirty = true;
 let drawn = "";
 let lastFrame = performance.now();
 const render = (now: number) => {
-  const span = attentiveSpan(natural, now - lastActionAt);
+  const span = attentiveSpan({ natural, practical, clearance }, now - lastActionAt);
   const view = camera(
     { position: session.position, look: lookOffset(open, heading), span: spanOf(span, zoomModifier) },
     { width: canvas.clientWidth, height: canvas.clientHeight },
@@ -123,6 +127,8 @@ const frame = (now: number) => {
     }
     heading = steer(heading, stepToward({ x: 0, y: 0 }, session.facing));
     natural = naturalSpan(open, heading);
+    practical = practicalSpan(open, heading);
+    clearance = clearanceAhead(terrain, session.position, session.facing);
     dirty = true;
     nextTurn = Math.max(nextTurn + turnMs, now);
   }

@@ -1,6 +1,19 @@
 import { describe, expect, it } from "vitest";
+import { Direction } from "../game/movement";
+import type { Terrain } from "../game/terrain";
 import { type Point } from "../lib";
-import { SETTLE_MS, approach, attentiveSpan, lookOffset, naturalSpan, openness, steer } from "./camera";
+import { Biome, Cover, Ground, Prop, Water, Way } from "../worldgen";
+import {
+  SETTLE_MS,
+  approach,
+  attentiveSpan,
+  clearanceAhead,
+  lookOffset,
+  naturalSpan,
+  openness,
+  practicalSpan,
+  steer,
+} from "./camera";
 
 const cone = (x: number, y: number) => 200 - Math.abs(x) - Math.abs(y);
 const plain = () => 100;
@@ -65,19 +78,74 @@ describe("naturalSpan", () => {
   });
 });
 
-describe("attentiveSpan", () => {
-  const summit = naturalSpan(openness(cone, ORIGIN), EAST);
-  const level = naturalSpan(openness(plain, ORIGIN), EAST);
-
-  it("holds close to the near view while acting, widening only a little with the view", () => {
-    expect(attentiveSpan(summit, 0)).toBeLessThan(summit);
-    expect(attentiveSpan(summit, 0)).toBeGreaterThan(level);
-    expect(attentiveSpan(level, 0)).toBe(level);
+describe("practicalSpan", () => {
+  it("stays well inside the settled view", () => {
+    for (const ground of [plain, cone, risingEast])
+      for (const heading of [EAST, WEST, STILL])
+        expect(practicalSpan(openness(ground, ORIGIN), heading)).toBeLessThan(
+          naturalSpan(openness(ground, ORIGIN), heading),
+        );
   });
 
-  it("settles to the full view after standing idle", () => {
-    expect(attentiveSpan(summit, SETTLE_MS - 1)).toBe(attentiveSpan(summit, 0));
-    expect(attentiveSpan(summit, SETTLE_MS)).toBe(summit);
+  it("widens a little looking down, from the near view looking up or across", () => {
+    const slope = openness(risingEast, ORIGIN);
+    expect(practicalSpan(slope, EAST)).toBe(practicalSpan(openness(plain, ORIGIN), EAST));
+    expect(practicalSpan(slope, WEST)).toBeGreaterThan(practicalSpan(slope, EAST));
+  });
+});
+
+const field =
+  (prop: (x: number) => Prop, height: (x: number) => number = () => 100): Terrain =>
+  (x) => ({
+    height: height(x),
+    ground: Ground.Grass,
+    water: Water.None,
+    prop: prop(x),
+    biome: Biome.Grassland,
+    way: Way.None,
+    cover: Cover.None,
+  });
+
+describe("clearanceAhead", () => {
+  const treeAt = (at: number) => field((x) => (x === at ? Prop.Oak : Prop.None));
+
+  it("counts the clear tiles before the first obstacle", () => {
+    expect(clearanceAhead(treeAt(1), ORIGIN, Direction.East)).toBe(0);
+    expect(clearanceAhead(treeAt(3), ORIGIN, Direction.East)).toBe(2);
+  });
+
+  it("treats a cliff as an obstacle", () => {
+    expect(
+      clearanceAhead(
+        field(
+          () => Prop.None,
+          (x) => (x >= 2 ? 120 : 100),
+        ),
+        ORIGIN,
+        Direction.East,
+      ),
+    ).toBe(1);
+  });
+
+  it("only looks the way you face", () => {
+    expect(clearanceAhead(treeAt(1), ORIGIN, Direction.West)).toBeGreaterThan(2);
+  });
+});
+
+describe("attentiveSpan", () => {
+  const spans = { natural: 50, practical: 15, clearance: Infinity };
+
+  it("holds the practical view while acting and settles to the natural view when idle", () => {
+    expect(attentiveSpan(spans, 0)).toBe(15);
+    expect(attentiveSpan(spans, SETTLE_MS - 1)).toBe(15);
+    expect(attentiveSpan(spans, SETTLE_MS)).toBe(50);
+  });
+
+  it("closes in on an obstacle in your face, more the nearer it is, even when idle", () => {
+    const nose = attentiveSpan({ ...spans, clearance: 0 }, SETTLE_MS);
+    const nearby = attentiveSpan({ ...spans, clearance: 1 }, 0);
+    expect(nose).toBeLessThan(nearby);
+    expect(nearby).toBeLessThan(15);
   });
 });
 
