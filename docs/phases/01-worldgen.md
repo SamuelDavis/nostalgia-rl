@@ -33,6 +33,10 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 
 _Record user feedback verbatim, newest first, with the commit it refers to._
 
+### 1ea8663: chunks in a worker
+
+> It feels very good.
+
 ### 24a7bca: footsteps
 
 > can you cheaply/easily add a little noise to that so each step has just a little bit of variance so the bobbing isn't quite uniform?
