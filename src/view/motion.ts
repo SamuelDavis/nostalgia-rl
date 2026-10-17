@@ -1,12 +1,16 @@
 import { Direction } from "../game/movement";
-import { type Point, clamp, lerp, mod } from "../lib";
+import { type Point, clamp, hash, lerp, mod, unit } from "../lib";
 
 const STRIDE = 0.5;
+const STRIDE_VARIANCE = 0.2;
 
-const footstep = (progress: number): number => progress - (STRIDE * Math.sin(2 * Math.PI * progress)) / (2 * Math.PI);
+const strideTo = ({ x, y }: Point) => STRIDE + STRIDE_VARIANCE * (2 * unit(hash(x, y)) - 1);
+
+const footstep = (progress: number, stride: number): number =>
+  progress - (stride * Math.sin(2 * Math.PI * progress)) / (2 * Math.PI);
 
 const between = (from: Point, to: Point, progress: number): Point => {
-  const t = footstep(clamp(progress, 0, 1));
+  const t = footstep(clamp(progress, 0, 1), strideTo(to));
   return { x: lerp(from.x, to.x, t), y: lerp(from.y, to.y, t) };
 };
 

@@ -35,6 +35,15 @@ describe("createGlide", () => {
     expect(covered(0, 10)).toBeGreaterThan(0);
   });
 
+  it("varies a little from step to step", () => {
+    const glide = createGlide(DURATION, { x: 0, y: 0 });
+    const starts = [1, 2, 3, 4].map((x) => {
+      glide.moveTo({ x, y: 0 }, x * DURATION);
+      return (glide.shownAt(x * DURATION + 10).x - (x - 1)).toFixed(6);
+    });
+    expect(new Set(starts).size).toBeGreaterThan(1);
+  });
+
   it("turns mid-glide from where it is shown, without jumping", () => {
     const glide = createGlide(DURATION, { x: 0, y: 0 });
     glide.moveTo({ x: 1, y: 0 }, 0);
