@@ -10,7 +10,7 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 
 - **Exploration:** `@` moves one tile per turn with WASD. Turns default to 100 ms in this phase so exploring is quick; the real turn length is decided with movement smoothing (see [ideas](../ideas.md#smoothed-grid-movement)). A tap between turns is buffered and acts once (latest tap wins); a held key repeats every turn. No diagonals.
 - **Presentation:** glyphs on a canvas; HTML HUD on top showing position and worldgen debug data for the player's tile; M toggles an HTML map of the field-sampled overview (`src/view/overview.ts`).
-- **Camera:** close and overhead, standing in for what you'd see first-person. It leads the heading, which each turn tick steers toward the facing (about 3 ticks to swing round; zig-zags settle diagonal), so single turns don't jerk it; zoom is recomputed every tick too, so it follows turning on the spot. Zoom follows how far the ground drops away in the heading's direction (8 compass directions, sampled 12 and 24 tiles out): looking up a slope or across a plain stays close (24 tiles across the short side), looking down a slope or off a summit opens out (up to 64). The camera also leans toward open, lower ground. The user's zoom modifier (+/−, wheel) adds tiles on top. The tile layer redraws only when the player moves or the view leaves an 8-tile margin; easing frames just pan it.
+- **Camera:** close and overhead, standing in for what you'd see first-person. It leads the heading, which each turn tick steers toward the facing (about 3 ticks to swing round; zig-zags settle diagonal), so single turns don't jerk it; zoom is recomputed every tick too, so it follows turning on the spot. Zoom follows how far the ground drops away in the heading's direction (8 compass directions, sampled 12 and 24 tiles out): looking up a slope or across a plain stays close (24 tiles across the short side), looking down a slope or off a summit opens out (up to 64). The camera also leans toward open, lower ground. The user's zoom modifier (+/−, wheel) adds tiles on top. The tile layer is drawn at the resting zoom and redraws only when the player moves, the resting zoom changes, or the view leaves an 8-tile margin; easing frames pan and scale it (zoom eases over ~600 ms), so zoom changes are continuous rather than whole-pixel steps.
 - **Deep forest:** the first bespoke feature; dense enough (85% trees at the core) that its own paths are the way through. A canopy hides its interior from outside; standing under it reveals the floor, darkened. See [worldgen](../worldgen.md).
 - **Scale:** 1 m tiles, 0.5 m levels, compressed relief; see [ADR 0002](../adr/0002-scale.md).
 - **Height resolution:** 256 levels (was 16). At 16, the steepest natural tile rose under half a level, so cliffs could not exist and height bands were ~60 tiles wide.
@@ -30,6 +30,12 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 ## Playtest log
 
 _Record user feedback verbatim, newest first, with the commit it refers to._
+
+### 6bfda2b: heading and zoom per tick
+
+> It's real jerky now, as you turn and the relative zoom level wants to change it's very choppy. If you're standing still and the zoom is fixing itself it feels okay, but if you're also moving then it's very choppy and unpleasant.
+
+Zoom eased in whole-pixel tile sizes (~5% jumps), and every jump redrew the whole layer on top of the per-step redraw. Now zoom eases by scaling a layer drawn at the resting tile size, more slowly.
 
 ### e7ae456: close camera, relative height shading
 

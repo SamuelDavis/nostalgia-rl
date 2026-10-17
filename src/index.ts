@@ -70,7 +70,9 @@ const render = (now: number) => {
     now - lastFrame,
   );
   lastFrame = now;
-  const placement = [view.centre.x, view.centre.y].map((v) => Math.round(v * view.cellPx)).join() + `,${view.cellPx}`;
+  const placement = [view.centre.x * view.tilePx, view.centre.y * view.tilePx, view.tilePx * 100]
+    .map(Math.round)
+    .join();
   if (!dirty && placement === drawn) return;
   drawViewport(terrain, view, session.position, mode);
   hud.update({

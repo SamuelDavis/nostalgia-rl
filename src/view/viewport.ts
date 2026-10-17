@@ -250,29 +250,45 @@ const drawTiles = (
 const LAYER_SNAP = 8;
 const snapToLayer = (edge: number) => Math.floor(edge / LAYER_SNAP) * LAYER_SNAP;
 
+interface Drawn {
+  readonly area: TileWindow;
+  readonly key: string;
+}
+
+const covers = (area: TileWindow, left: number, top: number, columns: number, rows: number) =>
+  area.left <= left &&
+  area.top <= top &&
+  area.left + area.columns >= left + columns &&
+  area.top + area.rows >= top + rows;
+
 export const createViewport = (ctx: CanvasRenderingContext2D) => {
   const layer = document.createElement("canvas").getContext("2d")!;
-  let drawn = "";
-  return (terrain: Terrain, { centre, cellPx }: View, player: Point, mode: HeightMode): void => {
+  let drawn: Drawn | undefined;
+  return (terrain: Terrain, { centre, tilePx, restingTilePx }: View, player: Point, mode: HeightMode): void => {
     const { clientWidth: width, clientHeight: height } = ctx.canvas;
-    const area: TileWindow = {
-      left: snapToLayer(centre.x - width / 2 / cellPx),
-      top: snapToLayer(centre.y - height / 2 / cellPx),
-      columns: Math.ceil(width / cellPx) + 1 + LAYER_SNAP,
-      rows: Math.ceil(height / cellPx) + 1 + LAYER_SNAP,
-      cellPx,
-    };
-    const [layerWidth, layerHeight] = [area.columns * cellPx, area.rows * cellPx];
-    const key = [...Object.values(area), devicePixelRatio, player.x, player.y, mode].join();
-    if (key !== drawn) {
-      layer.canvas.width = Math.round(layerWidth * devicePixelRatio);
-      layer.canvas.height = Math.round(layerHeight * devicePixelRatio);
+    const visibleLeft = centre.x - width / 2 / tilePx;
+    const visibleTop = centre.y - height / 2 / tilePx;
+    const key = [restingTilePx, devicePixelRatio, player.x, player.y, mode].join();
+    const isCurrent =
+      drawn?.key === key && covers(drawn.area, visibleLeft, visibleTop, width / tilePx, height / tilePx);
+    if (!isCurrent) {
+      const widestTilePx = Math.min(tilePx, restingTilePx);
+      const area: TileWindow = {
+        left: snapToLayer(visibleLeft),
+        top: snapToLayer(visibleTop),
+        columns: Math.ceil(width / widestTilePx) + 1 + LAYER_SNAP,
+        rows: Math.ceil(height / widestTilePx) + 1 + LAYER_SNAP,
+        cellPx: restingTilePx,
+      };
+      layer.canvas.width = Math.round(area.columns * restingTilePx * devicePixelRatio);
+      layer.canvas.height = Math.round(area.rows * restingTilePx * devicePixelRatio);
       layer.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
       drawTiles(layer, terrain, area, player, mode);
-      drawn = key;
+      drawn = { area, key };
     }
-    const originX = Math.round(width / 2 - (centre.x - area.left) * cellPx);
-    const originY = Math.round(height / 2 - (centre.y - area.top) * cellPx);
-    ctx.drawImage(layer.canvas, originX, originY, layerWidth, layerHeight);
+    const { area } = drawn!;
+    const originX = Math.round(width / 2 - (centre.x - area.left) * tilePx);
+    const originY = Math.round(height / 2 - (centre.y - area.top) * tilePx);
+    ctx.drawImage(layer.canvas, originX, originY, area.columns * tilePx, area.rows * tilePx);
   };
 };

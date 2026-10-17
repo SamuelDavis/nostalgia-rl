@@ -80,8 +80,8 @@ describe("lookOffset", () => {
 
 describe("approach", () => {
   it("moves part of the way toward the target, more with more time", () => {
-    const short = approach(0, 10, 50);
-    const long = approach(0, 10, 500);
+    const short = approach(0, 10, 50, 250);
+    const long = approach(0, 10, 500, 250);
     expect(short).toBeGreaterThan(0);
     expect(long).toBeGreaterThan(short);
     expect(long).toBeLessThan(10);

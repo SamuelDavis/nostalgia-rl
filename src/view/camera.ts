@@ -8,7 +8,8 @@ export interface Extent {
 
 export interface View {
   readonly centre: Point;
-  readonly cellPx: number;
+  readonly tilePx: number;
+  readonly restingTilePx: number;
 }
 
 const COMPASS: readonly Point[] = Array.from({ length: 8 }, (_, i) => ({
@@ -23,7 +24,9 @@ const STEER = 0.3;
 const LEAD = 0.25;
 const LEAN = 0.5;
 const MAX_OFFSET = 0.35;
-const EASING_MS = 250;
+const PAN_EASING_MS = 250;
+const ZOOM_EASING_MS = 600;
+const RESTING_PX_TOLERANCE = 0.01;
 const MIN_SPAN = 8;
 const MAX_SPAN = 160;
 
@@ -62,8 +65,8 @@ export const lookOffset = (open: readonly number[], heading: Point): Point => {
   };
 };
 
-export const approach = (current: number, target: number, elapsedMs: number): number =>
-  target + (current - target) * Math.exp(-elapsedMs / EASING_MS);
+export const approach = (current: number, target: number, elapsedMs: number, easingMs: number): number =>
+  target + (current - target) * Math.exp(-elapsedMs / easingMs);
 
 export const spanOf = (natural: number, modifier: number): number => clamp(natural + modifier, MIN_SPAN, MAX_SPAN);
 
@@ -77,18 +80,18 @@ interface Subject {
 }
 
 export const createCamera = () => {
-  let current: { centre: Point; span: number } | undefined;
+  let current: { centre: Point; tilePx: number } | undefined;
   return (subject: Subject, screen: Extent, elapsedMs: number): View => {
-    const span = current ? approach(current.span, subject.span, elapsedMs) : subject.span;
-    const cellPx = Math.max(1, Math.round(Math.min(screen.width, screen.height) / span));
+    const restingTilePx = Math.max(1, Math.round(Math.min(screen.width, screen.height) / subject.span));
+    const easedTilePx = current ? approach(current.tilePx, restingTilePx, elapsedMs, ZOOM_EASING_MS) : restingTilePx;
+    const tilePx = Math.abs(easedTilePx - restingTilePx) < RESTING_PX_TOLERANCE ? restingTilePx : easedTilePx;
     const target = {
-      x: subject.position.x + 0.5 + (subject.look.x * screen.width) / cellPx,
-      y: subject.position.y + 0.5 + (subject.look.y * screen.height) / cellPx,
+      x: subject.position.x + 0.5 + (subject.look.x * screen.width) / tilePx,
+      y: subject.position.y + 0.5 + (subject.look.y * screen.height) / tilePx,
     };
-    const centre = current
-      ? { x: approach(current.centre.x, target.x, elapsedMs), y: approach(current.centre.y, target.y, elapsedMs) }
-      : target;
-    current = { centre, span };
-    return { centre, cellPx };
+    const pan = (from: number, to: number) => approach(from, to, elapsedMs, PAN_EASING_MS);
+    const centre = current ? { x: pan(current.centre.x, target.x), y: pan(current.centre.y, target.y) } : target;
+    current = { centre, tilePx };
+    return { centre, tilePx, restingTilePx };
   };
 };
