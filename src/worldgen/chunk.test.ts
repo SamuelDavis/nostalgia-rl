@@ -5,6 +5,8 @@ import { type Chunk, generateChunk, tileIndex } from "./chunk";
 import { CHUNK_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
 import { createWorldgen } from "./world";
 
+const worldOf = memoize(createWorldgen, String, 8);
+
 const cachedChunk = memoize(
   ({ world, cx, cy }: { world: ReturnType<typeof createWorldgen>; cx: number; cy: number }) =>
     generateChunk(world, cx, cy),
@@ -55,7 +57,7 @@ describe("generateChunk", () => {
   });
 
   it("matches golden digests", () => {
-    const world = createWorldgen(1);
+    const world = worldOf(1);
     expect([generateChunk(world, 0, 0), generateChunk(world, -5, 9), generateChunk(world, 20, -13)].map(digest))
       .toMatchInlineSnapshot(`
         [
@@ -66,8 +68,8 @@ describe("generateChunk", () => {
       `);
   });
 
-  it("floods the ocean at a flat surface", () => {
-    const world = createWorldgen(2);
+  it("floods the ocean at a flat surface", { tags: "slow" }, () => {
+    const world = worldOf(2);
     for (let cy = -8; cy < 8; cy += 3)
       for (let cx = -8; cx < 8; cx += 3) {
         const chunk = generateChunk(world, cx * 4, cy * 4);
@@ -83,7 +85,7 @@ describe("generateChunk", () => {
   });
 
   it("carves rivers as water", () => {
-    const world = createWorldgen(1);
+    const world = worldOf(1);
     const rivers =
       Array.from({ length: 49 }, (_, i) => world.riversNear((i % 7) - 3, Math.floor(i / 7) - 3)).find(
         (found) => found.length > 0,
@@ -97,7 +99,7 @@ describe("generateChunk", () => {
   });
 
   it("paves roads and bridges rivers", () => {
-    const world = createWorldgen(1);
+    const world = worldOf(1);
     const { cx, cy } = world.regionOf(world.spawn);
     const roads = world.roadsNear(cx, cy);
     expect(roads.length).toBeGreaterThan(0);
@@ -112,19 +114,19 @@ describe("generateChunk", () => {
   });
 
   it("lights a campfire at the world spawn", () => {
-    const world = createWorldgen(1);
+    const world = worldOf(1);
     const { chunk, i } = tileAt(world, world.spawn.x, world.spawn.y);
     expect(chunk.prop[i]).toBe(Prop.Campfire);
   });
 
   it("grows trees", () => {
-    const world = createWorldgen(1);
+    const world = worldOf(1);
     const trees = generateChunk(world, 2, 2).prop.filter((f) => f === Prop.Oak || f === Prop.Pine);
     expect(trees.length).toBeGreaterThan(0);
   });
 
   it("settles camps without carving cliffs", () => {
-    const world = createWorldgen(1);
+    const world = worldOf(1);
     const camps = Array.from({ length: 25 }, (_, i) => world.campAt((i % 5) - 2, Math.floor(i / 5) - 2));
     for (const camp of camps.filter((c) => c !== undefined))
       for (let y = camp.y - 14; y <= camp.y + 14; y++)
@@ -133,7 +135,7 @@ describe("generateChunk", () => {
   });
 
   it("settles each camp at the median level of the ground around it", () => {
-    const world = createWorldgen(1);
+    const world = worldOf(1);
     const natural = (x: number, y: number) => heightLevel(world.fields.elevation(x + 0.5, y + 0.5));
     for (let cy = -3; cy <= 3; cy++)
       for (let cx = -3; cx <= 3; cx++) {
@@ -153,7 +155,7 @@ describe("generateChunk", () => {
 
   it("carves rivers without cliffs", () => {
     for (const seed of [1, 2, 3]) {
-      const world = createWorldgen(seed);
+      const world = worldOf(seed);
       const { cx, cy } = world.regionOf(world.spawn);
       for (const river of world.riversNear(cx, cy))
         for (const node of river.nodes.slice(1, -1)) {
@@ -164,7 +166,7 @@ describe("generateChunk", () => {
   });
 
   it("keeps roads and trails off the sea", () => {
-    const world = createWorldgen(1);
+    const world = worldOf(1);
     for (const [cx, cy] of [
       [-23, -42],
       [-24, -42],

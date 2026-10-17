@@ -14,6 +14,7 @@ export interface TileDraft {
   way: Way;
   cover: Cover;
   readonly biome: Biome;
+  readonly forestness: number;
 }
 
 export interface FeatureType<A extends Anchor, L> {

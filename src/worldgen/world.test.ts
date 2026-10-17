@@ -1,7 +1,9 @@
-import { distance } from "../lib";
+import { distance, memoize } from "../lib";
 import { describe, expect, it } from "vitest";
 import { SEA_LEVEL, heightLevel } from "./constants";
 import { createWorldgen } from "./world";
+
+const worldOf = memoize(createWorldgen, String, 8);
 
 const seeds = [1, 2, 3, 4, 5];
 const regions = Array.from({ length: 25 }, (_, i) => ({
@@ -12,7 +14,7 @@ const regions = Array.from({ length: 25 }, (_, i) => ({
 describe("createWorldgen", () => {
   it("places a flat, dry world spawn near the origin", () => {
     for (const seed of seeds) {
-      const world = createWorldgen(seed);
+      const world = worldOf(seed);
       const { elevation } = world.fields;
       expect(distance(world.spawn, { x: 0, y: 0 })).toBeLessThan(1000);
       expect(heightLevel(elevation(world.spawn.x, world.spawn.y))).toBeGreaterThan(SEA_LEVEL);
@@ -21,7 +23,7 @@ describe("createWorldgen", () => {
 
   it("puts the world spawn camp in its macro region", () => {
     for (const seed of seeds) {
-      const world = createWorldgen(seed);
+      const world = worldOf(seed);
       const { cx, cy } = world.regionOf(world.spawn);
       expect(world.campAt(cx, cy)).toMatchObject(world.spawn);
     }
@@ -29,7 +31,7 @@ describe("createWorldgen", () => {
 
   it("links the world spawn by road", () => {
     for (const seed of seeds) {
-      const world = createWorldgen(seed);
+      const world = worldOf(seed);
       const { cx, cy } = world.regionOf(world.spawn);
       const roads = world.roadsNear(cx, cy).filter((r) => r.from === world.spawn || r.to === world.spawn);
       expect(roads.length).toBeGreaterThan(0);
@@ -38,7 +40,7 @@ describe("createWorldgen", () => {
 
   it("connects roads between camps over land", () => {
     for (const seed of seeds) {
-      const world = createWorldgen(seed);
+      const world = worldOf(seed);
       const roads = regions.flatMap(({ cx, cy }) => world.roadsFrom(cx, cy));
       expect(roads.length).toBeGreaterThan(0);
       for (const road of roads) {

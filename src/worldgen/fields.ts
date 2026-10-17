@@ -18,6 +18,8 @@ export interface Fields {
   readonly temperature: Field2;
   readonly moisture: Field2;
   readonly forestness: Field2;
+  readonly groves: Field2;
+  readonly frostEdge: Field2;
   readonly conditions: (x: number, y: number) => Conditions;
   readonly landform: (x: number, y: number) => Landform;
 }
@@ -55,6 +57,8 @@ export const createFields = (seed: number): Fields => {
   const wetness = layer(seed, "moisture", 4, 1 / 1500);
   const mountainEdge = layer(seed, "mountain edge", 2, 1 / 24);
   const forestEdge = layer(seed, "forest edge", 2, 1 / 24);
+  const groveNoise = createNoise(seed, hashString("groves"));
+  const frostNoise = createNoise(seed, hashString("ground"));
 
   const landform = (x: number, y: number): Landform => ({
     continentalness: Math.min(
@@ -113,6 +117,8 @@ export const createFields = (seed: number): Fields => {
     temperature: (x, y) => temperatureAt(x, y, elevation(x, y)),
     moisture,
     forestness: (x, y) => conditions(x, y).forestness,
+    groves: (x, y) => groveNoise(x / 40, y / 40),
+    frostEdge: (x, y) => frostNoise(x / 7, y / 7),
     conditions,
     landform,
   };

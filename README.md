@@ -53,7 +53,8 @@ These are requirements, not designs. How to meet them is decided in the multipla
 | Command                             | Purpose                                                        |
 | ----------------------------------- | -------------------------------------------------------------- |
 | `npm run dev`                       | Vite dev server                                                |
-| `npm test`                          | Unit tests (Vitest)                                            |
+| `npm test`                          | Unit tests (Vitest), excluding those tagged `slow`             |
+| `npm run test:all`                  | All tests; run before merging                                  |
 | `npm run bench`                     | Benchmarks (`*.bench.ts`)                                      |
 | `npm run typecheck`                 | TypeScript                                                     |
 | `npm run map -- --seed 1 --scale 8` | Render the world to `artifacts/map.png` (see docs/worldgen.md) |

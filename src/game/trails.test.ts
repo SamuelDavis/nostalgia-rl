@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { type Point, projectOntoSegment } from "../lib";
-import { type Trail, type Worldgen, createWorldgen, findPeak } from "../worldgen";
+import { type Point, projectOntoSegment, memoize } from "../lib";
+import { type Trail, Way, createWorldgen, findPeak } from "../worldgen";
 import { blockerBetween } from "./movement";
 import { type Terrain, createTerrain } from "./terrain";
+
+const worldOf = memoize(createWorldgen, String, 8);
 
 const NEIGHBOURS: readonly Point[] = [
   { x: 1, y: 0 },
@@ -21,12 +23,7 @@ const nearTrail = (trail: Trail, p: Point): boolean =>
     return projectOntoSegment({ x: p.x + 0.5, y: p.y + 0.5 }, a, b).distance <= CORRIDOR;
   });
 
-const deepForestPaths = (world: Worldgen, cx: number, cy: number): ReadonlySet<string>[] =>
-  Array.from({ length: 25 }, (_, i) => world.deepForestsIn(cx + (i % 5) - 2, cy + Math.floor(i / 5) - 2)).flatMap(
-    (forests) => forests.map((forest) => forest.layout.paths),
-  );
-
-const walksAlong = (terrain: Terrain, trail: Trail, forestPaths: readonly ReadonlySet<string>[]): boolean => {
+const walksAlong = (terrain: Terrain, trail: Trail): boolean => {
   const start = tileOf(trail.nodes[0]!);
   const goal = tileOf(trail.nodes.at(-1)!);
   const key = (p: Point) => `${p.x},${p.y}`;
@@ -38,7 +35,7 @@ const walksAlong = (terrain: Terrain, trail: Trail, forestPaths: readonly Readon
     for (const o of NEIGHBOURS) {
       const n = { x: p.x + o.x, y: p.y + o.y };
       const to = terrain(n.x, n.y);
-      const onWay = nearTrail(trail, n) || forestPaths.some((paths) => paths.has(key(n)));
+      const onWay = to.way === Way.Path || nearTrail(trail, n);
       if (seen.has(key(n)) || !onWay || blockerBetween(terrain(p.x, p.y), to)) continue;
       seen.add(key(n));
       frontier.push(n);
@@ -48,27 +45,26 @@ const walksAlong = (terrain: Terrain, trail: Trail, forestPaths: readonly Readon
 };
 
 describe("trails", () => {
-  it("lead walkers to their far end, over ledges by stairs and rivers by bridge", () => {
+  it("lead walkers to their far end, over ledges by stairs and rivers by bridge", { tags: "slow" }, () => {
     const regions = Array.from({ length: 9 }, (_, i) => ({ cx: (i % 3) - 1, cy: Math.floor(i / 3) - 1 }));
     const mountainRegion = Array.from({ length: 289 }, (_, i) => ({
       cx: (i % 17) - 8,
       cy: Math.floor(i / 17) - 8,
-    })).find(({ cx, cy }) => findPeak(createWorldgen(1).fields, cx, cy) !== undefined)!;
+    })).find(({ cx, cy }) => findPeak(worldOf(1).fields, cx, cy) !== undefined)!;
     const cases = [
       ...[1, 2, 3].flatMap((seed) => regions.map((region) => ({ seed, region }))),
       { seed: 1, region: mountainRegion },
     ];
     let walked = 0;
     for (const { seed, region } of cases) {
-      const world = createWorldgen(seed);
+      const world = worldOf(seed);
       const terrain = createTerrain(world);
-      const forestPaths = deepForestPaths(world, region.cx, region.cy);
       for (const trail of world.trailsNear(region.cx, region.cy)) {
         const { x, y } = tileOf(trail.nodes[0]!);
-        expect(walksAlong(terrain, trail, forestPaths), `seed ${seed}, trail from ${x},${y}`).toBe(true);
+        expect(walksAlong(terrain, trail), `seed ${seed}, trail from ${x},${y}`).toBe(true);
         walked++;
       }
     }
     expect(walked).toBeGreaterThan(0);
-  }, 120_000);
+  });
 });

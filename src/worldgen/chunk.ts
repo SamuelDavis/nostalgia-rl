@@ -1,5 +1,5 @@
 import { Cover, Prop, Ground, Water, Way } from "./terrain";
-import { type Point, createNoise, distance, floorDiv, hash, hashString, projectOntoSegment, unit } from "../lib";
+import { type Point, distance, floorDiv, hash, hashString, projectOntoSegment, unit } from "../lib";
 import { BIOMES, biomeOf } from "./biome";
 import { type TileDraft, paintInOrder } from "./features/feature";
 import { CHUNK_SIZE, REGION_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
@@ -29,8 +29,6 @@ const TRAIL_HALF_WIDTH = 0.8;
 const TRAIL_CLEARANCE = 0.6;
 const VEGETATION_SALT = hashString("vegetation");
 const DECORATION_SALT = hashString("decoration");
-const GROVE_SALT = hashString("groves");
-const GROUND_SALT = hashString("ground");
 
 interface Channel {
   readonly a: RiverNode;
@@ -101,8 +99,6 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
     .filter(({ bounds }) =>
       overlaps(bounds, { minX: originX, minY: originY, maxX: originX + CHUNK_SIZE, maxY: originY + CHUNK_SIZE }),
     );
-  const groves = createNoise(seed, GROVE_SALT);
-  const frostEdge = createNoise(seed, GROUND_SALT);
 
   const height = new Uint8Array(TILES);
   const ground = new Uint8Array(TILES);
@@ -124,7 +120,7 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
       const traits = BIOMES[tileBiome];
       let level = heightLevel(elevation);
       let tileWater: Water = Water.None;
-      let tileGround = traits.ground(level, temperature + frostEdge(x / 7, y / 7) * 0.035);
+      let tileGround = traits.ground(level, temperature + fields.frostEdge(x, y) * 0.035);
 
       const isSea = level < SEA_LEVEL;
       if (isSea) {
@@ -167,11 +163,12 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
         way: way?.kind ?? Way.None,
         cover: Cover.None,
         biome: tileBiome,
+        forestness: conditions.forestness,
       };
       const claimed = paintInOrder(features, draft, x, y);
       if (!claimed && !way && draft.water === Water.None && !nearWater && !nearWay) {
         const roll = unit(hash(seed, VEGETATION_SALT, x, y));
-        if (!inGlade && roll < traits.treeDensity(groves(x / 40, y / 40))) draft.prop = traits.tree(temperature);
+        if (!inGlade && roll < traits.treeDensity(fields.groves(x, y))) draft.prop = traits.tree(temperature);
         else draft.prop = traits.decoration(unit(hash(seed, DECORATION_SALT, x, y)));
       }
 

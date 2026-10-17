@@ -407,8 +407,7 @@ export const createDeepForests = ({ seed, level, forestness, campAt, waysNear }:
         return true;
       }
       if (draft.biome === Biome.Ocean || !isInFootprint(forest, centre)) return false;
-      const deepness = forestness(centre);
-      if (deepness < DEEP_FORESTNESS) return false;
+      if (draft.forestness < DEEP_FORESTNESS) return false;
       draft.cover = Cover.Canopy;
       if (draft.ground === Ground.Sand) draft.ground = Ground.Grass;
       draft.way = Way.None;
@@ -417,7 +416,7 @@ export const createDeepForests = ({ seed, level, forestness, campAt, waysNear }:
       else if (isWall()) draft.prop = draft.ground === Ground.Snow || roll < 1 / 3 ? Prop.Pine : Prop.Oak;
       else if (distance(centre, glade) <= glade.radius) draft.prop = roll < 0.2 ? Prop.Flowers : Prop.Tuft;
       else {
-        const depth = clamp((deepness - DEEP_FORESTNESS) / SEAM_FORESTNESS, 0, 1);
+        const depth = clamp((draft.forestness - DEEP_FORESTNESS) / SEAM_FORESTNESS, 0, 1);
         const density = lerp(EDGE_DENSITY, CORE_DENSITY, depth);
         const tree = draft.ground === Ground.Snow || roll < density / 3 ? Prop.Pine : Prop.Oak;
         draft.prop = roll < density ? tree : roll < density + UNDERGROWTH * (1 - density) ? Prop.Bush : Prop.None;

@@ -10,6 +10,7 @@ const draft = (): TileDraft => ({
   way: Way.None,
   cover: Cover.None,
   biome: Biome.Grassland,
+  forestness: 0,
 });
 
 const stamping = (
