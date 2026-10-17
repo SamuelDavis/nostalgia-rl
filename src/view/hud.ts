@@ -2,7 +2,7 @@ import { floorDiv } from "../lib";
 import { Direction, isSwimming } from "../game/movement";
 import type { Session } from "../game/session";
 import type { Tile } from "../game/terrain";
-import { Biome, CHUNK_SIZE, Prop, Ground, Water, type Worldgen } from "../worldgen";
+import { Biome, CHUNK_SIZE, METRES_PER_LEVEL, Prop, Ground, SEA_LEVEL, Water, type Worldgen } from "../worldgen";
 import type { HeightMode } from "./palette";
 
 export interface HudState {
@@ -54,7 +54,8 @@ export const createHud = (parent: HTMLElement, world: Worldgen) => {
       ["facing", nameOf(Direction, facing)],
       ["blocked", blocked ?? "—"],
       ["swimming", isSwimming(tile) ? "yes" : "no"],
-      ["height", `${tile.height} (elevation ${fixed(elevation(x + 0.5, y + 0.5))})`],
+      ["height", `${tile.height} (${(tile.height - SEA_LEVEL) * METRES_PER_LEVEL} m above sea)`],
+      ["elevation", fixed(elevation(x + 0.5, y + 0.5))],
       ["biome", nameOf(Biome, tile.biome)],
       ["ground", nameOf(Ground, tile.ground)],
       ["water", nameOf(Water, tile.water)],

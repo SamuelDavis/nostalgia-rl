@@ -1,5 +1,5 @@
 import { type Field2, clamp, createNoise, fbm, hashString, lerp, smoothstep } from "../lib";
-import { HEIGHT_LEVELS, SEA_ELEVATION } from "./constants";
+import { HEIGHT_LEVELS, SEA_ELEVATION, metresToLevels } from "./constants";
 import { type Landform, jaggedness, peaksAndValleys, ruggedness, terrainOffset } from "./landform";
 
 export interface Climate {
@@ -21,7 +21,7 @@ export interface Fields {
 const layer = (seed: number, name: string, octaves: number, frequency: number): Field2 =>
   fbm(createNoise(seed, hashString(name)), { octaves, frequency });
 
-const TERRACE_STEP = 16 / HEIGHT_LEVELS;
+const TERRACE_STEP = metresToLevels(8) / HEIGHT_LEVELS;
 const ELEVATION_PER_OFFSET = 128 / HEIGHT_LEVELS;
 const NOISE_STRETCH = 1.7;
 const JAGGED_AMPLITUDE = 0.15;

@@ -12,6 +12,13 @@ _Avoid_: overworld, instance, space
 The noise-generated base of the world: height, biomes, rivers, and the ways between features.
 _Avoid_: overworld
 
+**Tile**:
+One square metre of the world, the space one entity occupies.
+
+**Level**:
+The unit of height: half a metre.
+_Avoid_: z-level (for floors)
+
 **Region**:
 A fixed square of the world's grid that holds at most one anchor per feature type.
 _Avoid_: macro cell, zone

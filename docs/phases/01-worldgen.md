@@ -10,6 +10,7 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 
 - **Exploration:** `@` moves one tile per turn with WASD. Turns default to 100 ms in this phase so exploring is quick; the real turn length is decided with movement smoothing (see [ideas](../ideas.md#smoothed-grid-movement)). A tap between turns is buffered and acts once (latest tap wins); a held key repeats every turn. No diagonals.
 - **Presentation:** glyphs on a canvas; HTML HUD on top showing position and worldgen debug data for the player's tile; M toggles an HTML map of the field-sampled overview (`src/view/overview.ts`).
+- **Scale:** 1 m tiles, 0.5 m levels, compressed relief; see [ADR 0002](../adr/0002-scale.md).
 - **Height resolution:** 256 levels (was 16). At 16, the steepest natural tile rose under half a level, so cliffs could not exist and height bands were ~60 tiles wide.
 - **Cliffs:** a step of more than `MAX_CLIMB` (2) levels is impassable, drawn as a dark line on the tile edge. Rivers, banks and camps are shaped so carving never adds cliffs; natural terrain may. Trees, cacti, boulders, tents and campfires block; low plants don't.
 - **Swimming:** deep water is passable for now, shown as "swimming" in the HUD. Costs or risks come with game mechanics.
@@ -26,6 +27,16 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 ## Playtest log
 
 _Record user feedback verbatim, newest first, with the commit it refers to._
+
+### 2a23ea7: hillshading, contours
+
+> Interestingly there's a black line showing at `?seed=1&x=-5&y=0` and a pale one at `?seed=1&x=-34&y=1`; what's causing those? They appear to be height/cliff bands, but they're passable. The mountain at `?seed=1&x=-159&y=-16` has a lot of very visible lines. I think they must be banding lines?
+> You think 1x0.5, so the voxels aren't perfect cubes? Will that have ramifications later? That would mean a single "floor" of a house would need to be 4-8 levels, which is fine as long as that's understood and accounted for.
+> Why does retuning become difficult with features built on top? I would have imagined that terrain generation and feature generation are isolated behaviors which have relatively few and well-controlled interaction points?
+
+> looking at the mountain at `?seed=1&x=-142&y=-5`, it seems pretty good. Lots of games use height compression for mountains. I'm curious to see what a "to scale" mountain would look like for reference, but I suspect we can use scaled mountains.
+
+Those were contour lines styled too close to cliffs; contours are now thin and brown (2a23ea7). Scale settled in ADR 0002.
 
 ### 4d51948: feature system, camps
 

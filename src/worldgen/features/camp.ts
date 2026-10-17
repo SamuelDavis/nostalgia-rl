@@ -1,5 +1,5 @@
 import { type Point, distance, hash, hashString, intBetween, memoize, unit } from "../../lib";
-import { MAX_CLIMB, REGION_SIZE } from "../constants";
+import { MAX_CLIMB, REGION_SIZE, metresToLevels } from "../constants";
 import { type Region, regionKey, regionOf } from "../region";
 import { type River, distanceToRiver } from "../rivers";
 import { Biome, Ground, Prop, Water, Way } from "../terrain";
@@ -25,7 +25,7 @@ const CAMP_SPACING = 120;
 const CAMP_CHANCE = 0.55;
 const CAMP_ATTEMPTS = 4;
 const CAMP_MARGIN = 32;
-const CAMP_FLATNESS = 8;
+const CAMP_FLATNESS = metresToLevels(4);
 const RIVER_CLEARANCE = 10;
 const SPAWN_SEARCH_STEP = 16;
 const SPAWN_SEARCH_RINGS = 60;
