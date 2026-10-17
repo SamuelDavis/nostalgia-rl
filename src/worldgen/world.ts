@@ -126,12 +126,15 @@ export const createWorldgen = (seed: number): Worldgen => {
     };
   };
 
+  const peakOf = memoize((region: Region) => findPeak(fields, region.cx, region.cy), regionKey, REGION_CACHE);
+
   const deepForests = createDeepForests({
     seed,
     level,
     biomeAt,
     moisture: (p) => fields.moisture(p.x, p.y),
     campAt: campAtRegion,
+    peakAt: peakOf,
     waysNear: (region) => [...roadsNearRegion(region), ...trailsNearRegion(region)],
   });
   const campPlacer = placer(camps.type, campAtRegion);
@@ -200,7 +203,6 @@ export const createWorldgen = (seed: number): Worldgen => {
     regionKey,
     REGION_CACHE,
   );
-  const peakOf = memoize((region: Region) => findPeak(fields, region.cx, region.cy), regionKey, REGION_CACHE);
 
   const landmarksIn = (region: Region): Landmark[] =>
     (

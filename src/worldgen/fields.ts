@@ -1,11 +1,13 @@
 import { type Field2, clamp, createNoise, fbm, hashString, lerp, smoothstep } from "../lib";
-import { HEIGHT_LEVELS, SEA_ELEVATION, metresToLevels } from "./constants";
+import { mountainness } from "./biome";
+import { HEIGHT_LEVELS, SEA_ELEVATION, heightLevel, metresToLevels } from "./constants";
 import { type Landform, jaggedness, peaksAndValleys, ruggedness, terrainOffset } from "./landform";
 
 export interface Climate {
   readonly elevation: number;
   readonly temperature: number;
   readonly moisture: number;
+  readonly mountainness: number;
 }
 
 export interface Fields {
@@ -28,6 +30,7 @@ const JAGGED_AMPLITUDE = 0.15;
 const HILLS_AMPLITUDE = 0.02;
 const ORIGIN_LAND_BIAS = 0.5;
 const ORIGIN_LAND_RADIUS = 1800;
+const MOUNTAIN_EDGE_JITTER = 0.15;
 
 const distanceFromOrigin = (x: number, y: number) => Math.sqrt(x * x + y * y);
 
@@ -47,6 +50,7 @@ export const createFields = (seed: number): Fields => {
   const ledges = layer(seed, "ledges", 2, 1 / 150);
   const heat = layer(seed, "temperature", 3, 1 / 3000);
   const wetness = layer(seed, "moisture", 4, 1 / 1500);
+  const mountainEdge = layer(seed, "mountain edge", 2, 1 / 24);
 
   const landform = (x: number, y: number): Landform => ({
     continentalness: Math.min(
@@ -70,12 +74,15 @@ export const createFields = (seed: number): Fields => {
     return { form, smooth: drainage + peaks + hills(x, y) * HILLS_AMPLITUDE };
   };
 
-  const elevation: Field2 = (x, y) => {
+  const shapedElevation = (x: number, y: number) => {
     const { form, smooth } = smoothElevation(x, y);
     const phase = ledges(x, y) * TERRACE_STEP;
     const terraced = Math.floor((smooth + phase) / TERRACE_STEP) * TERRACE_STEP - phase;
-    return clamp(lerp(smooth, terraced, ruggedness(form)), 0, 0.999);
+    const rugged = ruggedness(form);
+    return { rugged, elevation: clamp(lerp(smooth, terraced, rugged), 0, 0.999) };
   };
+
+  const elevation: Field2 = (x, y) => shapedElevation(x, y).elevation;
 
   const temperatureAt = (x: number, y: number, e: number) =>
     clamp(0.5 + heat(x, y) * 0.8 - Math.max(0, e - 0.55) * 1.2, 0, 1);
@@ -83,8 +90,13 @@ export const createFields = (seed: number): Fields => {
   const moisture: Field2 = (x, y) => clamp(0.5 + wetness(x, y) * 0.8, 0, 1);
 
   const climate = (x: number, y: number): Climate => {
-    const e = elevation(x, y);
-    return { elevation: e, temperature: temperatureAt(x, y, e), moisture: moisture(x, y) };
+    const { rugged, elevation: e } = shapedElevation(x, y);
+    return {
+      elevation: e,
+      temperature: temperatureAt(x, y, e),
+      moisture: moisture(x, y),
+      mountainness: mountainness(rugged, heightLevel(e)) + MOUNTAIN_EDGE_JITTER * mountainEdge(x, y),
+    };
   };
 
   return {

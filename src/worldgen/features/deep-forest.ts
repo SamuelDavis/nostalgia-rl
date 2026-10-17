@@ -44,6 +44,7 @@ export interface DeepForestSiting {
   readonly biomeAt: (p: Point) => Biome;
   readonly moisture: (p: Point) => number;
   readonly campAt: (region: Region) => Camp | undefined;
+  readonly peakAt: (region: Region) => Point | undefined;
   readonly waysNear: (region: Region) => readonly { readonly nodes: readonly Point[] }[];
 }
 
@@ -111,7 +112,7 @@ const rasterize = (nodes: readonly Point[], tiles: Set<string>) =>
         if (projectOntoSegment({ x: x + 0.5, y: y + 0.5 }, a, b).distance <= PATH_HALF_WIDTH) tiles.add(tileKey(x, y));
   });
 
-export const createDeepForests = ({ seed, level, biomeAt, moisture, campAt, waysNear }: DeepForestSiting) => {
+export const createDeepForests = ({ seed, level, biomeAt, moisture, campAt, peakAt, waysNear }: DeepForestSiting) => {
   const ragged = createNoise(seed, SALT);
   const wobble = createNoise(seed, hash(SALT, 1));
 
@@ -151,10 +152,14 @@ export const createDeepForests = ({ seed, level, biomeAt, moisture, campAt, ways
   const outranks = (a: DeepForest, b: DeepForest) =>
     a.moisture > b.moisture || (a.moisture === b.moisture && a.id > b.id);
 
-  const isClearOfCamps = (forest: DeepForest) =>
+  const isClearOfLandmarks = (forest: DeepForest) =>
     regionsAround(regionOf(forest), 1).every((region) => {
       const camp = campAt(region);
-      return !camp || distance(camp, forest) > DEEP_FOREST_REACH + CAMP_RADIUS;
+      const peak = peakAt(region);
+      return (
+        (!camp || distance(camp, forest) > DEEP_FOREST_REACH + CAMP_RADIUS) &&
+        (!peak || distance(peak, forest) > DEEP_FOREST_REACH)
+      );
     });
 
   const at = memoize(
@@ -165,7 +170,7 @@ export const createDeepForests = ({ seed, level, biomeAt, moisture, campAt, ways
         const rival = candidate(other);
         return rival && rival !== forest && distance(rival, forest) < 2 * DEEP_FOREST_REACH && outranks(rival, forest);
       });
-      if (crowded || !isClearOfCamps(forest)) return undefined;
+      if (crowded || !isClearOfLandmarks(forest)) return undefined;
       const inForest = DIRECTIONS.filter((d) => isForest(along(forest, d, forest.radius / 2))).length;
       return inForest >= MIN_FOREST_RING ? forest : undefined;
     },

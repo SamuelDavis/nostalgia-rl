@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type Point, distance } from "../lib";
-import { Cover, Water, Way, createWorldgen } from "../worldgen";
+import { Cover, Water, Way, createWorldgen, findPeak } from "../worldgen";
 import { blockerBetween } from "./movement";
 import { createTerrain } from "./terrain";
 
@@ -30,6 +30,20 @@ describe("deep forests", () => {
     for (const a of forests)
       for (const b of forests)
         if (a !== b) expect(distance(a.anchor, b.anchor)).toBeGreaterThanOrEqual(a.reach + b.reach);
+  });
+
+  it("leave mountain peaks outside", () => {
+    const world = createWorldgen(2);
+    for (let cy = 1; cy <= 3; cy++)
+      for (let cx = 0; cx <= 2; cx++) {
+        const forest = world.deepForestAt(cx, cy);
+        if (!forest) continue;
+        for (let py = cy - 1; py <= cy + 1; py++)
+          for (let px = cx - 1; px <= cx + 1; px++) {
+            const peak = findPeak(world.fields, px, py);
+            if (peak) expect(forest.layout.contains(peak), `peak at ${peak.x},${peak.y}`).toBe(false);
+          }
+      }
   });
 
   it("connect every opening to the glade by walkable tiles inside the forest", () => {

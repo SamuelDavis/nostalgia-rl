@@ -18,7 +18,7 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 - **Cliffs:** a step of more than `MAX_CLIMB` (2) levels is impassable, drawn as a dark line on the tile edge. Rivers, banks and camps are shaped so carving never adds cliffs; natural terrain may. Trees, cacti, boulders, tents and campfires block; low plants don't.
 - **Swimming:** deep water is passable for now, shown as "swimming" in the HUD. Costs or risks come with game mechanics.
 - **Stairs:** a step of any height is allowed between two trail tiles (road, path, bridge), drawn as `≡`. Trails, not terrain, guarantee access.
-- **Terrain model:** Minecraft-style splines over continentalness, erosion and peaks-and-valleys replace the hand formula ([worldgen](../worldgen.md)), so there are rolling plains, plateaus, cliffs and jagged peaks. Our fbm is stretched ×1.7 to roughly match Minecraft's value range, then thresholds were calibrated by measurement: Mountain biome from level 128 (≈8% of land), river sources from level 107. Peaks follow ridge zero crossings, because Minecraft's fold produced crater rings with our noise.
+- **Terrain model:** Minecraft-style splines over continentalness, erosion and peaks-and-valleys replace the hand formula ([worldgen](../worldgen.md)), so there are rolling plains, plateaus, cliffs and jagged peaks. Our fbm is stretched ×1.7 to roughly match Minecraft's value range, then thresholds were calibrated by measurement: river sources from level 107. The Mountain biome was first a cutoff at level 128 (≈8% of land); it is now mountainness by ruggedness and altitude (7.8–9.5% of land on seeds 1–3, keeping ~88% of the old mountains), after the cutoff drew grassland tongues up mountain valleys. Peaks follow ridge zero crossings, because Minecraft's fold produced crater rings with our noise.
 - **Cliff faces:** a tile with cliffs on 3 or more sides is drawn as rock face, not as a grid of edge lines. Escarpments steeper than a ledge per tile are real cliffs; this only changes how they read.
 - **Mountain ledges:** mountain elevation is floored to 16-level steps with a noise-varied phase, so every ledge is a single-tile cliff. Smooth ramps were tried and rejected: wherever a ramp was steeper than `MAX_CLIMB` but wider than a tile, it became a band of cliffs on every tile edge (58% of cliffs). Pass noise to keep mountains climbable without trails was also rejected.
 - **Trails:** one route network instead of per-kind walkers, following the [research](../research/worldgen-techniques.md): a relative neighbourhood graph picks links, and weighted A\* routes them over a cost field, discounting tiles already walked so trails merge. Each glade or peak gets 1–5 trails (weights 5:4:3:2:1, as the user suggested). Replaced random-walk forest trails, which crossed into tangles, and random road links. Earlier measurement on seed 1 (before the network): cliffs in multi-tile bands 0.1%, summit reachable, 90% of mountain tiles reachable.
@@ -31,6 +31,12 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 ## Playtest log
 
 _Record user feedback verbatim, newest first, with the commit it refers to._
+
+### e843855: cliff view, repeat delay
+
+> yes, go with option 3
+
+(Option 3: mountains decided by terrain shape, with a blended edge.) Done; a deep forest newly sited over a peak on seed 2 sealed a trail's start inside its trees, so deep forests now also keep clear of peaks.
 
 ### ec30b8b: facing and tap-to-face
 
