@@ -39,6 +39,8 @@ Each stage depends only on coarser stages within a bounded neighbourhood. That i
 
 Results for a region (rivers, anchors, placed features, ways) are memoized in an LRU cache inside the world object. The first chunk in a new region pays for the links and features near it. On the author's machine an isolated cold region takes about 220 ms, and a warm chunk about 4 ms (`npm run bench`).
 
+In the browser a Web Worker (`src/chunk-worker.ts`) generates chunks with its own world object. The main thread prefetches chunks nearest first within two view spans of the player (`src/game/chunk-store.ts`), and generates a chunk itself only when it is needed before the worker delivers it, as at startup. Output is identical either way, so this only moves cost.
+
 ## Determinism
 
 Peers will generate terrain independently, so results must be bit-identical across JavaScript engines.

@@ -12,7 +12,7 @@ import {
   regionsAround,
 } from "../worldgen";
 import { blockerBetween } from "./movement";
-import { type Terrain, createTerrain } from "./terrain";
+import { type Terrain, generatedTerrain } from "./terrain";
 
 const worldOf = memoize(createWorldgen, String, 8);
 
@@ -76,7 +76,7 @@ describe("ways", () => {
     let walked = 0;
     for (const { seed, region } of cases) {
       const world = worldOf(seed);
-      const terrain = createTerrain(world);
+      const terrain = generatedTerrain(world);
       for (const link of world.waysNear(region)) {
         const ends = unfaded(link);
         if (ends.length < 2) continue;

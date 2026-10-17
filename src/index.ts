@@ -3,7 +3,9 @@ import type { Point } from "./lib";
 import { actionFor, createDirectionInput } from "./game/input";
 import { Direction, stepToward } from "./game/movement";
 import { playTurn, startSession } from "./game/session";
+import { createChunkStore } from "./game/chunk-store";
 import { createTerrain } from "./game/terrain";
+import type { ChunkRequest } from "./chunk-worker";
 import {
   approach,
   attentiveSpan,
@@ -23,7 +25,7 @@ import { directionAt } from "./view/tap";
 import { createMap } from "./view/map";
 import { HEIGHT_MODES, type HeightMode } from "./view/palette";
 import { createViewport } from "./view/viewport";
-import { createWorldgen } from "./worldgen";
+import { type Chunk, CHUNK_SIZE, createWorldgen, generateChunk } from "./worldgen";
 
 const DEFAULT_TURN_MS = 100;
 const DEFAULT_REPEAT_DELAY_MS = 50;
@@ -31,6 +33,7 @@ const URL_SYNC_DELAY_MS = 300;
 const ZOOM_STEP = 4;
 const EYE_EASING_MS = 300;
 const TURN_EASING_MS = 60;
+const PREFETCH_SPANS = 2;
 
 const KEY_DIRECTIONS: Record<string, Direction> = {
   KeyW: Direction.North,
@@ -45,7 +48,13 @@ const turnMs = Number(params.get("turn") ?? DEFAULT_TURN_MS);
 const repeatDelayMs = Number(params.get("repeat") ?? DEFAULT_REPEAT_DELAY_MS);
 
 const world = createWorldgen(seed);
-const terrain = createTerrain(world);
+const worker = new Worker(new URL("./chunk-worker.ts", import.meta.url), { type: "module" });
+const chunks = createChunkStore(
+  (cx, cy) => generateChunk(world, cx, cy),
+  (cx, cy) => worker.postMessage({ seed, cx, cy } satisfies ChunkRequest),
+);
+worker.addEventListener("message", ({ data }: MessageEvent<Chunk>) => chunks.receive(data));
+const terrain = createTerrain(chunks.chunkAt);
 const input = createDirectionInput(repeatDelayMs);
 
 const canvas = document.createElement("canvas");
@@ -169,6 +178,7 @@ const frame = (now: number) => {
       syncUrl();
     }
     heading = steer(heading, stepToward({ x: 0, y: 0 }, session.facing));
+    chunks.prefetch(session.position, PREFETCH_SPANS * spanOf(natural, zoomModifier) + CHUNK_SIZE);
     natural = naturalSpan(open, heading);
     practical = practicalSpan(open, heading);
     sight = sightAhead(terrain, session.position, session.facing);

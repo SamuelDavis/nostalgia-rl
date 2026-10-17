@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { type Point, distance } from "../lib";
 import { Cover, type DeepForestLayout, Water, Way, createWorldgen, regionOf, regionsAround } from "../worldgen";
 import { blockerBetween } from "./movement";
-import { createTerrain } from "./terrain";
+import { generatedTerrain } from "./terrain";
 
 const NEIGHBOURS: readonly Point[] = [
   { x: 1, y: 0 },
@@ -12,7 +12,7 @@ const NEIGHBOURS: readonly Point[] = [
 ];
 
 const world = createWorldgen(1);
-const terrain = createTerrain(world);
+const terrain = generatedTerrain(world);
 const forests = regionsAround({ rx: 0, ry: 0 }, 6).flatMap(world.deepForestsIn);
 
 const key = (p: Point) => `${p.x},${p.y}`;
