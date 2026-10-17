@@ -1,9 +1,10 @@
 import "./index.css";
+import type { Point } from "./lib";
 import { createDirectionInput } from "./game/input";
 import { Direction } from "./game/movement";
 import { playTurn, startSession } from "./game/session";
 import { createTerrain } from "./game/terrain";
-import { createCamera, modifierWithin, naturalSpan, prominence, spanOf } from "./view/camera";
+import { createCamera, lookOffset, modifierWithin, naturalSpan, openness, spanOf, steer } from "./view/camera";
 import { createHud } from "./view/hud";
 import { createMap } from "./view/map";
 import { HEIGHT_MODES, type HeightMode } from "./view/palette";
@@ -41,8 +42,10 @@ let session = startSession({
 });
 let mode: HeightMode = HEIGHT_MODES[0];
 let zoomModifier = 0;
-const naturalSpanAt = (p: typeof session.position) => naturalSpan(prominence((x, y) => terrain(x, y).height, p));
-let natural = naturalSpanAt(session.position);
+const opennessAt = (p: Point) => openness((x, y) => terrain(x, y).height, p);
+let open = opennessAt(session.position);
+let heading: Point = { x: 0, y: 0 };
+let natural = naturalSpan(open, heading);
 const camera = createCamera();
 const drawViewport = createViewport(ctx);
 
@@ -62,7 +65,7 @@ let drawn = "";
 let lastFrame = performance.now();
 const render = (now: number) => {
   const view = camera(
-    { position: session.position, facing: session.facing, span: spanOf(natural, zoomModifier) },
+    { position: session.position, look: lookOffset(open, heading), span: spanOf(natural, zoomModifier) },
     { width: canvas.clientWidth, height: canvas.clientHeight },
     now - lastFrame,
   );
@@ -100,7 +103,9 @@ const frame = (now: number) => {
     const previous = session.position;
     session = playTurn(session, terrain, input.take());
     if (session.position !== previous) {
-      natural = naturalSpanAt(session.position);
+      heading = steer(heading, { x: session.position.x - previous.x, y: session.position.y - previous.y });
+      open = opennessAt(session.position);
+      natural = naturalSpan(open, heading);
       syncUrl();
     }
     dirty = true;

@@ -10,7 +10,7 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 
 - **Exploration:** `@` moves one tile per turn with WASD. Turns default to 100 ms in this phase so exploring is quick; the real turn length is decided with movement smoothing (see [ideas](../ideas.md#smoothed-grid-movement)). A tap between turns is buffered and acts once (latest tap wins); a held key repeats every turn. No diagonals.
 - **Presentation:** glyphs on a canvas; HTML HUD on top showing position and worldgen debug data for the player's tile; M toggles an HTML map of the field-sampled overview (`src/view/overview.ts`).
-- **Camera:** close and overhead, leading a quarter of the view in the facing direction (last move) and easing after the player. Zoom follows prominence, the player's height above the mean of the ground 12 and 24 tiles around: hollows, plains and slopes stay close (24 tiles across the short side), summits open out (up to 64). The user's zoom modifier (+/−, wheel) adds tiles on top of that natural span. The tile layer redraws only when the player moves or the view leaves an 8-tile margin; easing frames just pan it.
+- **Camera:** close and overhead, standing in for what you'd see first-person. It leads the heading, a running average of actual steps (about 3 steps to swing round; zig-zags settle diagonal), so single turns don't jerk it. Zoom follows how far the ground drops away in the heading's direction (8 compass directions, sampled 12 and 24 tiles out): looking up a slope or across a plain stays close (24 tiles across the short side), looking down a slope or off a summit opens out (up to 64). The camera also leans toward open, lower ground. The user's zoom modifier (+/−, wheel) adds tiles on top. The tile layer redraws only when the player moves or the view leaves an 8-tile margin; easing frames just pan it.
 - **Deep forest:** the first bespoke feature; dense enough (85% trees at the core) that its own paths are the way through. A canopy hides its interior from outside; standing under it reveals the floor, darkened. See [worldgen](../worldgen.md).
 - **Scale:** 1 m tiles, 0.5 m levels, compressed relief; see [ADR 0002](../adr/0002-scale.md).
 - **Height resolution:** 256 levels (was 16). At 16, the steepest natural tile rose under half a level, so cliffs could not exist and height bands were ~60 tiles wide.
@@ -30,6 +30,18 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 ## Playtest log
 
 _Record user feedback verbatim, newest first, with the commit it refers to._
+
+### e7ae456: close camera, relative height shading
+
+> 1. this is awesome, I love it.
+> 2. rather than immediately swinging to your orientation, the camera should lag behind a little, e.g. you need to take a few steps in a direction before it reorients. Otherwise, trying to go diagonally, it jerks vertical then horizontal then vertical again. If you can imagine: you have to have an established direction for a few steps before the camera reorients to face that way.
+> 3. standing on the mountain, `/?seed=1&x=-142&y=-5`, grants a huge vision range both below _and above_. I'm not sure how easy this is to fix but, essentially, you should only get that vision range _looking down_. My gut instinct is, if you're facing a steep incline, force the camera to zoom in, then if you turn and look down a slope, let the camera zoom out again. That and/or bias the camera so that it's not just going towards the direction you're looking but also away from steep surfaces.
+> 4. I'm not sure about this but I think that the zoom factor should actually be _relative_ elevation rather than absolute elevation?
+> 5. I could also imagine zoom based on density of obstructions. Although maybe this is better solved with LOS and shadows.
+>
+> But you get the gist: leveraging the camera zoom and offset to infer the level of visibility you'd have from first person.
+
+Zoom was already relative (height above the surrounding mean) but undirected. Now the camera follows a step-averaged heading, zooms by the drop in that direction, and leans toward open ground. Obstruction density deferred to field of view ([ideas](../ideas.md#visibility-from-obstructions)).
 
 ### 5ffd697: deep forest canopy
 

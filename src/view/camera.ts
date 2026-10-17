@@ -1,5 +1,4 @@
 import { type Point, clamp, lerp } from "../lib";
-import { type Direction, stepToward } from "../game/movement";
 import { metresToLevels } from "../worldgen";
 
 export interface Extent {
@@ -12,44 +11,68 @@ export interface View {
   readonly cellPx: number;
 }
 
-const SURROUNDINGS: readonly Point[] = [12, 24].flatMap((radius) =>
-  Array.from({ length: 8 }, (_, i) => ({
-    x: Math.round(radius * Math.cos((i * Math.PI) / 4)),
-    y: Math.round(radius * Math.sin((i * Math.PI) / 4)),
-  })),
-);
+const COMPASS: readonly Point[] = Array.from({ length: 8 }, (_, i) => ({
+  x: Math.cos((i * Math.PI) / 4),
+  y: Math.sin((i * Math.PI) / 4),
+}));
+const SIGHT_RADII = [12, 24] as const;
 const CLOSE_SPAN = 24;
 const FAR_SPAN = 64;
-const FULL_PROMINENCE = metresToLevels(12);
+const FULL_DROP = metresToLevels(12);
+const STEER = 0.3;
 const LEAD = 0.25;
+const LEAN = 0.5;
+const MAX_OFFSET = 0.35;
 const EASING_MS = 250;
 const MIN_SPAN = 8;
 const MAX_SPAN = 160;
 
-export const prominence = (levelAt: (x: number, y: number) => number, at: Point): number => {
-  const surrounding = SURROUNDINGS.reduce((sum, o) => sum + levelAt(at.x + o.x, at.y + o.y), 0);
-  return levelAt(at.x, at.y) - surrounding / SURROUNDINGS.length;
+const dot = (a: Point, b: Point) => a.x * b.x + a.y * b.y;
+const mean = (values: readonly number[]) => values.reduce((sum, v) => sum + v, 0) / values.length;
+
+export const openness = (levelAt: (x: number, y: number) => number, at: Point): readonly number[] => {
+  const eye = levelAt(at.x, at.y);
+  return COMPASS.map((d) => {
+    const drops = SIGHT_RADII.map((r) => eye - levelAt(at.x + Math.round(d.x * r), at.y + Math.round(d.y * r)));
+    return clamp(mean(drops) / FULL_DROP, 0, 1);
+  });
 };
 
-export const naturalSpan = (prominence: number): number =>
-  Math.round(lerp(CLOSE_SPAN, FAR_SPAN, clamp(prominence / FULL_PROMINENCE, 0, 1)));
+export const steer = (heading: Point, step: Point): Point => ({
+  x: lerp(heading.x, step.x, STEER),
+  y: lerp(heading.y, step.y, STEER),
+});
+
+const opennessAhead = (open: readonly number[], heading: Point): number => {
+  const weights = COMPASS.map((d) => Math.max(0, dot(d, heading)));
+  const total = weights.reduce((sum, w) => sum + w, 0);
+  if (total === 0) return mean(open);
+  const ahead = open.reduce((sum, o, i) => sum + o * weights[i]!, 0) / total;
+  return lerp(mean(open), ahead, Math.min(1, Math.hypot(heading.x, heading.y)));
+};
+
+export const naturalSpan = (open: readonly number[], heading: Point): number =>
+  Math.round(lerp(CLOSE_SPAN, FAR_SPAN, opennessAhead(open, heading)));
+
+export const lookOffset = (open: readonly number[], heading: Point): Point => {
+  const lean = (axis: "x" | "y") => mean(COMPASS.map((d, i) => d[axis] * open[i]!));
+  return {
+    x: clamp(heading.x * LEAD + lean("x") * LEAN, -MAX_OFFSET, MAX_OFFSET),
+    y: clamp(heading.y * LEAD + lean("y") * LEAN, -MAX_OFFSET, MAX_OFFSET),
+  };
+};
+
+export const approach = (current: number, target: number, elapsedMs: number): number =>
+  target + (current - target) * Math.exp(-elapsedMs / EASING_MS);
 
 export const spanOf = (natural: number, modifier: number): number => clamp(natural + modifier, MIN_SPAN, MAX_SPAN);
 
 export const modifierWithin = (natural: number, modifier: number): number =>
   clamp(modifier, MIN_SPAN - natural, MAX_SPAN - natural);
 
-export const leadToward = (facing: Direction, view: Extent): Point => {
-  const { x, y } = stepToward({ x: 0, y: 0 }, facing);
-  return { x: x * view.width * LEAD, y: y * view.height * LEAD };
-};
-
-export const approach = (current: number, target: number, elapsedMs: number): number =>
-  target + (current - target) * Math.exp(-elapsedMs / EASING_MS);
-
 interface Subject {
   readonly position: Point;
-  readonly facing: Direction;
+  readonly look: Point;
   readonly span: number;
 }
 
@@ -58,8 +81,10 @@ export const createCamera = () => {
   return (subject: Subject, screen: Extent, elapsedMs: number): View => {
     const span = current ? approach(current.span, subject.span, elapsedMs) : subject.span;
     const cellPx = Math.max(1, Math.round(Math.min(screen.width, screen.height) / span));
-    const lead = leadToward(subject.facing, { width: screen.width / cellPx, height: screen.height / cellPx });
-    const target = { x: subject.position.x + 0.5 + lead.x, y: subject.position.y + 0.5 + lead.y };
+    const target = {
+      x: subject.position.x + 0.5 + (subject.look.x * screen.width) / cellPx,
+      y: subject.position.y + 0.5 + (subject.look.y * screen.height) / cellPx,
+    };
     const centre = current
       ? { x: approach(current.centre.x, target.x, elapsedMs), y: approach(current.centre.y, target.y, elapsedMs) }
       : target;
