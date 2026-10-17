@@ -41,7 +41,7 @@ export const findPeak = (fields: Fields, cx: number, cy: number): Peak | undefin
 };
 
 export const findGlade = (seed: number, fields: Fields, cx: number, cy: number): Glade | undefined => {
-  const isForest = (p: Point) => biomeOf(fields.climate(p.x, p.y)) === Biome.Forest;
+  const isForest = (p: Point) => biomeOf(fields.conditions(p.x, p.y)) === Biome.Forest;
   const forest = probesIn(cx, cy).filter(isForest);
   if (forest.length < MIN_FOREST_PROBES) return undefined;
   const interior = forest.filter((p) => PROBE_NEIGHBOURS.every((o) => isForest({ x: p.x + o.x, y: p.y + o.y })));

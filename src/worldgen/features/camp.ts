@@ -1,6 +1,6 @@
 import { type Point, distance, hash, hashString, intBetween, memoize, unit } from "../../lib";
 import { MAX_CLIMB, REGION_SIZE, metresToLevels } from "../constants";
-import { type Region, regionKey, regionOf } from "../region";
+import { type Region, boundsOf, regionKey, regionOf } from "../region";
 import { type River, distanceToRiver } from "../rivers";
 import { Biome, Ground, Prop, Water, Way } from "../terrain";
 import type { Anchor, FeatureType } from "./feature";
@@ -130,6 +130,7 @@ export const createCamps = ({ seed, level, biomeAt, riversNear }: CampSiting) =>
     name: "camp",
     priority: 1,
     reach: CAMP_RADIUS,
+    bounds: (camp) => boundsOf([camp], CAMP_RADIUS),
     build: (camp) => ({ camp, level: campLevel(camp) }),
     paint: ({ camp, level: campLevel }, draft, x, y) => {
       const gap = distance({ x: x + 0.5, y: y + 0.5 }, { x: camp.x + 0.5, y: camp.y + 0.5 });

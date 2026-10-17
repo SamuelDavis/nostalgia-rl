@@ -1,5 +1,5 @@
 import type { Point } from "../lib";
-import { Biome, type Climate, REGION_SIZE, Water, type Worldgen, biomeOf, heightLevel } from "../worldgen";
+import { Biome, type Conditions, REGION_SIZE, Water, type Worldgen, biomeOf, heightLevel } from "../worldgen";
 import {
   type HeightMode,
   type Rgb,
@@ -31,12 +31,12 @@ export interface FieldNeighbours {
 
 export const fieldColor = (
   mode: HeightMode,
-  climate: Climate,
+  conditions: Conditions,
   { westLevel, northLevel, spacing }: FieldNeighbours,
 ): Rgb => {
-  const biome = biomeOf(climate);
+  const biome = biomeOf(conditions);
   if (biome === Biome.Ocean) return waterColor[Water.Deep];
-  const level = heightLevel(climate.elevation);
+  const level = heightLevel(conditions.elevation);
   const light = hillshade((level - westLevel) / spacing, (level - northLevel) / spacing);
   const color = surfaceColor(mode, biomeColor[biome], level, light);
   const onIndex = contourBetween(level, westLevel) === "index" || contourBetween(level, northLevel) === "index";
@@ -57,8 +57,7 @@ export const overviewMarks = (world: Worldgen, center: Point, radius: number): M
         for (const point of road.nodes) marks.push({ point, color: ROAD_MARK });
       const camp = world.campAt(cx, cy);
       if (camp) marks.push({ point: camp, color: CAMP_MARK });
-      const forest = world.deepForestAt(cx, cy);
-      if (forest) marks.push({ point: forest.anchor, color: DEEP_FOREST_MARK });
+      for (const forest of world.deepForestsIn(cx, cy)) marks.push({ point: forest.anchor, color: DEEP_FOREST_MARK });
     }
   return marks;
 };

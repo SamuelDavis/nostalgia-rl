@@ -29,7 +29,7 @@ One square metre of the world, the space one entity occupies.
 The unit of height: half a metre.
 
 **Region**:
-A fixed square of the world's grid that holds at most one anchor per feature type.
+A fixed square of the world's grid; each feature type sites its anchors region by region.
 
 ## Features
 

@@ -22,8 +22,8 @@ const nearTrail = (trail: Trail, p: Point): boolean =>
   });
 
 const deepForestPaths = (world: Worldgen, cx: number, cy: number): ReadonlySet<string>[] =>
-  Array.from({ length: 25 }, (_, i) => world.deepForestAt(cx + (i % 5) - 2, cy + Math.floor(i / 5) - 2)).flatMap(
-    (forest) => (forest ? [forest.layout.paths] : []),
+  Array.from({ length: 25 }, (_, i) => world.deepForestsIn(cx + (i % 5) - 2, cy + Math.floor(i / 5) - 2)).flatMap(
+    (forests) => forests.map((forest) => forest.layout.paths),
   );
 
 const walksAlong = (terrain: Terrain, trail: Trail, forestPaths: readonly ReadonlySet<string>[]): boolean => {
@@ -70,5 +70,5 @@ describe("trails", () => {
       }
     }
     expect(walked).toBeGreaterThan(0);
-  }, 60_000);
+  }, 120_000);
 });

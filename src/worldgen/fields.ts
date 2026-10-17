@@ -1,13 +1,14 @@
 import { type Field2, clamp, createNoise, fbm, hashString, lerp, smoothstep } from "../lib";
-import { mountainness } from "./biome";
+import { forestness, mountainness } from "./biome";
 import { HEIGHT_LEVELS, SEA_ELEVATION, heightLevel, metresToLevels } from "./constants";
 import { type Landform, jaggedness, peaksAndValleys, ruggedness, terrainOffset } from "./landform";
 
-export interface Climate {
+export interface Conditions {
   readonly elevation: number;
   readonly temperature: number;
   readonly moisture: number;
   readonly mountainness: number;
+  readonly forestness: number;
 }
 
 export interface Fields {
@@ -16,7 +17,8 @@ export interface Fields {
   readonly drainage: Field2;
   readonly temperature: Field2;
   readonly moisture: Field2;
-  readonly climate: (x: number, y: number) => Climate;
+  readonly forestness: Field2;
+  readonly conditions: (x: number, y: number) => Conditions;
   readonly landform: (x: number, y: number) => Landform;
 }
 
@@ -31,6 +33,7 @@ const HILLS_AMPLITUDE = 0.02;
 const ORIGIN_LAND_BIAS = 0.5;
 const ORIGIN_LAND_RADIUS = 1800;
 const MOUNTAIN_EDGE_JITTER = 0.15;
+const FOREST_EDGE_JITTER = 0.1;
 
 const distanceFromOrigin = (x: number, y: number) => Math.sqrt(x * x + y * y);
 
@@ -51,6 +54,7 @@ export const createFields = (seed: number): Fields => {
   const heat = layer(seed, "temperature", 3, 1 / 3000);
   const wetness = layer(seed, "moisture", 4, 1 / 1500);
   const mountainEdge = layer(seed, "mountain edge", 2, 1 / 24);
+  const forestEdge = layer(seed, "forest edge", 2, 1 / 24);
 
   const landform = (x: number, y: number): Landform => ({
     continentalness: Math.min(
@@ -89,13 +93,16 @@ export const createFields = (seed: number): Fields => {
 
   const moisture: Field2 = (x, y) => clamp(0.5 + wetness(x, y) * 0.8, 0, 1);
 
-  const climate = (x: number, y: number): Climate => {
+  const conditions = (x: number, y: number): Conditions => {
     const { rugged, elevation: e } = shapedElevation(x, y);
+    const wet = moisture(x, y);
+    const mountain = mountainness(rugged, heightLevel(e)) + MOUNTAIN_EDGE_JITTER * mountainEdge(x, y);
     return {
       elevation: e,
       temperature: temperatureAt(x, y, e),
-      moisture: moisture(x, y),
-      mountainness: mountainness(rugged, heightLevel(e)) + MOUNTAIN_EDGE_JITTER * mountainEdge(x, y),
+      moisture: wet,
+      mountainness: mountain,
+      forestness: forestness(wet, mountain, e) + FOREST_EDGE_JITTER * forestEdge(x, y),
     };
   };
 
@@ -105,7 +112,8 @@ export const createFields = (seed: number): Fields => {
     drainage,
     temperature: (x, y) => temperatureAt(x, y, elevation(x, y)),
     moisture,
-    climate,
+    forestness: (x, y) => conditions(x, y).forestness,
+    conditions,
     landform,
   };
 };

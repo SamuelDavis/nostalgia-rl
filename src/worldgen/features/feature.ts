@@ -1,4 +1,5 @@
 import type { Point } from "../../lib";
+import type { Bounds } from "../region";
 import type { Biome, Cover, Ground, Prop, Water, Way } from "../terrain";
 
 export interface Anchor extends Point {
@@ -19,6 +20,7 @@ export interface FeatureType<A extends Anchor, L> {
   readonly name: string;
   readonly priority: number;
   readonly reach: number;
+  readonly bounds: (anchor: A) => Bounds;
   readonly build: (anchor: A) => L;
   readonly paint: (layout: L, draft: TileDraft, x: number, y: number) => boolean;
 }
@@ -27,7 +29,7 @@ export interface PlacedFeature<L = unknown> {
   readonly anchor: Anchor;
   readonly layout: L;
   readonly priority: number;
-  readonly reach: number;
+  readonly bounds: Bounds;
   readonly paint: (draft: TileDraft, x: number, y: number) => boolean;
 }
 
@@ -37,7 +39,7 @@ export const place = <A extends Anchor, L>(type: FeatureType<A, L>, anchor: A): 
     anchor,
     layout,
     priority: type.priority,
-    reach: type.reach,
+    bounds: type.bounds(anchor),
     paint: (draft, x, y) => type.paint(layout, draft, x, y),
   };
 };

@@ -21,6 +21,7 @@ const stamping = (
   name,
   priority,
   reach: 1,
+  bounds: () => ({ minX: 0, minY: 0, maxX: 0, maxY: 0 }),
   build: () => {
     builds.push(name);
     return prop;

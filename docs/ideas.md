@@ -6,6 +6,10 @@ Candidate directions the user liked. They aren't commitments: adopt one only whe
 
 Superseded the earlier "spaces" idea (separate maps behind teleporting entrances): see [ADR 0001](adr/0001-contiguous-world-with-features.md). Candidate feature types, each with its own generator: Rogue-style cave levels under mountains, multi-storey houses and castles, towns, deep forests and their glades. Multi-level dungeons are one feature with several vertical levels, linked by stairs.
 
+## Staged feature pipeline
+
+Features declare which earlier stages they read (fields, biomes, other features' anchors) instead of taking hand-wired siting arguments, and roads, trails, rivers, glades and peaks become features too. Parent features could spawn children, such as a castle growing a town. Stages read only earlier stages within a bounded radius ([ADR 0003](adr/0003-pure-generation-mutation-as-deltas.md)).
+
 ## World forking and elective persistence
 
 Every peer could keep a full copy of the world's changes. If the host drops, a peer can carry on with its copy as a new, independent world that others can join. A player could later choose to overwrite their own copy with someone else's, which keeps a world persistent across hosts by choice. Host migration is the automatic version of the same thing.

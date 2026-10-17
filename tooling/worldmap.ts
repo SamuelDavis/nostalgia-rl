@@ -83,7 +83,7 @@ writePng(values.out!, size, size, (px, py) => {
   return values.layer === "tiles"
     ? tileColor(Math.floor(x), Math.floor(y))
     : (overlay.get(`${px},${py}`) ??
-        fieldColor(mode, world.fields.climate(x, y), {
+        fieldColor(mode, world.fields.conditions(x, y), {
           westLevel: heightLevel(world.fields.elevation(x - scale, y)),
           northLevel: heightLevel(world.fields.elevation(x, y - scale)),
           spacing: scale,

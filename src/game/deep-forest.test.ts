@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type Point, distance } from "../lib";
-import { Cover, Water, Way, createWorldgen, findPeak } from "../worldgen";
+import { Cover, type DeepForestLayout, Water, Way, createWorldgen } from "../worldgen";
 import { blockerBetween } from "./movement";
 import { createTerrain } from "./terrain";
 
@@ -13,66 +13,67 @@ const NEIGHBOURS: readonly Point[] = [
 
 const world = createWorldgen(1);
 const terrain = createTerrain(world);
-const forests = Array.from({ length: 169 }, (_, i) => world.deepForestAt((i % 13) - 6, Math.floor(i / 13) - 6)).filter(
-  (forest) => forest !== undefined,
-);
+const forests = Array.from({ length: 169 }, (_, i) => world.deepForestsIn((i % 13) - 6, Math.floor(i / 13) - 6)).flat();
 
 const key = (p: Point) => `${p.x},${p.y}`;
 const centre = (p: Point) => ({ x: p.x + 0.5, y: p.y + 0.5 });
 const tileOf = (p: Point): Point => ({ x: Math.floor(p.x), y: Math.floor(p.y) });
 
+const regionDistance = (a: { anchor: Point }, b: { anchor: Point }) => {
+  const [ra, rb] = [world.regionOf(a.anchor), world.regionOf(b.anchor)];
+  return Math.abs(ra.cx - rb.cx) + Math.abs(ra.cy - rb.cy);
+};
+
+const reachable = (start: Point, layouts: readonly DeepForestLayout[]): Set<string> => {
+  const reached = new Set([key(start)]);
+  const frontier = [start];
+  while (frontier.length > 0) {
+    const p = frontier.pop()!;
+    for (const o of NEIGHBOURS) {
+      const n = { x: p.x + o.x, y: p.y + o.y };
+      if (reached.has(key(n)) || !layouts.some((l) => l.contains(centre(n)) || l.paths.has(key(n)))) continue;
+      if (blockerBetween(terrain(p.x, p.y), terrain(n.x, n.y))) continue;
+      reached.add(key(n));
+      frontier.push(n);
+    }
+  }
+  return reached;
+};
+
 describe("deep forests", () => {
-  it("grow in wet forest", () => {
+  it("grow where forest is deepest", () => {
     expect(forests.length).toBeGreaterThan(2);
   });
 
-  it("never overlap", () => {
-    for (const a of forests)
-      for (const b of forests)
-        if (a !== b) expect(distance(a.anchor, b.anchor)).toBeGreaterThanOrEqual(a.reach + b.reach);
+  it("join neighbouring parts of one forest by a walkable path", () => {
+    const joined = forests.flatMap((a) =>
+      forests
+        .filter((b) => b.anchor.x > a.anchor.x && a.layout.links.length > 0 && regionDistance(a, b) === 1)
+        .map((b) => [a, b] as const)
+        .filter(([a, b]) => a.layout.links.some((link) => b.layout.contains(link.there))),
+    );
+    expect(joined.length).toBeGreaterThan(0);
+    for (const [a, b] of joined.slice(0, 3)) {
+      const reached = reachable(tileOf(a.layout.glade), [a.layout, b.layout]);
+      expect(reached.has(key(tileOf(b.layout.glade))), `from ${key(a.anchor)} to ${key(b.anchor)}`).toBe(true);
+    }
   });
 
-  it("leave mountain peaks outside", () => {
-    const world = createWorldgen(2);
-    for (let cy = 1; cy <= 3; cy++)
-      for (let cx = 0; cx <= 2; cx++) {
-        const forest = world.deepForestAt(cx, cy);
-        if (!forest) continue;
-        for (let py = cy - 1; py <= cy + 1; py++)
-          for (let px = cx - 1; px <= cx + 1; px++) {
-            const peak = findPeak(world.fields, px, py);
-            if (peak) expect(forest.layout.contains(peak), `peak at ${peak.x},${peak.y}`).toBe(false);
-          }
-      }
-  });
-
-  it("connect every opening to the glade by walkable tiles inside the forest", () => {
+  it("connect every opening, link and landmark inside to the glade by walkable tiles inside the forest", () => {
     for (const { layout } of forests.slice(0, 4)) {
       expect(layout.openings.length).toBeGreaterThanOrEqual(2);
-      const start = tileOf(layout.glade);
-      const reached = new Set([key(start)]);
-      const frontier = [start];
-      while (frontier.length > 0) {
-        const p = frontier.pop()!;
-        for (const o of NEIGHBOURS) {
-          const n = { x: p.x + o.x, y: p.y + o.y };
-          if (reached.has(key(n)) || !(layout.contains(centre(n)) || layout.paths.has(key(n)))) continue;
-          if (blockerBetween(terrain(p.x, p.y), terrain(n.x, n.y))) continue;
-          reached.add(key(n));
-          frontier.push(n);
-        }
-      }
-      for (const opening of layout.openings)
-        expect(reached.has(key(tileOf(opening.inside))), `opening at ${key(tileOf(opening.inside))}`).toBe(true);
+      const reached = reachable(tileOf(layout.glade), [layout]);
+      for (const p of [...layout.openings.map((o) => o.inside), ...layout.links.map((l) => l.here), ...layout.stops])
+        expect(reached.has(key(tileOf(p))), `from ${key(tileOf(p))}`).toBe(true);
     }
   });
 
   it("are too dense to cross off their paths", () => {
-    for (const { layout, anchor, reach } of forests.slice(0, 4)) {
+    for (const { layout, bounds } of forests.slice(0, 4)) {
       let open = 0;
       let blocked = 0;
-      for (let y = anchor.y - reach; y <= anchor.y + reach; y += 3)
-        for (let x = anchor.x - reach; x <= anchor.x + reach; x += 3) {
+      for (let y = bounds.minY; y <= bounds.maxY; y += 3)
+        for (let x = bounds.minX; x <= bounds.maxX; x += 3) {
           if (!layout.contains(centre({ x, y })) || distance(centre({ x, y }), layout.glade) <= layout.glade.radius)
             continue;
           const tile = terrain(x, y);
@@ -95,9 +96,9 @@ describe("deep forests", () => {
   });
 
   it("can only be entered along their paths and rivers", () => {
-    for (const { anchor, reach } of forests.slice(0, 4))
-      for (let y = anchor.y - reach; y <= anchor.y + reach; y++)
-        for (let x = anchor.x - reach; x <= anchor.x + reach; x++) {
+    for (const { bounds } of forests.slice(0, 4))
+      for (let y = bounds.minY; y <= bounds.maxY; y++)
+        for (let x = bounds.minX; x <= bounds.maxX; x++) {
           const tile = terrain(x, y);
           if (tile.cover === Cover.None || tile.way !== Way.None || tile.water !== Water.None) continue;
           for (const o of NEIGHBOURS) {

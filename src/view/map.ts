@@ -43,13 +43,13 @@ export const createMap = (parent: HTMLElement, world: Worldgen) => {
       for (const end = Math.min(MAP_PX, row + ROWS_PER_FRAME); row < end; row++) {
         const levels: number[] = [];
         for (let col = 0; col < MAP_PX; col++) {
-          const climate = world.fields.climate(
+          const conditions = world.fields.conditions(
             center.x + (col - MAP_PX / 2) * TILES_PER_PX,
             center.y + (row - MAP_PX / 2) * TILES_PER_PX,
           );
-          const level = heightLevel(climate.elevation);
+          const level = heightLevel(conditions.elevation);
           levels.push(level);
-          const [r, g, b] = fieldColor(mode, climate, {
+          const [r, g, b] = fieldColor(mode, conditions, {
             westLevel: levels[col - 1] ?? level,
             northLevel: previous[col] ?? level,
             spacing: TILES_PER_PX,

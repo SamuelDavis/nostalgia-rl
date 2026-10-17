@@ -1,6 +1,6 @@
-import { smoothstep } from "../lib";
+import { clamp, smoothstep } from "../lib";
 import { Biome, Ground, Prop } from "./terrain";
-import type { Climate } from "./fields";
+import type { Conditions } from "./fields";
 import { SEA_ELEVATION, SEA_LEVEL, heightLevel } from "./constants";
 
 const BEACH_ELEVATION = SEA_ELEVATION + 0.0125;
@@ -8,6 +8,10 @@ const RUGGED_RANGE = [0.4, 0.9] as const;
 const RUGGED_HEIGHT_RANGE = [100, 130] as const;
 const ALTITUDE_RANGE = [135, 165] as const;
 const MOUNTAIN_THRESHOLD = 0.5;
+const SHORE_FADE = 0.005;
+const TREELINE_MOUNTAINNESS = 0.25;
+const FOREST_MOISTURE_RANGE = [0.36, 0.86] as const;
+export const FOREST_THRESHOLD = 0.4;
 
 export const MOUNTAIN_LEVEL = heightLevel(0.5);
 
@@ -17,13 +21,18 @@ export const mountainness = (ruggedness: number, level: number): number =>
     smoothstep(...ALTITUDE_RANGE, level),
   );
 
-export const biomeOf = ({ elevation, temperature, moisture, mountainness }: Climate): Biome => {
+export const forestness = (moisture: number, mountainness: number, elevation: number): number =>
+  clamp((moisture - FOREST_MOISTURE_RANGE[0]) / (FOREST_MOISTURE_RANGE[1] - FOREST_MOISTURE_RANGE[0]), 0, 1) *
+  (1 - smoothstep(TREELINE_MOUNTAINNESS, MOUNTAIN_THRESHOLD, mountainness)) *
+  smoothstep(BEACH_ELEVATION, BEACH_ELEVATION + SHORE_FADE, elevation);
+
+export const biomeOf = ({ elevation, temperature, moisture, mountainness, forestness }: Conditions): Biome => {
   const height = heightLevel(elevation);
   if (height < SEA_LEVEL) return Biome.Ocean;
   if (elevation < BEACH_ELEVATION) return Biome.Beach;
   if (mountainness >= MOUNTAIN_THRESHOLD) return Biome.Mountain;
   if (temperature > 0.6 && moisture < 0.42) return Biome.Desert;
-  if (moisture > 0.56) return Biome.Forest;
+  if (forestness >= FOREST_THRESHOLD) return Biome.Forest;
   return Biome.Grassland;
 };
 

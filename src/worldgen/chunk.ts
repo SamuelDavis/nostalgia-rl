@@ -4,6 +4,7 @@ import { BIOMES, biomeOf } from "./biome";
 import { type TileDraft, paintInOrder } from "./features/feature";
 import { CHUNK_SIZE, REGION_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
 import type { RiverNode } from "./rivers";
+import { overlaps } from "./region";
 import type { Worldgen } from "./world";
 
 export interface Chunk {
@@ -95,7 +96,11 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
     ...segmentsOf(world.trailsNear(region.cx, region.cy), Way.Path, TRAIL_HALF_WIDTH, TRAIL_CLEARANCE),
   ];
   const glades = world.gladesNear(region.cx, region.cy).filter((glade) => near(glade, glade.radius));
-  const features = world.featuresNear(region.cx, region.cy).filter((f) => near(f.anchor, f.reach));
+  const features = world
+    .featuresNear(region.cx, region.cy)
+    .filter(({ bounds }) =>
+      overlaps(bounds, { minX: originX, minY: originY, maxX: originX + CHUNK_SIZE, maxY: originY + CHUNK_SIZE }),
+    );
   const groves = createNoise(seed, GROVE_SALT);
   const frostEdge = createNoise(seed, GROUND_SALT);
 
@@ -113,9 +118,9 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
       const x = originX + lx;
       const y = originY + ly;
       const center = { x: x + 0.5, y: y + 0.5 };
-      const climate = fields.climate(center.x, center.y);
-      const { elevation, temperature } = climate;
-      const tileBiome = biomeOf(climate);
+      const conditions = fields.conditions(center.x, center.y);
+      const { elevation, temperature } = conditions;
+      const tileBiome = biomeOf(conditions);
       const traits = BIOMES[tileBiome];
       let level = heightLevel(elevation);
       let tileWater: Water = Water.None;
