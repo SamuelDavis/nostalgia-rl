@@ -23,6 +23,7 @@ export const tileIndex = (lx: number, ly: number): number => ly * CHUNK_SIZE + l
 
 const TILES = CHUNK_SIZE * CHUNK_SIZE;
 const BANK_WIDTH = 12;
+const BANK_SLOPE = MAX_CLIMB * 0.75;
 const ROAD_HALF_WIDTH = 1.1;
 const ROAD_CLEARANCE = 1.5;
 const TRAIL_HALF_WIDTH = 0.8;
@@ -48,7 +49,7 @@ interface Pool extends Point {
   readonly level: number;
 }
 
-const bankRise = (gap: number): number => Math.ceil(gap) * MAX_CLIMB;
+const bankLevel = (bed: number, gap: number): number => Math.floor(bed + gap * BANK_SLOPE);
 
 export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk => {
   const { seed, fields } = world;
@@ -130,17 +131,17 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
         if (gap <= 0) {
           tileWater = gap <= -2 ? Water.Deep : Water.Shallow;
           level = Math.min(level, pool.level);
-        } else if (gap <= BANK_WIDTH) level = Math.min(level, pool.level + bankRise(gap));
+        } else if (gap <= BANK_WIDTH) level = Math.min(level, bankLevel(pool.level, gap));
       }
 
       for (const { a, b } of channels) {
         const projection = projectOntoSegment(center, a, b);
         const gap = projection.distance - b.halfWidth;
-        const bed = Math.round(a.level + (b.level - a.level) * projection.t);
+        const bed = a.level + (b.level - a.level) * projection.t;
         if (gap <= 0) {
           if (tileWater !== Water.Deep) tileWater = b.halfWidth >= 2 && gap <= -1 ? Water.Deep : Water.Shallow;
-          level = Math.min(level, bed);
-        } else if (gap <= BANK_WIDTH) level = Math.min(level, bed + bankRise(gap));
+          level = Math.min(level, Math.round(bed));
+        } else if (gap <= BANK_WIDTH) level = Math.min(level, bankLevel(bed, gap));
       }
 
       const nearWater =

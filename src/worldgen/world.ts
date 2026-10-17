@@ -17,7 +17,7 @@ import { type DeepForestLayout, createDeepForests, gladeOf as deepForestGlade } 
 import { type Anchor, type FeatureType, type PlacedFeature, place } from "./features/feature";
 import { REGION_SIZE, SEA_LEVEL, heightLevel } from "./constants";
 import { type Fields, createFields } from "./fields";
-import { MAX_RIVER_REACH, type River, traceRiver } from "./rivers";
+import { type River, createRivers } from "./rivers";
 import { climbCost, route } from "./routing";
 import { type Bounds, type Region, boundsOf, overlaps, regionBounds, regionKey, regionsAround } from "./region";
 import { type Glade, type Trail, findGlade, findPeak } from "./trails";
@@ -54,8 +54,6 @@ const TRAIL_DIFFICULTY_SCALE = 60;
 const TRAIL_REUSE = 0.35;
 const TRAIL_TYPICAL_COST = 2.5;
 
-const RIVER_REGION_RADIUS = Math.ceil(MAX_RIVER_REACH / REGION_SIZE) + 1;
-
 const pointKey = ({ x, y }: Point) => `${x},${y}`;
 
 const isForward = (from: Region, to: Region) => to.ry > from.ry || (to.ry === from.ry && to.rx > from.rx);
@@ -83,31 +81,10 @@ export const createWorldgen = (seed: number): Worldgen => {
   const isDry = (p: Point) => level(p) > SEA_LEVEL;
   const biomeAt = (p: Point) => biomeOf(fields.conditions(p.x, p.y));
 
-  const tracedRiver = memoize(
-    (region: Region) => {
-      const river = traceRiver(seed, fields, region);
-      return (
-        river && {
-          river,
-          bounds: boundsOf(river.nodes, (river.lake?.radius ?? 0) + 8),
-        }
-      );
-    },
-    regionKey,
-    REGION_CACHE,
-  );
+  const rivers = createRivers(seed, fields);
+  const riversNearRegion = rivers.near;
 
-  const riversNearRegion = memoize(
-    (region: Region) =>
-      regionsAround(region, RIVER_REGION_RADIUS).flatMap((source) => {
-        const traced = tracedRiver(source);
-        return traced && overlaps(traced.bounds, regionBounds(region)) ? [traced.river] : [];
-      }),
-    regionKey,
-    REGION_CACHE,
-  );
-
-  const camps = createCamps({ seed, level, biomeAt, riversNear: riversNearRegion });
+  const camps = createCamps({ seed, level, biomeAt, riversNear: rivers.bandsNear });
   const { spawn } = camps;
   const campAtRegion = camps.at;
 

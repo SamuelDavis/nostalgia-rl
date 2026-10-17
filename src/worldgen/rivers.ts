@@ -1,7 +1,20 @@
-import { type Point, distance, projectOntoSegment, createNoise, hash, hashString, intBetween, unit } from "../lib";
-import { REGION_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
+import {
+  type Point,
+  clamp,
+  createNoise,
+  distance,
+  hash,
+  hashString,
+  intBetween,
+  lerp,
+  MinHeap,
+  memoize,
+  projectOntoSegment,
+} from "../lib";
+import { REGION_SIZE, SEA_LEVEL, heightLevel, metresToLevels } from "./constants";
 import type { Fields } from "./fields";
-import type { Region } from "./region";
+import { route } from "./routing";
+import { type Region, regionKey } from "./region";
 
 export interface RiverNode extends Point {
   readonly level: number;
@@ -18,104 +31,182 @@ export interface River {
   readonly lake?: Lake;
 }
 
+interface Cell {
+  readonly col: number;
+  readonly row: number;
+}
+
 const SALT = hashString("rivers");
-const SOURCE_CHANCE = 0.7;
-const MIN_SOURCE_LEVEL = heightLevel(0.42);
-const STEP = 4;
-const MAX_DESCENT = (MAX_CLIMB / 2) * STEP;
-const MAX_STEPS = 300;
-const STAGNATION_STEPS = 40;
-const GRADIENT_SPAN = 20;
-const STEPS_PER_WIDTH = 45;
+const CELL = 64;
+const CELLS_PER_REGION = REGION_SIZE / CELL;
+const NODE_MARGIN = 12;
+const UPSTREAM_DEPTH = 12;
+const RIVER_FLOW = 3;
+const FLOW_PER_WIDTH = 8;
 const MAX_HALF_WIDTH = 3;
-const MARGIN = 24;
+const MEANDER = 0.6;
+const MEANDER_SCALE = 40;
+const UPHILL = 2;
+const ROUTE_CACHE = 1 << 14;
+const CHANNEL_MARGIN = 24;
+const LAKE_RADII = [5, 12] as const;
+const SPILL_RADIUS = 3;
+const SPILL_SIDE = 2 * SPILL_RADIUS + 1;
+const MAX_GORGE = metresToLevels(6);
+const NEAR_CELLS = SPILL_RADIUS + 1;
+const CELL_CACHE = 1 << 16;
 
-const LOOP_GAP = 6;
-const LOOP_DISTANCE = 6;
+const AROUND: readonly Cell[] = [
+  { col: 1, row: 0 },
+  { col: 1, row: 1 },
+  { col: 0, row: 1 },
+  { col: -1, row: 1 },
+  { col: -1, row: 0 },
+  { col: -1, row: -1 },
+  { col: 0, row: -1 },
+  { col: 1, row: -1 },
+];
 
-const loopsBack = (nodes: readonly RiverNode[]): boolean => {
-  const head = nodes.at(-1)!;
-  return nodes
-    .slice(0, -LOOP_GAP)
-    .some((node) => Math.abs(node.x - head.x) < LOOP_DISTANCE && Math.abs(node.y - head.y) < LOOP_DISTANCE);
+const cellKey = ({ col, row }: Cell) => `${col},${row}`;
+const isSameCell = (a: Cell | undefined, b: Cell) => a !== undefined && a.col === b.col && a.row === b.row;
+const neighboursOf = (c: Cell) => AROUND.map((o) => ({ col: c.col + o.col, row: c.row + o.row }));
+
+const cellsAround = ({ rx, ry }: Region, ring: number): Cell[] => {
+  const side = CELLS_PER_REGION + 2 * ring;
+  return Array.from({ length: side * side }, (_, i) => ({
+    col: rx * CELLS_PER_REGION - ring + (i % side),
+    row: ry * CELLS_PER_REGION - ring + Math.floor(i / side),
+  }));
 };
 
-export const MAX_RIVER_REACH = STEP * MAX_STEPS;
-
-const normalize = (x: number, y: number): Point => {
-  const length = Math.sqrt(x * x + y * y);
-  return length === 0 ? { x: 0, y: 0 } : { x: x / length, y: y / length };
-};
-
-const downhill = ({ drainage }: Fields, p: Point): Point =>
-  normalize(
-    drainage(p.x - GRADIENT_SPAN, p.y) - drainage(p.x + GRADIENT_SPAN, p.y),
-    drainage(p.x, p.y - GRADIENT_SPAN) - drainage(p.x, p.y + GRADIENT_SPAN),
-  );
-
-const sourceOf = (seed: number, { rx, ry }: Region): Point | undefined => {
-  if (unit(hash(seed, SALT, rx, ry)) > SOURCE_CHANCE) return undefined;
-  return {
-    x: rx * REGION_SIZE + intBetween(MARGIN, REGION_SIZE - MARGIN, hash(seed, SALT, rx, ry, 1)),
-    y: ry * REGION_SIZE + intBetween(MARGIN, REGION_SIZE - MARGIN, hash(seed, SALT, rx, ry, 2)),
-  };
-};
-
-export const traceRiver = (seed: number, fields: Fields, region: Region): River | undefined => {
-  const { rx, ry } = region;
-  const source = sourceOf(seed, region);
-  if (!source) return undefined;
-  const sourceLevel = heightLevel(fields.elevation(source.x, source.y));
-  if (sourceLevel < MIN_SOURCE_LEVEL) return undefined;
-
+export const createRivers = (seed: number, fields: Fields) => {
   const meander = createNoise(seed, SALT);
-  const nodes: RiverNode[] = [{ ...source, level: sourceLevel, halfWidth: 1 }];
-  let position = source;
-  let heading = downhill(fields, source);
-  let lowest = fields.drainage(source.x, source.y);
-  let lowestIndex = 0;
+  const cached = <R>(compute: (c: Cell) => R) => memoize(compute, cellKey, CELL_CACHE);
 
-  for (let step = 1; step <= MAX_STEPS; step++) {
-    const slope = downhill(fields, position);
-    const sway = meander(position.x / 90, position.y / 90) * 0.6;
-    heading = normalize(
-      heading.x * 0.6 + (slope.x - heading.y * sway) * 0.4,
-      heading.y * 0.6 + (slope.y + heading.x * sway) * 0.4,
-    );
-    position = {
-      x: position.x + heading.x * STEP,
-      y: position.y + heading.y * STEP,
-    };
+  const nodeOf = cached(({ col, row }): Point => ({
+    x: col * CELL + intBetween(NODE_MARGIN, CELL - NODE_MARGIN, hash(seed, SALT, col, row, 1)),
+    y: row * CELL + intBetween(NODE_MARGIN, CELL - NODE_MARGIN, hash(seed, SALT, col, row, 2)),
+  }));
+  const drainageOf = cached((c) => fields.drainage(nodeOf(c).x, nodeOf(c).y));
+  const groundOf = cached((c) => Math.max(SEA_LEVEL - 1, heightLevel(fields.elevation(nodeOf(c).x, nodeOf(c).y))));
+  const rainOf = cached((c) => fields.moisture(nodeOf(c).x, nodeOf(c).y));
+  const isSea = (c: Cell) => groundOf(c) < SEA_LEVEL;
 
-    const elevation = fields.elevation(position.x, position.y);
-    const previous = nodes.at(-1)!.level;
-    const level = Math.max(previous - MAX_DESCENT, Math.min(previous, heightLevel(elevation)));
-    const halfWidth = Math.min(MAX_HALF_WIDTH, 1 + Math.floor(step / STEPS_PER_WIDTH));
-    nodes.push({ ...position, level, halfWidth });
+  const fallOf = cached((c): Cell | undefined => {
+    if (isSea(c)) return undefined;
+    const lowest = neighboursOf(c).reduce((best, n) => (drainageOf(n) < drainageOf(best) ? n : best));
+    return drainageOf(lowest) < drainageOf(c) ? lowest : undefined;
+  });
 
-    if (heightLevel(elevation) < SEA_LEVEL) return { nodes };
-    if (loopsBack(nodes)) {
-      lowestIndex = Math.min(lowestIndex, nodes.length - LOOP_GAP);
-      break;
+  const drainsTo = cached((c): Cell | undefined => {
+    const fall = fallOf(c);
+    return fall && groundOf(fall) <= groundOf(c) ? fall : undefined;
+  });
+
+  const isBasin = (c: Cell) => !isSea(c) && !drainsTo(c);
+
+  const spillOf = cached((basin: Cell): Cell[] | undefined => {
+    if (!isBasin(basin)) return undefined;
+    const limit = groundOf(basin) + MAX_GORGE;
+    const cameFrom = new Map<string, Cell>([[cellKey(basin), basin]]);
+    const open = new MinHeap<Cell>();
+    open.push(basin, groundOf(basin));
+    for (let c = open.pop(); c; c = open.pop()) {
+      if (groundOf(c) < groundOf(basin)) {
+        const path = [];
+        for (let p = c; !isSameCell(p, basin); p = cameFrom.get(cellKey(p))!) path.push(p);
+        return [basin, ...path.reverse()];
+      }
+      for (const n of neighboursOf(c)) {
+        const isFar = Math.max(Math.abs(n.col - basin.col), Math.abs(n.row - basin.row)) > SPILL_RADIUS;
+        if (isFar || cameFrom.has(cellKey(n)) || groundOf(n) > limit) continue;
+        cameFrom.set(cellKey(n), c);
+        open.push(n, groundOf(n));
+      }
     }
-    const drainage = fields.drainage(position.x, position.y);
-    if (drainage < lowest) {
-      lowest = drainage;
-      lowestIndex = step;
-    } else if (step - lowestIndex > STAGNATION_STEPS) break;
-  }
+    return undefined;
+  });
 
-  const basin = nodes.slice(0, lowestIndex + 1);
-  const mouth = basin.at(-1)!;
-  return {
-    nodes: basin,
-    lake: {
-      x: mouth.x,
-      y: mouth.y,
-      level: mouth.level,
-      radius: intBetween(5, 12, hash(seed, SALT, rx, ry, 3)),
-    },
+  const spillsAround = (c: Cell) =>
+    Array.from({ length: SPILL_SIDE * SPILL_SIDE }, (_, i) => ({
+      col: c.col - SPILL_RADIUS + (i % SPILL_SIDE),
+      row: c.row - SPILL_RADIUS + Math.floor(i / SPILL_SIDE),
+    })).filter((b) => isSameCell(spillOf(b)?.at(-1), c));
+
+  const upstreamOf = cached((c) => [...neighboursOf(c).filter((n) => isSameCell(drainsTo(n), c)), ...spillsAround(c)]);
+
+  const flowWithin = (c: Cell, depth: number): number =>
+    rainOf(c) + (depth === 0 ? 0 : upstreamOf(c).reduce((sum, u) => sum + flowWithin(u, depth - 1), 0));
+  const flowOf = cached((c) => flowWithin(c, UPSTREAM_DEPTH));
+  const isRiver = (c: Cell) => !isSea(c) && flowOf(c) >= RIVER_FLOW;
+
+  const halfWidthOf = (c: Cell) => clamp(1 + Math.floor((flowOf(c) - RIVER_FLOW) / FLOW_PER_WIDTH), 1, MAX_HALF_WIDTH);
+
+  const lakeAt = (c: Cell): Lake => {
+    const { x, y } = nodeOf(c);
+    return { x, y, level: groundOf(c), radius: intBetween(...LAKE_RADII, hash(seed, SALT, c.col, c.row, 3)) };
   };
+
+  const levelAt = (p: Point) => Math.max(SEA_LEVEL - 1, heightLevel(fields.elevation(p.x, p.y)));
+
+  const channel = (from: Cell, to: Cell, levels: readonly [number, number], halfWidth: number): RiverNode[] => {
+    const [a, b] = [nodeOf(from), nodeOf(to)];
+    const [source, mouth] = levels;
+    const levelOf = memoize(levelAt, ({ x, y }) => `${x},${y}`, ROUTE_CACHE);
+    const path = route(a, b, {
+      gradeLevel: levelOf,
+      isOpen: () => true,
+      unitCost: (_, at) =>
+        1 +
+        MEANDER * (1 + meander(at.x / MEANDER_SCALE, at.y / MEANDER_SCALE)) +
+        UPHILL * Math.max(0, levelOf(at) - source),
+      typicalUnitCost: 2.5,
+      margin: CHANNEL_MARGIN,
+    });
+    const points = [a, ...(path ?? []).slice(1, -1), b];
+    const lengths = points.map((p, i) => distance(p, points[i - 1] ?? p));
+    const total = lengths.reduce((sum, d) => sum + d, 0);
+    let travelled = 0;
+    let level = source;
+    return points.map((p, i) => {
+      travelled += lengths[i]!;
+      const steady = lerp(source, mouth, travelled / total);
+      level = Math.max(mouth, Math.min(level, steady, levelAt(p)));
+      return { x: p.x, y: p.y, level, halfWidth };
+    });
+  };
+
+  const courseOf = (c: Cell): Cell[] => {
+    const to = drainsTo(c);
+    return to ? [c, to] : (spillOf(c) ?? []);
+  };
+
+  const riverFrom = cached((c): River | undefined => {
+    if (!isRiver(c)) return undefined;
+    const course = courseOf(c);
+    const halfWidth = halfWidthOf(c);
+    const nodes = course.slice(1).flatMap((to, i) => {
+      const isLast = i === course.length - 2;
+      return channel(course[i]!, to, [groundOf(c), isLast ? groundOf(to) : groundOf(c)], halfWidth);
+    });
+    return { nodes, lake: isBasin(c) ? lakeAt(c) : undefined };
+  });
+
+  const bandFrom = cached((c): River | undefined => {
+    if (!isRiver(c)) return undefined;
+    const halfWidth = halfWidthOf(c) + CHANNEL_MARGIN;
+    const nodes = courseOf(c).map((cell) => ({ ...nodeOf(cell), level: groundOf(cell), halfWidth }));
+    return { nodes, lake: isBasin(c) ? lakeAt(c) : undefined };
+  });
+
+  const nearBy = (from: (c: Cell) => River | undefined) =>
+    memoize(
+      (region: Region): River[] => cellsAround(region, NEAR_CELLS).flatMap((c) => from(c) ?? []),
+      regionKey,
+      CELL_CACHE,
+    );
+
+  return { near: nearBy(riverFrom), bandsNear: nearBy(bandFrom) };
 };
 
 export const distanceToRiver = (river: River, p: Point): number => {

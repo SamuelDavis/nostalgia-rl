@@ -61,12 +61,19 @@ describe("generateChunk", () => {
 
   it("matches golden digests", () => {
     const world = worldOf(1);
-    expect([generateChunk(world, 0, 0), generateChunk(world, -5, 9), generateChunk(world, 20, -13)].map(digest))
-      .toMatchInlineSnapshot(`
+    expect(
+      [
+        [0, 0],
+        [-5, 9],
+        [20, -13],
+        [-5, -7],
+      ].map(([cx, cy]) => digest(generateChunk(world, cx!, cy!))),
+    ).toMatchInlineSnapshot(`
         [
           517722342,
           3467417234,
           2896958364,
+          410932772,
         ]
       `);
   });
@@ -154,7 +161,7 @@ describe("generateChunk", () => {
     }
   });
 
-  it("carves rivers without cliffs", () => {
+  it("carves rivers without cliffs", { tags: "slow" }, () => {
     for (const seed of [1, 2, 3]) {
       const world = worldOf(seed);
       for (const river of world.riversNear(regionOf(world.spawn)))

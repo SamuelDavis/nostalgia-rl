@@ -35,17 +35,18 @@ export interface RouteCosts {
   readonly isOpen: (p: Point) => boolean;
   readonly unitCost: UnitCost;
   readonly typicalUnitCost: number;
+  readonly margin?: number;
 }
 
 export const route = (
   from: Point,
   to: Point,
-  { gradeLevel, isOpen, unitCost, typicalUnitCost }: RouteCosts,
+  { gradeLevel, isOpen, unitCost, typicalUnitCost, margin = MARGIN }: RouteCosts,
 ): Point[] | undefined => {
-  const minX = Math.min(from.x, to.x) - MARGIN;
-  const maxX = Math.max(from.x, to.x) + MARGIN;
-  const minY = Math.min(from.y, to.y) - MARGIN;
-  const maxY = Math.max(from.y, to.y) + MARGIN;
+  const minX = Math.min(from.x, to.x) - margin;
+  const maxX = Math.max(from.x, to.x) + margin;
+  const minY = Math.min(from.y, to.y) - margin;
+  const maxY = Math.max(from.y, to.y) + margin;
   const toGrid = (v: number) => Math.round(v / STEP);
   const toWorld = (g: Point): Point => ({ x: g.x * STEP, y: g.y * STEP });
   const openness = new Map<number, boolean>();
