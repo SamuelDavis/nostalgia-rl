@@ -42,7 +42,7 @@ describe("createWorldgen", () => {
     }
   });
 
-  it("lays ways over land", () => {
+  it("lays ways over land", { tags: "slow" }, () => {
     for (const seed of seeds) {
       const world = worldOf(seed);
       const links = regions.flatMap(world.waysNear);
