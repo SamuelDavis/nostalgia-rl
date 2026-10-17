@@ -42,7 +42,7 @@ Results for a region (traced rivers, anchors, placed features, roads, trails) ar
 Peers will generate terrain independently, so results must be bit-identical across JavaScript engines.
 
 - All randomness is counter-based hashing (`src/lib/hash.ts`): `hash(seed, salt, x, y, …)`. There is no stateful random number generator and no `Math.random`.
-- Use only operations with exactly specified results: `+ - * /`, `Math.sqrt`, `Math.floor`, `ceil`, `round`, `abs`, `min`, `max`, and integer operations. `Math.sin`, `cos`, `exp`, `pow`, `atan2`, `hypot`, and `**` are implementation-approximated, so keep them out of anything peers must reproduce.
+- Use only operations with exactly specified results: `+ - * /`, `Math.sqrt`, `Math.floor`, `ceil`, `round`, `abs`, `min`, `max`, and integer operations. `Math.sin`, `cos`, `exp`, `pow`, `atan2`, `hypot`, and `**` are implementation-approximated, so keep them out of anything peers must reproduce. `npm run lint` enforces this in `src/lib`, `src/worldgen` and `src/game`.
 - `simplex-noise` uses only exact operations, and it is seeded through the hash.
 
 ## Tests
@@ -51,7 +51,7 @@ Peers will generate terrain independently, so results must be bit-identical acro
   - **determinism:** generation order and world instance don't affect results;
   - **golden digests** of three chunks (`chunk.test.ts`): update them deliberately, with `-u`, whenever generation is meant to change;
   - **invariants across seeds:** rivers never flow uphill and end in sea or lake, roads cross land, the spawn is dry and near the origin, and carving (rivers, camps) never makes a step steeper than `max(MAX_CLIMB, natural step)`; trails are walkable up to their far end under the game's movement rules (`src/game/trails.test.ts`).
-- Tests tagged `slow` sweep many seeds or regions; `npm test` skips them and `npm run test:all` runs them. Tests share one world per seed within a file, since a cold region costs far more than a warm one.
+- Tests tagged `slow` sweep many seeds or regions; `npm test` skips them; `npm run test:all` and `npm run verify` run them. Tests share one world per seed within a file, since a cold region costs far more than a warm one.
 - `chunk.bench.ts` asserts a time budget for a warm chunk.
 
 ## Looking at the world

@@ -18,7 +18,9 @@ export const hashString = (text: string): number => {
   return lowbias32(h);
 };
 
-export const unit = (h: number): number => h / 2 ** 32;
+const UINT32_RANGE = 0x1_0000_0000;
+
+export const unit = (h: number): number => h / UINT32_RANGE;
 
 export const intBetween = (min: number, max: number, h: number): number => min + Math.floor(unit(h) * (max - min + 1));
 

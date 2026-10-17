@@ -11,16 +11,20 @@
     "test:all": "vitest run",
     "bench": "vitest bench --run",
     "typecheck": "tsc",
+    "lint": "eslint .",
+    "verify": "tsc && eslint . && vitest run",
     "map": "tsx tooling/worldmap.ts",
     "format": "prettier --write ."
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
     "@types/pngjs": "^6.0.5",
+    "eslint": "^10.13.0",
     "pngjs": "^7.0.0",
     "prettier": "^3.9.10",
     "tsx": "^4.23.15",
     "typescript": "~6.0.2",
+    "typescript-eslint": "^8.71.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.5"
   },
