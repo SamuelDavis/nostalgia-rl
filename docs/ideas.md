@@ -14,10 +14,6 @@ Every peer could keep a full copy of the world's changes. If the host drops, a p
 
 On level-up, players choose abilities from a pool (for example, warrior, wizard, or thief abilities) instead of picking a class, so classes can be mixed freely.
 
-## Smoothed grid movement
-
-Render movement between tiles as a short glide with acceleration and deceleration, so a slower turn (~250 ms) feels continuous while still reading as grid steps. Presentation only: game state stays on the grid. Deferred from phase 1, which uses 100 ms turns instead.
-
 ## Visibility from obstructions
 
 Close the view in dense trees, as the camera already closes when looking uphill. Probably better as field of view: line of sight with shadows cast by trees and rising ground, the tutorial's next step after movement.

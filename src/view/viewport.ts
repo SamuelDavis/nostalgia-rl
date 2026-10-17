@@ -145,6 +145,38 @@ const coverLook = (cover: Exclude<Cover, typeof Cover.None>, light: number, x: n
 
 const underCover = (look: Look): Look => ({ ...look, background: shade(look.background, UNDER_COVER_SHADE) });
 
+const setGlyphFont = (ctx: CanvasRenderingContext2D, cellPx: number) => {
+  ctx.font = `${cellPx - 3}px "DejaVu Sans Mono", Menlo, Consolas, monospace`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+};
+
+const SPRITE_BACKDROP = "rgb(0 0 0 / 0.4)";
+const SPRITE_BACKDROP_RADIUS = 0.45;
+
+const drawSprite = (
+  ctx: CanvasRenderingContext2D,
+  px: number,
+  py: number,
+  cellPx: number,
+  glyph: string,
+  color: Rgb,
+) => {
+  const [cx, cy] = [px + cellPx / 2, py + cellPx / 2];
+  ctx.fillStyle = SPRITE_BACKDROP;
+  ctx.beginPath();
+  ctx.arc(cx, cy, cellPx * SPRITE_BACKDROP_RADIUS, 0, 2 * Math.PI);
+  ctx.fill();
+  setGlyphFont(ctx, cellPx);
+  ctx.fillStyle = css(color);
+  ctx.fillText(glyph, cx, cy + 1);
+};
+
+export interface Player {
+  readonly position: Point;
+  readonly shown: Point;
+}
+
 interface TileWindow {
   readonly left: number;
   readonly top: number;
@@ -157,7 +189,7 @@ const drawTiles = (
   ctx: CanvasRenderingContext2D,
   source: Terrain,
   { left, top, columns, rows, cellPx }: TileWindow,
-  player: Point,
+  eye: Tile,
   mode: HeightMode,
 ): void => {
   const terrain = snapshot(
@@ -169,13 +201,10 @@ const drawTiles = (
   );
   const screen = (x: number, y: number) => ({ px: (x - left) * cellPx, py: (y - top) * cellPx });
 
-  ctx.font = `${cellPx - 3}px "DejaVu Sans Mono", Menlo, Consolas, monospace`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
+  setGlyphFont(ctx, cellPx);
 
-  const standing = terrain(player.x, player.y);
-  const isInside = standing.cover !== Cover.None;
-  const heightShade = relativeHeightShade(standing.height);
+  const isInside = eye.cover !== Cover.None;
+  const heightShade = relativeHeightShade(eye.height);
   const isHidden = (tile: Tile) => !isInside && tile.cover !== Cover.None;
   const lightAt = createLighting(terrain, left, top, columns, rows);
   const lookAt = (tile: Tile, x: number, y: number): Look => {
@@ -191,11 +220,9 @@ const drawTiles = (
       const look = lookAt(tile, x, y);
       ctx.fillStyle = css(look.background);
       ctx.fillRect(px, py, cellPx, cellPx);
-      const isPlayer = x === player.x && y === player.y;
       const stairs = !isHidden(tile) && hasStairs(terrain, x, y, tile);
-      const glyph = isPlayer ? PLAYER_GLYPH : stairs ? STAIRS_GLYPH : look.glyph;
-      ctx.fillStyle = css(isPlayer ? PLAYER_COLOR : look.color);
-      ctx.fillText(glyph, px + cellPx / 2, py + cellPx / 2 + 1);
+      ctx.fillStyle = css(look.color);
+      ctx.fillText(stairs ? STAIRS_GLYPH : look.glyph, px + cellPx / 2, py + cellPx / 2 + 1);
     }
 
   const contourAt = (tile: Tile, next: Tile): Contour =>
@@ -264,11 +291,12 @@ const covers = (area: TileWindow, left: number, top: number, columns: number, ro
 export const createViewport = (ctx: CanvasRenderingContext2D) => {
   const layer = document.createElement("canvas").getContext("2d")!;
   let drawn: Drawn | undefined;
-  return (terrain: Terrain, { centre, tilePx, restingTilePx }: View, player: Point, mode: HeightMode): void => {
+  return (terrain: Terrain, { centre, tilePx, restingTilePx }: View, player: Player, mode: HeightMode): void => {
     const { clientWidth: width, clientHeight: height } = ctx.canvas;
     const visibleLeft = centre.x - width / 2 / tilePx;
     const visibleTop = centre.y - height / 2 / tilePx;
-    const key = [restingTilePx, devicePixelRatio, player.x, player.y, mode].join();
+    const eye = terrain(player.position.x, player.position.y);
+    const key = [restingTilePx, devicePixelRatio, eye.height, eye.cover, mode].join();
     const isCurrent =
       drawn?.key === key && covers(drawn.area, visibleLeft, visibleTop, width / tilePx, height / tilePx);
     if (!isCurrent) {
@@ -283,12 +311,21 @@ export const createViewport = (ctx: CanvasRenderingContext2D) => {
       layer.canvas.width = Math.round(area.columns * restingTilePx * devicePixelRatio);
       layer.canvas.height = Math.round(area.rows * restingTilePx * devicePixelRatio);
       layer.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-      drawTiles(layer, terrain, area, player, mode);
+      drawTiles(layer, terrain, area, eye, mode);
       drawn = { area, key };
     }
     const { area } = drawn!;
     const originX = Math.round(width / 2 - (centre.x - area.left) * tilePx);
     const originY = Math.round(height / 2 - (centre.y - area.top) * tilePx);
     ctx.drawImage(layer.canvas, originX, originY, area.columns * tilePx, area.rows * tilePx);
+    const toScreen = (p: number, centreAt: number, extent: number) => extent / 2 + (p - centreAt) * tilePx;
+    drawSprite(
+      ctx,
+      toScreen(player.shown.x, centre.x, width),
+      toScreen(player.shown.y, centre.y, height),
+      tilePx,
+      PLAYER_GLYPH,
+      PLAYER_COLOR,
+    );
   };
 };

@@ -17,6 +17,7 @@ import {
   steer,
 } from "./view/camera";
 import { createHud } from "./view/hud";
+import { createGlide } from "./view/motion";
 import { createMap } from "./view/map";
 import { HEIGHT_MODES, type HeightMode } from "./view/palette";
 import { createViewport } from "./view/viewport";
@@ -61,6 +62,7 @@ let practical = practicalSpan(open, heading);
 let clearance = clearanceAhead(terrain, session.position, session.facing);
 let lastActionAt = performance.now();
 const camera = createCamera();
+const glide = createGlide(turnMs, session.position);
 const drawViewport = createViewport(ctx);
 
 let urlSync: ReturnType<typeof setTimeout> | undefined;
@@ -78,18 +80,21 @@ let dirty = true;
 let drawn = "";
 let lastFrame = performance.now();
 const render = (now: number) => {
+  const shown = glide(session.position, now);
   const span = attentiveSpan({ natural, practical, clearance }, now - lastActionAt);
   const view = camera(
-    { position: session.position, look: lookOffset(open, heading), span: spanOf(span, zoomModifier) },
+    { position: shown, look: lookOffset(open, heading), span: spanOf(span, zoomModifier) },
     { width: canvas.clientWidth, height: canvas.clientHeight },
     now - lastFrame,
   );
   lastFrame = now;
-  const placement = [view.centre.x * view.tilePx, view.centre.y * view.tilePx, view.tilePx * 100]
+  const placement = [view.centre.x, view.centre.y, shown.x, shown.y]
+    .map((v) => v * view.tilePx)
+    .concat(view.tilePx * 100)
     .map(Math.round)
     .join();
   if (!dirty && placement === drawn) return;
-  drawViewport(terrain, view, session.position, mode);
+  drawViewport(terrain, view, { position: session.position, shown }, mode);
   hud.update({
     session,
     turnMs,
