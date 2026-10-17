@@ -67,3 +67,12 @@ Something with state or behaviour, such as a player, monster or item.
 
 **Way**:
 A road or path that people travel along.
+
+**Node**:
+A point that ways or rivers pass through, linked to nearby nodes. The world's lattice holds at most one per cell, and features own child nodes.
+
+**Reach**:
+How far a node looks for other nodes to link to.
+
+**Wayness**:
+A derived field for how likely ways are to pass through a place; high where land is worth settling, low in empty country.
