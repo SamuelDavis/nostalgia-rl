@@ -41,6 +41,8 @@ export const createHud = (parent: HTMLElement, world: Worldgen, controls: readon
   const table = document.createElement("dl");
   const help = document.createElement("p");
   help.textContent = "WASD or tap move · wheel zoom";
+  table.hidden = true;
+  help.hidden = true;
   const buttons = document.createElement("menu");
   buttons.append(
     ...controls.map(({ label, run }) => {

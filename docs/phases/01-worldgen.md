@@ -26,7 +26,7 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 - **Map:** 256 px at 4 tiles/px (1024 tiles across); ~0.4 s to draw in headless Chromium.
 - **Height display:** two modes, toggled with H, to compare in playtest. `shade`: ground colour, lightness by height. `tint`: hypsometric colour ramp, ground shown by glyph colour. Both are hillshaded (lit from the northwest, slope averaged over a 7×7 window so single-level steps don't speckle) and drawn with contour lines every `CONTOUR_INTERVAL` (4) levels, darker every 5th (index contours). Replaced alternating shade bands, which showed neither direction nor size of change: a camp 2–3 levels below a gentle shoulder read as sitting in a ditch.
 - **Relative height:** in `shade` mode the viewport tints ground above the player lighter and below darker, instead of shading by absolute height, which barely varies across a close view. The tint compresses with distance (half strength 4 m away) but never saturates, so successive ledges stay distinct. It is a per-tile overlay against an eye level that eases over ~300 ms, so stepping up or down fades rather than flickers and never redraws the tiles. The map keeps absolute shading.
-- **HUD:** each hotkey toggle has a button too, stacked in the top-left corner so the column covers little of the tap triangles; rows update in place, so text stays selectable; the URL tracks the player's position (debounced) for sharing locations.
+- **HUD:** each hotkey toggle has a button too, stacked in the top-left corner so the column covers little of the tap triangles; the HUD starts collapsed to that column; rows update in place, so text stays selectable; the URL tracks the player's position (debounced) for sharing locations.
 
 ## Playtest log
 
