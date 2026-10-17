@@ -8,7 +8,7 @@ Superseded the earlier "spaces" idea (separate maps behind teleporting entrances
 
 ## Staged feature pipeline
 
-Features declare which earlier stages they read (fields, biomes, other features' anchors) instead of taking hand-wired siting arguments, and roads, trails, rivers, glades and peaks become features too. Parent features could spawn children, such as a castle growing a town. Stages read only earlier stages within a bounded radius ([ADR 0003](adr/0003-pure-generation-mutation-as-deltas.md)).
+Features declare which earlier stages they read (fields, biomes, other features' anchors) instead of taking hand-wired siting arguments, and roads, trails, rivers, glades and peaks become features too. Parent features could spawn any number of children, such as a castle growing a town, or a deep forest holding several features within it, its glades among them. Stages read only earlier stages within a bounded radius ([ADR 0003](adr/0003-pure-generation-mutation-as-deltas.md)).
 
 ## World forking and elective persistence
 
