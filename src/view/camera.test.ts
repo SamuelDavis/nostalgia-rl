@@ -36,10 +36,10 @@ describe("openness", () => {
     expect(openness(cone, ORIGIN).every((o) => o > 0.5)).toBe(true);
   });
 
-  it("is open down a slope and closed up it", () => {
+  it("is open down a slope and enclosed up it", () => {
     const open = openness(risingEast, ORIGIN);
     expect(Math.max(...open)).toBeGreaterThan(0.5);
-    expect(Math.min(...open)).toBe(0);
+    expect(Math.min(...open)).toBeLessThan(-0.5);
   });
 });
 
@@ -65,10 +65,11 @@ describe("naturalSpan", () => {
     expect(naturalSpan(openness(plain, ORIGIN), EAST)).toBe(naturalSpan(openness(plain, ORIGIN), STILL));
   });
 
-  it("opens looking down a slope and stays close looking up it", () => {
+  it("opens looking down a slope and closes looking up it", () => {
     const slope = openness(risingEast, ORIGIN);
-    expect(naturalSpan(slope, WEST)).toBeGreaterThan(naturalSpan(slope, EAST));
-    expect(naturalSpan(slope, EAST)).toBe(naturalSpan(openness(plain, ORIGIN), EAST));
+    const level = naturalSpan(openness(plain, ORIGIN), EAST);
+    expect(naturalSpan(slope, WEST)).toBeGreaterThan(level);
+    expect(naturalSpan(slope, EAST)).toBeLessThan(level);
   });
 
   it("opens from a summit whichever way you look", () => {
@@ -87,10 +88,11 @@ describe("practicalSpan", () => {
         );
   });
 
-  it("widens a little looking down, from the near view looking up or across", () => {
+  it("widens a little looking down and narrows a little looking up", () => {
     const slope = openness(risingEast, ORIGIN);
-    expect(practicalSpan(slope, EAST)).toBe(practicalSpan(openness(plain, ORIGIN), EAST));
-    expect(practicalSpan(slope, WEST)).toBeGreaterThan(practicalSpan(slope, EAST));
+    const level = practicalSpan(openness(plain, ORIGIN), EAST);
+    expect(practicalSpan(slope, WEST)).toBeGreaterThan(level);
+    expect(practicalSpan(slope, EAST)).toBeLessThan(level);
   });
 });
 

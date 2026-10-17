@@ -19,10 +19,9 @@ const COMPASS: readonly Point[] = Array.from({ length: 8 }, (_, i) => ({
   y: Math.sin((i * Math.PI) / 4),
 }));
 const SIGHT_RADII = [12, 24] as const;
-const CLOSE_SPAN = 24;
-const FAR_SPAN = 64;
+const SETTLED_SPANS: Spread = { up: 14, level: 20, down: 64 };
 const FULL_DROP = metresToLevels(12);
-const PRACTICAL_SPANS = [10, 20] as const;
+const PRACTICAL_SPANS: Spread = { up: 10, level: 14, down: 20 };
 const NOSE_SPAN = 6;
 const SPAN_PER_CLEAR_TILE = 4;
 const OBSTRUCTION_REACH = 3;
@@ -37,6 +36,12 @@ const RESTING_PX_TOLERANCE = 0.01;
 const MIN_SPAN = 4;
 const MAX_SPAN = 160;
 
+interface Spread {
+  readonly up: number;
+  readonly level: number;
+  readonly down: number;
+}
+
 const dot = (a: Point, b: Point) => a.x * b.x + a.y * b.y;
 const mean = (values: readonly number[]) => values.reduce((sum, v) => sum + v, 0) / values.length;
 
@@ -44,7 +49,7 @@ export const openness = (levelAt: (x: number, y: number) => number, at: Point): 
   const eye = levelAt(at.x, at.y);
   return COMPASS.map((d) => {
     const drops = SIGHT_RADII.map((r) => eye - levelAt(at.x + Math.round(d.x * r), at.y + Math.round(d.y * r)));
-    return clamp(mean(drops) / FULL_DROP, 0, 1);
+    return clamp(mean(drops) / FULL_DROP, -1, 1);
   });
 };
 
@@ -61,11 +66,14 @@ const opennessAhead = (open: readonly number[], heading: Point): number => {
   return lerp(mean(open), ahead, Math.min(1, Math.hypot(heading.x, heading.y)));
 };
 
+const spanAcross = ({ up, level, down }: Spread, ahead: number): number =>
+  Math.round(ahead < 0 ? lerp(level, up, -ahead) : lerp(level, down, ahead));
+
 export const naturalSpan = (open: readonly number[], heading: Point): number =>
-  Math.round(lerp(CLOSE_SPAN, FAR_SPAN, opennessAhead(open, heading)));
+  spanAcross(SETTLED_SPANS, opennessAhead(open, heading));
 
 export const practicalSpan = (open: readonly number[], heading: Point): number =>
-  Math.round(lerp(...PRACTICAL_SPANS, opennessAhead(open, heading)));
+  spanAcross(PRACTICAL_SPANS, opennessAhead(open, heading));
 
 export const clearanceAhead = (terrain: Terrain, from: Point, facing: Direction): number => {
   let at = from;
