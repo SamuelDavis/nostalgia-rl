@@ -91,7 +91,6 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
     ...segmentsOf(world.roadsNear(region), Way.Road, ROAD_HALF_WIDTH, ROAD_CLEARANCE),
     ...segmentsOf(world.trailsNear(region), Way.Path, TRAIL_HALF_WIDTH, TRAIL_CLEARANCE),
   ];
-  const glades = world.gladesNear(region).filter((glade) => near(glade, glade.radius));
   const features = world
     .featuresNear(region)
     .filter(({ bounds }) =>
@@ -151,7 +150,6 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
       const wayDistance = (way: WaySegment) => projectOntoSegment(center, way.a, way.b).distance;
       const way = isSea ? undefined : waySegments.find((w) => wayDistance(w) <= w.halfWidth);
       const nearWay = waySegments.some((w) => wayDistance(w) <= w.halfWidth + w.clearance);
-      const inGlade = glades.some((glade) => distance(center, glade) <= glade.radius);
 
       const draft: TileDraft = {
         height: level,
@@ -166,7 +164,7 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
       const claimed = paintInOrder(features, draft, x, y);
       if (!claimed && !way && draft.water === Water.None && !nearWater && !nearWay) {
         const roll = unit(hash(seed, VEGETATION_SALT, x, y));
-        if (!inGlade && roll < traits.treeDensity(fields.groves(x, y))) draft.prop = traits.tree(temperature);
+        if (roll < traits.treeDensity(fields.groves(x, y))) draft.prop = traits.tree(temperature);
         else draft.prop = traits.decoration(unit(hash(seed, DECORATION_SALT, x, y)));
       }
 

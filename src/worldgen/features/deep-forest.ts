@@ -65,7 +65,7 @@ export interface DeepForestSiting {
 }
 
 const SALT = hashString("deep forests");
-const DEEP_FORESTNESS = 0.85;
+const DEEP_FORESTNESS = 0.7;
 const SEAM_FORESTNESS = 0.08;
 const CELL = 8;
 const CELLS_PER_SIDE = REGION_SIZE / CELL;

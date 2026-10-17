@@ -24,14 +24,14 @@ Each stage depends only on coarser stages within a bounded neighbourhood. That i
 5. **Route network** (`world.ts`, `routing.ts`, `trails.ts`): which places connect comes from the relative neighbourhood graph, and how comes from weighted A\* over a cost field with 16 move directions. See [research](research/worldgen-techniques.md).
    - Routes stay on dry land: real height is checked at each node and step midpoint, and chunks never lay a way on sea. Bridges are only for rivers and lakes.
    - **Roads** link each camp to its relative neighbours within two cells, each pair owned by one side. Cost: slope, with steps steeper than `MAX_CLIMB` heavily penalised, plus wobble noise.
-   - **Trails** start at landmarks: a glade (clearing) in each well-forested region and a peak in each mountainous one. Each links to its nearest 1–5 relative neighbours among nearby camps, glades and peaks, with the count biased toward 1. Cost: grade on elevation before ledges (ledges are crossed by stairs, see `src/game/movement.ts`), plus difficulty noise. Tiles already on a road or an earlier trail are discounted, so trails merge instead of crossing.
+   - **Trails** start at landmarks: the glade of a region's largest deep forest part and a peak in each mountainous one. Each links to its nearest 1–5 relative neighbours among nearby camps, glades and peaks, with the count biased toward 1. Cost: grade on elevation before ledges (ledges are crossed by stairs, see `src/game/movement.ts`), plus difficulty noise. Tiles already on a road or an earlier trail are discounted, so trails merge instead of crossing.
 6. **Chunk** (`chunk.ts`), per tile:
    - classify the biome;
    - flood the ocean;
    - carve rivers and lakes, with beds interpolated between nodes and banks that rise `MAX_CLIMB` per tile;
    - lay roads and trails into the `way` layer, placing bridges over water;
    - paint features in priority order;
-   - grow vegetation from biome density plus a grove noise layer (forests with clearings, groves in grassland), leaving glades clear;
+   - grow vegetation from biome density plus a grove noise layer (forests with clearings, groves in grassland);
    - add decorations.
      Snow appears in cold areas, with a noise-dithered edge.
 

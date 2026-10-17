@@ -69,13 +69,13 @@ describe("generateChunk", () => {
         [-5, -7],
       ].map(([cx, cy]) => digest(generateChunk(world, cx!, cy!))),
     ).toMatchInlineSnapshot(`
-        [
-          517722342,
-          3467417234,
-          2896958364,
-          410932772,
-        ]
-      `);
+      [
+        517722342,
+        3467417234,
+        2461489062,
+        410932772,
+      ]
+    `);
   });
 
   it("floods the ocean at a flat surface", { tags: "slow" }, () => {

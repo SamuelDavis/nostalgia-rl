@@ -20,7 +20,7 @@ import { type Fields, createFields } from "./fields";
 import { type River, createRivers } from "./rivers";
 import { climbCost, route } from "./routing";
 import { type Bounds, type Region, boundsOf, overlaps, regionBounds, regionKey, regionsAround } from "./region";
-import { type Glade, type Trail, findGlade, findPeak } from "./trails";
+import { type Trail, findPeak } from "./trails";
 
 export interface Road {
   readonly from: Camp;
@@ -37,7 +37,6 @@ export interface Worldgen {
   readonly roadsFrom: (region: Region) => readonly Road[];
   readonly roadsNear: (region: Region) => readonly Road[];
   readonly trailsNear: (region: Region) => readonly Trail[];
-  readonly gladesNear: (region: Region) => readonly Glade[];
   readonly deepForestsIn: (region: Region) => readonly PlacedFeature<DeepForestLayout>[];
   readonly featuresNear: (region: Region) => readonly PlacedFeature[];
 }
@@ -177,7 +176,7 @@ export const createWorldgen = (seed: number): Worldgen => {
   const gladeOf = memoize(
     (region: Region) => {
       const [forest] = deepForests.partsIn(region);
-      return forest ? deepForestGlade(forest) : findGlade(seed, fields, region);
+      return forest && deepForestGlade(forest);
     },
     regionKey,
     REGION_CACHE,
@@ -239,16 +238,6 @@ export const createWorldgen = (seed: number): Worldgen => {
     REGION_CACHE,
   );
 
-  const gladesNearRegion = memoize(
-    (region: Region) =>
-      regionsAround(region, 1).flatMap((source) => {
-        const glade = gladeOf(source);
-        return glade && overlaps(boundsOf([glade], glade.radius), regionBounds(region)) ? [glade] : [];
-      }),
-    regionKey,
-    REGION_CACHE,
-  );
-
   return {
     seed,
     fields,
@@ -258,7 +247,6 @@ export const createWorldgen = (seed: number): Worldgen => {
     roadsFrom: roadsFromRegion,
     roadsNear: roadsNearRegion,
     trailsNear: trailsNearRegion,
-    gladesNear: gladesNearRegion,
     deepForestsIn: (region) => deepForestPlacer.placedIn(region),
     featuresNear: featuresNearRegion,
   };
