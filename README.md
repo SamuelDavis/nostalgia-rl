@@ -2,7 +2,7 @@
 
 A real-time, open-world roguelike with peer-to-peer drop-in multiplayer, in the browser.
 
-It follows the classic roguelike conventions: a grid, turn-based movement, cardinal facing, and glyph-first presentation. The difference is that turns run on a real-time clock, as in _Crypt of the NecroDancer_: the world advances one turn about every 250 ms whether or not you act. The world is a seeded, infinite, Minecraft-style overworld with biomes, height, and features, not a stack of dungeon floors. Friends join a running world in real time.
+It follows the classic roguelike conventions: a grid, turn-based movement, cardinal facing, and glyph-first presentation. The difference is that turns run on a real-time clock, as in _Crypt of the NecroDancer_: the world advances one turn about every 250 ms whether or not you act. The world is one seeded, infinite, contiguous map with Minecraft-style terrain and features (camps, and later towns, deep forests, caves), not a stack of separate dungeon maps. Friends join a running world in real time.
 
 This file is the handoff document for a fresh session. It gives intent and current state and links to topical docs. Read the linked docs only when your task touches them. Domain vocabulary is in [CONTEXT.md](CONTEXT.md); architectural decisions are in [docs/adr](docs/adr).
 
@@ -39,14 +39,14 @@ These are requirements, not designs. How to meet them is decided in the multipla
 
 ## Layout
 
-| Path           | Contents                                                               |
-| -------------- | ---------------------------------------------------------------------- |
-| `src/lib`      | Game-agnostic utilities: hashing, seeded noise, math, A\*, LRU memoize |
-| `src/worldgen` | World generation ([docs/worldgen.md](docs/worldgen.md))                |
-| `src/game`     | Game state and rules, independent of presentation                      |
-| `src/view`     | Canvas viewport, HTML HUD and map, palette shared with `tooling`       |
-| `tooling`      | Node scripts for development, e.g. the offline map renderer            |
-| `docs/phases`  | One doc per phase: goal, decisions, playtest log                       |
+| Path           | Contents                                                                                 |
+| -------------- | ---------------------------------------------------------------------------------------- |
+| `src/lib`      | Game-agnostic utilities: hashing, seeded noise, math, A\*, LRU memoize                   |
+| `src/worldgen` | World generation ([docs/worldgen.md](docs/worldgen.md)); `features/` holds feature types |
+| `src/game`     | Game state and rules, independent of presentation                                        |
+| `src/view`     | Canvas viewport, HTML HUD and map, palette shared with `tooling`                         |
+| `tooling`      | Node scripts for development, e.g. the offline map renderer                              |
+| `docs/phases`  | One doc per phase: goal, decisions, playtest log                                         |
 
 ## Commands
 

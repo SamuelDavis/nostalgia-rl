@@ -7,3 +7,4 @@ export * from "./terrain";
 export * from "./world";
 export * from "./trails";
 export * from "./landform";
+export * from "./region";

@@ -1,4 +1,4 @@
-import { type Point, createNoise, hash, hashString, intBetween, unit } from "../lib";
+import { type Point, distance, projectOntoSegment, createNoise, hash, hashString, intBetween, unit } from "../lib";
 import { REGION_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
 import type { Fields } from "./fields";
 
@@ -114,4 +114,13 @@ export const traceRiver = (seed: number, fields: Fields, cx: number, cy: number)
       radius: intBetween(5, 12, hash(seed, SALT, cx, cy, 3)),
     },
   };
+};
+
+export const distanceToRiver = (river: River, p: Point): number => {
+  const lakeGap = river.lake ? distance(p, river.lake) - river.lake.radius : Infinity;
+  return river.nodes.reduce((nearest, node, i) => {
+    const next = river.nodes[i + 1];
+    if (!next) return nearest;
+    return Math.min(nearest, projectOntoSegment(p, node, next).distance - next.halfWidth);
+  }, lakeGap);
 };

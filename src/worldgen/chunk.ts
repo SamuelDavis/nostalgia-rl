@@ -1,10 +1,10 @@
 import { Biome, Prop, Ground, Water, Way } from "./terrain";
 import { type Point, createNoise, distance, floorDiv, hash, hashString, projectOntoSegment, unit } from "../lib";
 import { biomeOf } from "./biome";
-import { CAMP_RADIUS, CAMP_YARD, TENT_OFFSETS, settleTowardCamp } from "./camp";
+import { type TileDraft, paintInOrder } from "./features/feature";
 import { CHUNK_SIZE, REGION_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
 import type { RiverNode } from "./rivers";
-import type { Camp, Worldgen } from "./world";
+import type { Worldgen } from "./world";
 
 export interface Chunk {
   readonly cx: number;
@@ -92,11 +92,6 @@ const decorationFor = (biome: Biome, roll: number): Prop => {
 
 const bankRise = (gap: number): number => Math.ceil(gap) * MAX_CLIMB;
 
-const nearbyCamps = (world: Worldgen, cx: number, cy: number): Camp[] => {
-  const region = world.regionOf({ x: cx * CHUNK_SIZE, y: cy * CHUNK_SIZE });
-  return [-1, 0, 1].flatMap((dy) => [-1, 0, 1].flatMap((dx) => world.campAt(region.cx + dx, region.cy + dy) ?? []));
-};
-
 export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk => {
   const { seed, fields } = world;
   const originX = cx * CHUNK_SIZE;
@@ -141,7 +136,7 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
     ...segmentsOf(world.trailsNear(region.cx, region.cy), Way.Path, TRAIL_HALF_WIDTH, TRAIL_CLEARANCE),
   ];
   const glades = world.gladesNear(region.cx, region.cy).filter((glade) => near(glade, glade.radius));
-  const camps = nearbyCamps(world, cx, cy).filter((camp) => near(camp, CAMP_RADIUS));
+  const features = world.featuresNear(region.cx, region.cy).filter((f) => near(f.anchor, f.reach));
   const groves = createNoise(seed, GROVE_SALT);
   const frostEdge = createNoise(seed, GROUND_SALT);
 
@@ -164,7 +159,6 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
       let level = heightLevel(elevation);
       let tileWater: Water = Water.None;
       let tileGround = groundFor(tileBiome, level, temperature + frostEdge(x / 7, y / 7) * 0.035);
-      let tileProp: Prop = Prop.None;
 
       const isSea = level < SEA_LEVEL;
       if (isSea) {
@@ -199,29 +193,27 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
       const nearWay = waySegments.some((w) => wayDistance(w) <= w.halfWidth + w.clearance);
       const inGlade = glades.some((glade) => distance(center, glade) <= glade.radius);
 
-      const camp = camps.find((c) => distance(center, { x: c.x + 0.5, y: c.y + 0.5 }) <= CAMP_RADIUS);
-      if (camp) {
-        const gap = distance(center, { x: camp.x + 0.5, y: camp.y + 0.5 });
-        level = settleTowardCamp(level, heightLevel(fields.elevation(camp.x + 0.5, camp.y + 0.5)), gap);
-        tileWater = Water.None;
-        if (gap <= CAMP_YARD) tileGround = Ground.Dirt;
-        if (x === camp.x && y === camp.y) tileProp = Prop.Campfire;
-        else if (!way && TENT_OFFSETS.some((o) => x === camp.x + o.x && y === camp.y + o.y)) tileProp = Prop.Tent;
-      } else if (way) {
-        if (tileWater !== Water.None) tileProp = Prop.Bridge;
-      } else if (tileWater === Water.None && !nearWater && !nearWay) {
+      const draft: TileDraft = {
+        height: level,
+        ground: tileGround,
+        water: tileWater,
+        prop: way && tileWater !== Water.None ? Prop.Bridge : Prop.None,
+        way: way?.kind ?? Way.None,
+      };
+      const claimed = paintInOrder(features, draft, x, y);
+      if (!claimed && !way && draft.water === Water.None && !nearWater && !nearWay) {
         const roll = unit(hash(seed, VEGETATION_SALT, x, y));
         if (!inGlade && roll < treeDensity(tileBiome, groves(x / 40, y / 40)))
-          tileProp = treeFor(tileBiome, temperature);
-        else tileProp = decorationFor(tileBiome, unit(hash(seed, DECORATION_SALT, x, y)));
+          draft.prop = treeFor(tileBiome, temperature);
+        else draft.prop = decorationFor(tileBiome, unit(hash(seed, DECORATION_SALT, x, y)));
       }
 
-      height[i] = level;
-      ground[i] = tileWater === Water.None ? tileGround : Ground.Sand;
-      water[i] = tileWater;
-      prop[i] = tileProp;
+      height[i] = draft.height;
+      ground[i] = draft.water === Water.None ? draft.ground : Ground.Sand;
+      water[i] = draft.water;
+      prop[i] = draft.prop;
       biome[i] = tileBiome;
-      ways[i] = way?.kind ?? Way.None;
+      ways[i] = draft.way;
     }
 
   return { cx, cy, height, ground, water, prop, biome, way: ways };

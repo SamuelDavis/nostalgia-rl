@@ -3,37 +3,27 @@ import {
   countBiasedLow,
   createNoise,
   distance,
-  floorDiv,
   hash,
   hashString,
-  intBetween,
   memoize,
-  projectOntoSegment,
   relativeNeighbours,
-  unit,
 } from "../lib";
 import { biomeOf } from "./biome";
-import { seamFits } from "./camp";
+import { type Camp, createCamps } from "./features/camp";
+
+export type { Camp } from "./features/camp";
+import { type PlacedFeature, place } from "./features/feature";
 import { REGION_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
 import { type Fields, createFields } from "./fields";
 import { MAX_RIVER_REACH, type River, traceRiver } from "./rivers";
 import { route } from "./routing";
+import { type Region, boundsOf, overlaps, regionBounds, regionKey, regionOf, regionsAround } from "./region";
 import { type Glade, type Trail, findGlade, findPeak } from "./trails";
-import { Biome } from "./terrain";
-
-export interface Camp extends Point {
-  readonly id: number;
-}
 
 export interface Road {
   readonly from: Camp;
   readonly to: Camp;
   readonly nodes: readonly Point[];
-}
-
-export interface Region {
-  readonly cx: number;
-  readonly cy: number;
 }
 
 export interface Worldgen {
@@ -47,19 +37,10 @@ export interface Worldgen {
   readonly roadsNear: (cx: number, cy: number) => readonly Road[];
   readonly trailsNear: (cx: number, cy: number) => readonly Trail[];
   readonly gladesNear: (cx: number, cy: number) => readonly Glade[];
+  readonly featuresNear: (cx: number, cy: number) => readonly PlacedFeature[];
 }
 
-const CAMP_SPACING = 120;
-
-const CAMP_SALT = hashString("camps");
 const ROAD_SALT = hashString("roads");
-const CAMP_CHANCE = 0.55;
-const CAMP_ATTEMPTS = 4;
-const CAMP_MARGIN = 32;
-const CAMP_FLATNESS = 8;
-const RIVER_CLEARANCE = 10;
-const SPAWN_SEARCH_STEP = 16;
-const SPAWN_SEARCH_RINGS = 60;
 const LINK_REGION_RADIUS = 2;
 const ROAD_WOBBLE_SCALE = 48;
 const ROAD_TYPICAL_COST = 2;
@@ -73,18 +54,7 @@ const TRAIL_TYPICAL_COST = 2.5;
 const STEEP_PENALTY = 25;
 
 const RIVER_REGION_RADIUS = Math.ceil(MAX_RIVER_REACH / REGION_SIZE) + 1;
-const FLATNESS_PROBES: readonly Point[] = [
-  { x: 6, y: 0 },
-  { x: -6, y: 0 },
-  { x: 0, y: 6 },
-  { x: 0, y: -6 },
-  { x: 4, y: 4 },
-  { x: -4, y: 4 },
-  { x: 4, y: -4 },
-  { x: -4, y: -4 },
-];
 
-const regionKey = ({ cx, cy }: Region) => `${cx},${cy}`;
 const pointKey = ({ x, y }: Point) => `${x},${y}`;
 
 const isForward = (from: Region, to: Region) => to.cy > from.cy || (to.cy === from.cy && to.cx > from.cx);
@@ -106,46 +76,6 @@ const ownsLink = (head: Landmark, target: Landmark) =>
   isForward(head.region, target.region) ||
   (head.region.cx === target.region.cx && head.region.cy === target.region.cy && target.kind > head.kind);
 
-interface Bounds {
-  readonly minX: number;
-  readonly minY: number;
-  readonly maxX: number;
-  readonly maxY: number;
-}
-
-const boundsOf = (points: readonly Point[], margin: number): Bounds => ({
-  minX: Math.min(...points.map((p) => p.x)) - margin,
-  minY: Math.min(...points.map((p) => p.y)) - margin,
-  maxX: Math.max(...points.map((p) => p.x)) + margin,
-  maxY: Math.max(...points.map((p) => p.y)) + margin,
-});
-
-const regionBounds = ({ cx, cy }: Region): Bounds => ({
-  minX: cx * REGION_SIZE,
-  minY: cy * REGION_SIZE,
-  maxX: (cx + 1) * REGION_SIZE,
-  maxY: (cy + 1) * REGION_SIZE,
-});
-
-const overlaps = (a: Bounds, b: Bounds) => a.minX <= b.maxX && b.minX <= a.maxX && a.minY <= b.maxY && b.minY <= a.maxY;
-
-const regionsAround = ({ cx, cy }: Region, radius: number): Region[] => {
-  const side = 2 * radius + 1;
-  return Array.from({ length: side * side }, (_, i) => ({
-    cx: cx - radius + (i % side),
-    cy: cy - radius + Math.floor(i / side),
-  }));
-};
-
-const riverDistance = (river: River, p: Point): number => {
-  const lakeGap = river.lake ? distance(p, river.lake) - river.lake.radius : Infinity;
-  return river.nodes.reduce((nearest, node, i) => {
-    const next = river.nodes[i + 1];
-    if (!next) return nearest;
-    return Math.min(nearest, projectOntoSegment(p, node, next).distance - next.halfWidth);
-  }, lakeGap);
-};
-
 export const createWorldgen = (seed: number): Worldgen => {
   const fields = createFields(seed);
   const roadNoise = createNoise(seed, ROAD_SALT);
@@ -153,10 +83,6 @@ export const createWorldgen = (seed: number): Worldgen => {
   const level = (p: Point) => heightLevel(fields.elevation(p.x, p.y));
   const isDry = (p: Point) => level(p) > SEA_LEVEL;
   const biomeAt = (p: Point) => biomeOf(fields.climate(p.x, p.y));
-  const regionOf = (p: Point): Region => ({
-    cx: floorDiv(p.x, REGION_SIZE),
-    cy: floorDiv(p.y, REGION_SIZE),
-  });
 
   const tracedRiver = memoize(
     (region: Region) => {
@@ -182,57 +108,29 @@ export const createWorldgen = (seed: number): Worldgen => {
     REGION_CACHE,
   );
 
-  const isCampSite = (p: Point): boolean => {
-    const center = level(p);
-    const biome = biomeAt(p);
-    if (biome === Biome.Ocean || biome === Biome.Beach || biome === Biome.Mountain) return false;
-    if (FLATNESS_PROBES.some((o) => Math.abs(level({ x: p.x + o.x, y: p.y + o.y }) - center) > CAMP_FLATNESS))
-      return false;
-    if (!seamFits(level, p)) return false;
-    return riversNearRegion(regionOf(p)).every((river) => riverDistance(river, p) > RIVER_CLEARANCE);
-  };
+  const camps = createCamps({ seed, level, biomeAt, riversNear: riversNearRegion });
+  const { spawn } = camps;
+  const campAtRegion = camps.at;
 
-  const findSpawn = (): Camp => {
-    for (let ring = 0; ring <= SPAWN_SEARCH_RINGS; ring++)
-      for (let i = 0; i < Math.max(1, ring * 8); i++) {
-        const side = Math.floor(i / Math.max(1, ring * 2));
-        const along = (i % Math.max(1, ring * 2)) - ring;
-        const [gx, gy] = [
-          [along, -ring],
-          [ring, along],
-          [-along, ring],
-          [-ring, -along],
-        ][side]!;
-        const p = { x: gx! * SPAWN_SEARCH_STEP, y: gy! * SPAWN_SEARCH_STEP };
-        if (isCampSite(p)) return { ...p, id: hash(seed, CAMP_SALT, p.x, p.y) };
-      }
-    return { x: 0, y: 0, id: hash(seed, CAMP_SALT) };
-  };
+  const placedCamp = memoize(
+    (camp: Camp) => place(camps.type, camp),
+    (camp) => `${camp.x},${camp.y}`,
+    REGION_CACHE,
+  );
 
-  const spawn = findSpawn();
-  const spawnRegion = regionOf(spawn);
-
-  const campAtRegion = memoize(
-    ({ cx, cy }: Region): Camp | undefined => {
-      if (cx === spawnRegion.cx && cy === spawnRegion.cy) return spawn;
-      const nearSpawn = Math.abs(cx - spawnRegion.cx) <= 1 && Math.abs(cy - spawnRegion.cy) <= 1;
-      if (!nearSpawn && unit(hash(seed, CAMP_SALT, cx, cy)) > CAMP_CHANCE) return undefined;
-      for (let attempt = 0; attempt < CAMP_ATTEMPTS; attempt++) {
-        const p = {
-          x:
-            cx * REGION_SIZE +
-            intBetween(CAMP_MARGIN, REGION_SIZE - CAMP_MARGIN, hash(seed, CAMP_SALT, cx, cy, attempt, 1)),
-          y:
-            cy * REGION_SIZE +
-            intBetween(CAMP_MARGIN, REGION_SIZE - CAMP_MARGIN, hash(seed, CAMP_SALT, cx, cy, attempt, 2)),
-        };
-        if (distance(p, spawn) > CAMP_SPACING && isCampSite(p)) return { ...p, id: hash(seed, CAMP_SALT, cx, cy) };
-      }
-      return undefined;
-    },
+  const featuresNearRegion = memoize(
+    (region: Region): PlacedFeature[] =>
+      regionsAround(region, Math.ceil(camps.type.reach / REGION_SIZE))
+        .flatMap((source) => {
+          const camp = campAtRegion(source);
+          return camp ? [placedCamp(camp)] : [];
+        })
+        .filter((feature) => overlaps(boundsOf([feature.anchor], feature.reach), regionBounds(region)))
+        .sort((a, b) => a.priority - b.priority),
     regionKey,
     REGION_CACHE,
   );
+
   const campAt = (cx: number, cy: number) => campAtRegion({ cx, cy });
 
   const routeRoad = (from: Camp, to: Camp) =>
@@ -355,5 +253,6 @@ export const createWorldgen = (seed: number): Worldgen => {
     roadsNear: (cx, cy) => roadsNearRegion({ cx, cy }),
     trailsNear: (cx, cy) => trailsNearRegion({ cx, cy }),
     gladesNear: (cx, cy) => gladesNearRegion({ cx, cy }),
+    featuresNear: (cx, cy) => featuresNearRegion({ cx, cy }),
   };
 };
