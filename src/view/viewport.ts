@@ -27,8 +27,8 @@ const PATH_VISIBILITY = 0.6;
 const PATH_SALT = hashString("path glyphs");
 const SLOPE_REACH = 3;
 const CONTOUR_STYLE: Record<Exclude<Contour, "none">, { readonly color: string; readonly width: number }> = {
-  minor: { color: "rgb(20 15 10 / 0.18)", width: 1 },
-  index: { color: "rgb(20 15 10 / 0.5)", width: 1.5 },
+  minor: { color: "rgb(150 95 40 / 0.3)", width: 1 },
+  index: { color: "rgb(150 95 40 / 0.7)", width: 1 },
 };
 
 interface Look {
