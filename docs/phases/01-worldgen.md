@@ -10,7 +10,7 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 
 - **Exploration:** `@` moves one tile per turn with WASD. Turns default to 100 ms in this phase so exploring is quick; the real turn length is decided with movement smoothing (see [ideas](../ideas.md#smoothed-grid-movement)). A tap between turns is buffered and acts once (latest tap wins); a held key repeats every turn. No diagonals.
 - **Presentation:** glyphs on a canvas; HTML HUD on top showing position and worldgen debug data for the player's tile; M toggles an HTML map of the field-sampled overview (`src/view/overview.ts`).
-- **Deep forest:** the first bespoke feature; dense enough (85% trees at the core) that its own paths are the way through. No canopy cover yet. See [worldgen](../worldgen.md).
+- **Deep forest:** the first bespoke feature; dense enough (85% trees at the core) that its own paths are the way through. A canopy hides its interior from outside; standing under it reveals the floor, darkened. See [worldgen](../worldgen.md).
 - **Scale:** 1 m tiles, 0.5 m levels, compressed relief; see [ADR 0002](../adr/0002-scale.md).
 - **Height resolution:** 256 levels (was 16). At 16, the steepest natural tile rose under half a level, so cliffs could not exist and height bands were ~60 tiles wide.
 - **Cliffs:** a step of more than `MAX_CLIMB` (2) levels is impassable, drawn as a dark line on the tile edge. Rivers, banks and camps are shaped so carving never adds cliffs; natural terrain may. Trees, cacti, boulders, tents and campfires block; low plants don't.

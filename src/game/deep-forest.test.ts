@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type Point, distance } from "../lib";
-import { Way, createWorldgen } from "../worldgen";
+import { Cover, Way, createWorldgen } from "../worldgen";
 import { blockerBetween } from "./movement";
 import { createTerrain } from "./terrain";
 
@@ -67,6 +67,16 @@ describe("deep forests", () => {
           else open++;
         }
       expect(blocked / (open + blocked)).toBeGreaterThan(0.6);
+    }
+  });
+
+  it("hide under a canopy except at their openings", () => {
+    for (const { layout } of forests.slice(0, 4)) {
+      expect(terrain(Math.floor(layout.glade.x), Math.floor(layout.glade.y)).cover).toBe(Cover.Canopy);
+      for (const opening of layout.openings) {
+        const { x, y } = tileOf(opening.inside);
+        expect(terrain(x, y).cover, `opening at ${x},${y}`).toBe(Cover.None);
+      }
     }
   });
 });

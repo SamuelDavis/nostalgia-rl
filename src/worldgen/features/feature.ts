@@ -1,5 +1,5 @@
 import type { Point } from "../../lib";
-import type { Biome, Ground, Prop, Water, Way } from "../terrain";
+import type { Biome, Cover, Ground, Prop, Water, Way } from "../terrain";
 
 export interface Anchor extends Point {
   readonly id: number;
@@ -11,6 +11,7 @@ export interface TileDraft {
   water: Water;
   prop: Prop;
   way: Way;
+  cover: Cover;
   readonly biome: Biome;
 }
 

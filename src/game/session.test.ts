@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Prop, Ground, Water, Way } from "../worldgen";
+import { Cover, Prop, Ground, Water, Way } from "../worldgen";
 import { Direction } from "./movement";
 import { playTurn, startSession } from "./session";
 import type { Terrain } from "./terrain";
@@ -11,6 +11,7 @@ const flat: Terrain = () => ({
   prop: Prop.None,
   biome: 2,
   way: Way.None,
+  cover: Cover.None,
 });
 const walledEast: Terrain = (x, y) => (x > 0 ? { ...flat(x, y), prop: Prop.Boulder } : flat(x, y));
 

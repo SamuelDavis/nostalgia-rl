@@ -1,4 +1,4 @@
-import { Biome, Prop, Ground, HEIGHT_LEVELS, SEA_LEVEL, Water, Way } from "../worldgen";
+import { Biome, Cover, Prop, Ground, HEIGHT_LEVELS, SEA_LEVEL, Water, Way } from "../worldgen";
 
 export type Rgb = readonly [number, number, number];
 
@@ -28,6 +28,10 @@ export const groundColor: Record<Ground, Rgb> = {
 export const wayColor: Record<Exclude<Way, typeof Way.None>, Rgb> = {
   [Way.Road]: [175, 140, 95],
   [Way.Path]: [215, 185, 130],
+};
+
+export const coverColor: Record<Exclude<Cover, typeof Cover.None>, Rgb> = {
+  [Cover.Canopy]: [30, 75, 38],
 };
 
 export const waterColor: Record<Exclude<Water, typeof Water.None>, Rgb> = {

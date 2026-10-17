@@ -1,4 +1,4 @@
-import { Biome, Prop, Ground, Water, Way } from "./terrain";
+import { Biome, Cover, Prop, Ground, Water, Way } from "./terrain";
 import { type Point, createNoise, distance, floorDiv, hash, hashString, projectOntoSegment, unit } from "../lib";
 import { biomeOf } from "./biome";
 import { type TileDraft, paintInOrder } from "./features/feature";
@@ -15,6 +15,7 @@ export interface Chunk {
   readonly prop: Uint8Array;
   readonly biome: Uint8Array;
   readonly way: Uint8Array;
+  readonly cover: Uint8Array;
 }
 
 export const tileIndex = (lx: number, ly: number): number => ly * CHUNK_SIZE + lx;
@@ -146,6 +147,7 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
   const prop = new Uint8Array(TILES);
   const biome = new Uint8Array(TILES);
   const ways = new Uint8Array(TILES);
+  const covers = new Uint8Array(TILES);
 
   for (let ly = 0; ly < CHUNK_SIZE; ly++)
     for (let lx = 0; lx < CHUNK_SIZE; lx++) {
@@ -199,6 +201,7 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
         water: tileWater,
         prop: way && tileWater !== Water.None ? Prop.Bridge : Prop.None,
         way: way?.kind ?? Way.None,
+        cover: Cover.None,
         biome: tileBiome,
       };
       const claimed = paintInOrder(features, draft, x, y);
@@ -215,7 +218,8 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
       prop[i] = draft.prop;
       biome[i] = tileBiome;
       ways[i] = draft.way;
+      covers[i] = draft.cover;
     }
 
-  return { cx, cy, height, ground, water, prop, biome, way: ways };
+  return { cx, cy, height, ground, water, prop, biome, way: ways, cover: covers };
 };

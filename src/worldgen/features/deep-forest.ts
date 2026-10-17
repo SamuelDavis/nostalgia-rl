@@ -14,7 +14,7 @@ import {
 import { REGION_SIZE } from "../constants";
 import { type Region, regionKey, regionOf, regionsAround } from "../region";
 import { climbCost, route } from "../routing";
-import { Biome, Ground, Prop, Water, Way } from "../terrain";
+import { Biome, Cover, Ground, Prop, Water, Way } from "../terrain";
 import type { Glade } from "../trails";
 import { CAMP_RADIUS, type Camp } from "./camp";
 import type { Anchor, FeatureType } from "./feature";
@@ -35,6 +35,7 @@ export interface DeepForestLayout {
   readonly openings: readonly Opening[];
   readonly contains: (p: Point) => boolean;
   readonly paths: ReadonlySet<string>;
+  readonly mouths: ReadonlySet<string>;
 }
 
 export interface DeepForestSiting {
@@ -165,7 +166,7 @@ export const createDeepForests = ({ seed, level, biomeAt, moisture, campAt, ways
   );
 
   const build = (forest: DeepForest): DeepForestLayout => {
-    const contains = (p: Point) => depthIn(forest, tileCentre(p)) > 0 && isForest(p);
+    const contains = (p: Point) => depthIn(forest, tileCentre(p)) > 0 && biomeAt(tileCentre(p)) !== Biome.Ocean;
     const glade = gladeOf(forest);
 
     const ways = new Set(regionsAround(regionOf(forest), 1).flatMap(waysNear));
@@ -186,6 +187,7 @@ export const createDeepForests = ({ seed, level, biomeAt, moisture, campAt, ways
     const openings = [...crossings, ...guaranteed];
 
     const paths = new Set<string>();
+    const mouths = new Set<string>();
     const walked = new Set<string>();
     for (const opening of openings) {
       const nodes = route(opening.inside, glade, {
@@ -198,8 +200,9 @@ export const createDeepForests = ({ seed, level, biomeAt, moisture, campAt, ways
       }) ?? [glade];
       nodes.forEach((node) => walked.add(tileKey(node.x, node.y)));
       rasterize([opening.outside, opening.inside, ...nodes, glade], paths);
+      rasterize([opening.outside, opening.inside], mouths);
     }
-    return { forest, glade, openings, contains, paths };
+    return { forest, glade, openings, contains, paths, mouths };
   };
 
   const type: FeatureType<DeepForest, DeepForestLayout> = {
@@ -207,14 +210,19 @@ export const createDeepForests = ({ seed, level, biomeAt, moisture, campAt, ways
     priority: 0,
     reach: DEEP_FOREST_REACH,
     build,
-    paint: ({ forest, glade, paths }, draft, x, y) => {
+    paint: ({ forest, glade, paths, mouths }, draft, x, y) => {
       const centre = { x: x + 0.5, y: y + 0.5 };
-      if (paths.has(tileKey(x, y))) {
+      const key = tileKey(x, y);
+      const inside = draft.biome !== Biome.Ocean && depthIn(forest, centre) > 0;
+      if (paths.has(key)) {
         draft.way = Way.Path;
         draft.prop = draft.water === Water.None ? Prop.None : Prop.Bridge;
+        draft.cover = inside && !mouths.has(key) ? Cover.Canopy : Cover.None;
         return true;
       }
-      if (draft.biome !== Biome.Forest || depthIn(forest, centre) <= 0) return false;
+      if (!inside) return false;
+      draft.cover = Cover.Canopy;
+      if (draft.ground === Ground.Sand) draft.ground = Ground.Grass;
       draft.way = Way.None;
       const roll = unit(hash(seed, SALT, x, y));
       if (draft.water !== Water.None) draft.prop = Prop.None;

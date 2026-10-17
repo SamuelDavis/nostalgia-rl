@@ -1,13 +1,14 @@
 import { type Point, hash, hashString, unit } from "../lib";
 import { isCliff, isStairs, isTrail } from "../game/movement";
 import type { Terrain, Tile } from "../game/terrain";
-import { Prop, Water, Way } from "../worldgen";
-import { PLAYER_GLYPH, STAIRS_GLYPH, propGlyph, groundGlyph, waterGlyph, wayGlyph } from "./glyphs";
+import { Cover, Prop, Water, Way } from "../worldgen";
+import { PLAYER_GLYPH, STAIRS_GLYPH, coverGlyph, propGlyph, groundGlyph, waterGlyph, wayGlyph } from "./glyphs";
 import {
   type Contour,
   type HeightMode,
   type Rgb,
   contourBetween,
+  coverColor,
   css,
   hillshade,
   propColor,
@@ -25,6 +26,10 @@ const PLAYER_COLOR: Rgb = [255, 255, 255];
 const GROUND_GLYPH_SHADE = 0.8;
 const PATH_VISIBILITY = 0.6;
 const PATH_SALT = hashString("path glyphs");
+const COVER_SALT = hashString("cover glyphs");
+const COVER_GLYPH_SHARE = 0.5;
+const COVER_GLYPH_SHADE = 1.4;
+const UNDER_COVER_SHADE = 0.7;
 const SLOPE_REACH = 3;
 const CONTOUR_STYLE: Record<Exclude<Contour, "none">, { readonly color: string; readonly width: number }> = {
   minor: { color: "rgb(150 95 40 / 0.3)", width: 1 },
@@ -99,6 +104,14 @@ const lookOf = (tile: Tile, mode: HeightMode, light: number, x: number, y: numbe
   return { background, glyph: groundGlyph[tile.ground], color };
 };
 
+const coverLook = (cover: Exclude<Cover, typeof Cover.None>, light: number, x: number, y: number): Look => {
+  const background = shade(coverColor[cover], light);
+  const glyph = unit(hash(COVER_SALT, x, y)) < COVER_GLYPH_SHARE ? coverGlyph[cover] : "";
+  return { background, glyph, color: shade(background, COVER_GLYPH_SHADE) };
+};
+
+const underCover = (look: Look): Look => ({ ...look, background: shade(look.background, UNDER_COVER_SHADE) });
+
 export const drawViewport = (
   ctx: CanvasRenderingContext2D,
   terrain: Terrain,
@@ -120,22 +133,30 @@ export const drawViewport = (
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
+  const isInside = terrain(center.x, center.y).cover !== Cover.None;
+  const isHidden = (tile: Tile) => !isInside && tile.cover !== Cover.None;
   const lightAt = createLighting(terrain, left, top, columns, rows);
+  const lookAt = (tile: Tile, x: number, y: number): Look => {
+    if (tile.cover !== Cover.None && !isInside) return coverLook(tile.cover, lightAt(x, y), x, y);
+    const look = isCliffFace(terrain, x, y, tile) ? CLIFF_FACE : lookOf(tile, mode, lightAt(x, y), x, y);
+    return tile.cover === Cover.None ? look : underCover(look);
+  };
   for (let y = top; y < top + rows; y++)
     for (let x = left; x < left + columns; x++) {
       const { px, py } = screen(x, y);
       const tile = terrain(x, y);
-      const look = isCliffFace(terrain, x, y, tile) ? CLIFF_FACE : lookOf(tile, mode, lightAt(x, y), x, y);
+      const look = lookAt(tile, x, y);
       ctx.fillStyle = css(look.background);
       ctx.fillRect(px, py, CELL_PX, CELL_PX);
       const isPlayer = x === center.x && y === center.y;
-      const glyph = isPlayer ? PLAYER_GLYPH : hasStairs(terrain, x, y, tile) ? STAIRS_GLYPH : look.glyph;
+      const stairs = !isHidden(tile) && hasStairs(terrain, x, y, tile);
+      const glyph = isPlayer ? PLAYER_GLYPH : stairs ? STAIRS_GLYPH : look.glyph;
       ctx.fillStyle = css(isPlayer ? PLAYER_COLOR : look.color);
       ctx.fillText(glyph, px + CELL_PX / 2, py + CELL_PX / 2 + 1);
     }
 
   const contourAt = (tile: Tile, next: Tile): Contour =>
-    tile.water !== Water.None || next.water !== Water.None || isCliff(tile, next)
+    tile.water !== Water.None || next.water !== Water.None || isCliff(tile, next) || isHidden(tile) || isHidden(next)
       ? "none"
       : contourBetween(tile.height, next.height);
   for (const [contour, style] of Object.entries(CONTOUR_STYLE)) {
@@ -168,6 +189,7 @@ export const drawViewport = (
       const face = isCliffFace(terrain, x, y, tile);
       const edgeShown = (nx: number, ny: number) => {
         const next = terrain(nx, ny);
+        if (isHidden(tile) || isHidden(next)) return false;
         return isCliff(tile, next) && !(face && isCliffFace(terrain, nx, ny, next));
       };
       if (edgeShown(x + 1, y)) {

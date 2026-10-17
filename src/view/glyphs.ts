@@ -1,4 +1,4 @@
-import { Prop, Ground, Water, Way } from "../worldgen";
+import { Cover, Prop, Ground, Water, Way } from "../worldgen";
 
 export const PLAYER_GLYPH = "@";
 export const STAIRS_GLYPH = "≡";
@@ -15,6 +15,10 @@ export const propGlyph: Record<Prop, string> = {
   [Prop.Tent]: "▲",
   [Prop.Campfire]: "☼",
   [Prop.Bridge]: "#",
+};
+
+export const coverGlyph: Record<Exclude<Cover, typeof Cover.None>, string> = {
+  [Cover.Canopy]: "♣",
 };
 
 export const groundGlyph: Record<Ground, string> = {
