@@ -1,5 +1,5 @@
 import { smoothstep } from "../lib";
-import { Biome } from "./terrain";
+import { Biome, Ground, Prop } from "./terrain";
 import type { Climate } from "./fields";
 import { SEA_ELEVATION, SEA_LEVEL, heightLevel } from "./constants";
 
@@ -25,4 +25,49 @@ export const biomeOf = ({ elevation, temperature, moisture, mountainness }: Clim
   if (temperature > 0.6 && moisture < 0.42) return Biome.Desert;
   if (moisture > 0.56) return Biome.Forest;
   return Biome.Grassland;
+};
+
+export interface BiomeTraits {
+  readonly ground: (level: number, temperature: number) => Ground;
+  readonly treeDensity: (grove: number) => number;
+  readonly tree: (temperature: number) => Prop;
+  readonly decoration: (roll: number) => Prop;
+}
+
+const SNOW_LEVEL = heightLevel(0.8125);
+const COLD = 0.3;
+const PINE_TEMPERATURE = 0.4;
+
+const sand = () => Ground.Sand;
+const grassUnlessFrozen = (_level: number, temperature: number) =>
+  temperature < COLD - 0.08 ? Ground.Snow : Ground.Grass;
+const pineIfCool = (temperature: number) => (temperature < PINE_TEMPERATURE ? Prop.Pine : Prop.Oak);
+const bare = () => Prop.None;
+const boulders = (roll: number) => (roll < 0.03 ? Prop.Boulder : Prop.None);
+const flora = (roll: number) =>
+  roll < 0.015 ? Prop.Bush : roll < 0.04 ? Prop.Flowers : roll < 0.12 ? Prop.Tuft : Prop.None;
+const barren: BiomeTraits = { ground: sand, treeDensity: () => 0, tree: bare, decoration: bare };
+
+export const BIOMES: Record<Biome, BiomeTraits> = {
+  [Biome.Ocean]: barren,
+  [Biome.Beach]: barren,
+  [Biome.Grassland]: {
+    ground: grassUnlessFrozen,
+    treeDensity: (grove) => (grove > 0.45 ? 0.3 : 0.012),
+    tree: pineIfCool,
+    decoration: flora,
+  },
+  [Biome.Forest]: {
+    ground: grassUnlessFrozen,
+    treeDensity: (grove) => (grove < -0.35 ? 0.02 : 0.45),
+    tree: pineIfCool,
+    decoration: flora,
+  },
+  [Biome.Desert]: { ground: sand, treeDensity: () => 0.008, tree: () => Prop.Cactus, decoration: boulders },
+  [Biome.Mountain]: {
+    ground: (level, temperature) => (level >= SNOW_LEVEL || temperature < COLD ? Ground.Snow : Ground.Rock),
+    treeDensity: () => 0.04,
+    tree: () => Prop.Pine,
+    decoration: boulders,
+  },
 };

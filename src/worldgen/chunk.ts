@@ -1,6 +1,6 @@
-import { Biome, Cover, Prop, Ground, Water, Way } from "./terrain";
+import { Cover, Prop, Ground, Water, Way } from "./terrain";
 import { type Point, createNoise, distance, floorDiv, hash, hashString, projectOntoSegment, unit } from "../lib";
-import { biomeOf } from "./biome";
+import { BIOMES, biomeOf } from "./biome";
 import { type TileDraft, paintInOrder } from "./features/feature";
 import { CHUNK_SIZE, REGION_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
 import type { RiverNode } from "./rivers";
@@ -26,12 +26,10 @@ const ROAD_HALF_WIDTH = 1.1;
 const ROAD_CLEARANCE = 1.5;
 const TRAIL_HALF_WIDTH = 0.8;
 const TRAIL_CLEARANCE = 0.6;
-const SNOW_LEVEL = heightLevel(0.8125);
 const VEGETATION_SALT = hashString("vegetation");
 const DECORATION_SALT = hashString("decoration");
 const GROVE_SALT = hashString("groves");
 const GROUND_SALT = hashString("ground");
-const COLD = 0.3;
 
 interface Channel {
   readonly a: RiverNode;
@@ -50,46 +48,6 @@ interface Pool extends Point {
   readonly radius: number;
   readonly level: number;
 }
-
-const groundFor = (biome: Biome, height: number, temperature: number): Ground => {
-  switch (biome) {
-    case Biome.Ocean:
-    case Biome.Beach:
-    case Biome.Desert:
-      return Ground.Sand;
-    case Biome.Mountain:
-      return height >= SNOW_LEVEL || temperature < COLD ? Ground.Snow : Ground.Rock;
-    default:
-      return temperature < COLD - 0.08 ? Ground.Snow : Ground.Grass;
-  }
-};
-
-const treeDensity = (biome: Biome, grove: number): number => {
-  switch (biome) {
-    case Biome.Forest:
-      return grove < -0.35 ? 0.02 : 0.45;
-    case Biome.Grassland:
-      return grove > 0.45 ? 0.3 : 0.012;
-    case Biome.Mountain:
-      return 0.04;
-    case Biome.Desert:
-      return 0.008;
-    default:
-      return 0;
-  }
-};
-
-const treeFor = (biome: Biome, temperature: number): Prop =>
-  biome === Biome.Desert ? Prop.Cactus : biome === Biome.Mountain || temperature < 0.4 ? Prop.Pine : Prop.Oak;
-
-const decorationFor = (biome: Biome, roll: number): Prop => {
-  if (biome === Biome.Mountain || biome === Biome.Desert) return roll < 0.03 ? Prop.Boulder : Prop.None;
-  if (biome !== Biome.Grassland && biome !== Biome.Forest) return Prop.None;
-  if (roll < 0.015) return Prop.Bush;
-  if (roll < 0.04) return Prop.Flowers;
-  if (roll < 0.12) return Prop.Tuft;
-  return Prop.None;
-};
 
 const bankRise = (gap: number): number => Math.ceil(gap) * MAX_CLIMB;
 
@@ -158,9 +116,10 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
       const climate = fields.climate(center.x, center.y);
       const { elevation, temperature } = climate;
       const tileBiome = biomeOf(climate);
+      const traits = BIOMES[tileBiome];
       let level = heightLevel(elevation);
       let tileWater: Water = Water.None;
-      let tileGround = groundFor(tileBiome, level, temperature + frostEdge(x / 7, y / 7) * 0.035);
+      let tileGround = traits.ground(level, temperature + frostEdge(x / 7, y / 7) * 0.035);
 
       const isSea = level < SEA_LEVEL;
       if (isSea) {
@@ -207,9 +166,8 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
       const claimed = paintInOrder(features, draft, x, y);
       if (!claimed && !way && draft.water === Water.None && !nearWater && !nearWay) {
         const roll = unit(hash(seed, VEGETATION_SALT, x, y));
-        if (!inGlade && roll < treeDensity(tileBiome, groves(x / 40, y / 40)))
-          draft.prop = treeFor(tileBiome, temperature);
-        else draft.prop = decorationFor(tileBiome, unit(hash(seed, DECORATION_SALT, x, y)));
+        if (!inGlade && roll < traits.treeDensity(groves(x / 40, y / 40))) draft.prop = traits.tree(temperature);
+        else draft.prop = traits.decoration(unit(hash(seed, DECORATION_SALT, x, y)));
       }
 
       height[i] = draft.height;
