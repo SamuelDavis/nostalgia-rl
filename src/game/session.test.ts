@@ -22,13 +22,18 @@ describe("playTurn", () => {
   });
 
   it("moves and faces the chosen direction", () => {
-    const next = playTurn(startSession({ x: 0, y: 0 }), flat, Direction.West);
+    const next = playTurn(startSession({ x: 0, y: 0 }), flat, { kind: "step", direction: Direction.West });
     expect(next).toMatchObject({ position: { x: -1, y: 0 }, facing: Direction.West, blocked: undefined });
   });
 
   it("turns to face a blocker without moving, and clears it on the next move", () => {
-    const bumped = playTurn(startSession({ x: 0, y: 0 }), walledEast, Direction.East);
+    const bumped = playTurn(startSession({ x: 0, y: 0 }), walledEast, { kind: "step", direction: Direction.East });
     expect(bumped).toMatchObject({ position: { x: 0, y: 0 }, facing: Direction.East, blocked: "obstacle" });
-    expect(playTurn(bumped, walledEast, Direction.North).blocked).toBeUndefined();
+    expect(playTurn(bumped, walledEast, { kind: "step", direction: Direction.North }).blocked).toBeUndefined();
+  });
+
+  it("turns to face without moving", () => {
+    const turned = playTurn(startSession({ x: 0, y: 0 }), walledEast, { kind: "face", direction: Direction.East });
+    expect(turned).toMatchObject({ position: { x: 0, y: 0 }, facing: Direction.East, blocked: undefined });
   });
 });

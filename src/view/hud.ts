@@ -10,6 +10,7 @@ export interface HudState {
   readonly turnMs: number;
   readonly tile: Tile;
   readonly mode: HeightMode;
+  readonly tapTurnsFirst: boolean;
   readonly zoom: { readonly span: number; readonly natural: number; readonly modifier: number };
 }
 
@@ -23,7 +24,7 @@ export const createHud = (parent: HTMLElement, world: Worldgen) => {
   panel.className = "hud";
   const table = document.createElement("dl");
   const help = document.createElement("p");
-  help.textContent = "WASD move · M map · H height mode · +/− or wheel zoom";
+  help.textContent = "WASD move · T tap mode · M map · H height mode · +/− or wheel zoom";
   panel.append(table, help);
   parent.append(panel);
   const values = new Map<string, HTMLElement>();
@@ -40,7 +41,7 @@ export const createHud = (parent: HTMLElement, world: Worldgen) => {
     if (dd.textContent !== value) dd.textContent = value;
   };
 
-  const update = ({ session, turnMs, tile, mode, zoom }: HudState) => {
+  const update = ({ session, turnMs, tile, mode, zoom, tapTurnsFirst }: HudState) => {
     const { turn, facing, blocked } = session;
     const { x, y } = session.position;
     const { elevation, temperature, moisture, drainage, landform } = world.fields;
@@ -53,6 +54,7 @@ export const createHud = (parent: HTMLElement, world: Worldgen) => {
       ["chunk", `${floorDiv(x, CHUNK_SIZE)}, ${floorDiv(y, CHUNK_SIZE)}`],
       ["region", `${region.cx}, ${region.cy}`],
       ["facing", nameOf(Direction, facing)],
+      ["tap", tapTurnsFirst ? "turns, then steps" : "steps"],
       ["blocked", blocked ?? "—"],
       ["swimming", isSwimming(tile) ? "yes" : "no"],
       ["height", `${tile.height} (${(tile.height - SEA_LEVEL) * METRES_PER_LEVEL} m above sea)`],

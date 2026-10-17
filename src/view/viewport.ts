@@ -162,6 +162,7 @@ const drawSprite = (
   cellPx: number,
   glyph: string,
   color: Rgb,
+  angle: number,
 ) => {
   const [cx, cy] = [px + cellPx / 2, py + cellPx / 2];
   ctx.fillStyle = SPRITE_BACKDROP;
@@ -170,13 +171,18 @@ const drawSprite = (
   ctx.fill();
   setGlyphFont(ctx, cellPx);
   ctx.fillStyle = css(color);
-  ctx.fillText(glyph, cx, cy + 1);
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+  ctx.fillText(glyph, 0, 1);
+  ctx.restore();
 };
 
 export interface Player {
   readonly position: Point;
   readonly shown: Point;
   readonly eyeLevel: number;
+  readonly angle: number;
 }
 
 interface TileWindow {
@@ -374,6 +380,7 @@ export const createViewport = (ctx: CanvasRenderingContext2D) => {
       tilePx,
       PLAYER_GLYPH,
       PLAYER_COLOR,
+      player.angle,
     );
   };
 };

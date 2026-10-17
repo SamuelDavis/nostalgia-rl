@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createGlide } from "./motion";
+import { Direction } from "../game/movement";
+import { createGlide, facingAngle, turnToward } from "./motion";
 
 const DURATION = 100;
 
@@ -31,5 +32,25 @@ describe("createGlide", () => {
     glide.moveTo({ x: 1, y: 1 }, 50);
     expect(glide.shownAt(50)).toEqual({ x: 0.5, y: 0 });
     expect(glide.shownAt(150)).toEqual({ x: 1, y: 1 });
+  });
+});
+
+describe("facingAngle", () => {
+  it("rotates clockwise from the glyph's natural westward facing", () => {
+    expect(facingAngle(Direction.West)).toBe(0);
+    expect(facingAngle(Direction.North)).toBe(Math.PI / 2);
+    expect(facingAngle(Direction.East)).toBe(Math.PI);
+  });
+});
+
+describe("turnToward", () => {
+  it("turns part of the way, the short way round", () => {
+    const turned = turnToward(0, facingAngle(Direction.South), 30, 100);
+    expect(turned).toBeLessThan(0);
+    expect(turned).toBeGreaterThan(-Math.PI / 2);
+  });
+
+  it("arrives given time", () => {
+    expect(turnToward(0, Math.PI / 2, 10000, 100)).toBeCloseTo(Math.PI / 2);
   });
 });

@@ -1,6 +1,6 @@
 import "./index.css";
 import type { Point } from "./lib";
-import { createDirectionInput } from "./game/input";
+import { actionFor, createDirectionInput } from "./game/input";
 import { Direction, stepToward } from "./game/movement";
 import { playTurn, startSession } from "./game/session";
 import { createTerrain } from "./game/terrain";
@@ -18,7 +18,7 @@ import {
   steer,
 } from "./view/camera";
 import { createHud } from "./view/hud";
-import { createGlide } from "./view/motion";
+import { createGlide, facingAngle, turnToward } from "./view/motion";
 import { createMap } from "./view/map";
 import { HEIGHT_MODES, type HeightMode } from "./view/palette";
 import { createViewport } from "./view/viewport";
@@ -29,6 +29,7 @@ const DEFAULT_REPEAT_DELAY_MS = 250;
 const URL_SYNC_DELAY_MS = 300;
 const ZOOM_STEP = 4;
 const EYE_EASING_MS = 300;
+const TURN_EASING_MS = 60;
 
 const KEY_DIRECTIONS: Record<string, Direction> = {
   KeyW: Direction.North,
@@ -65,6 +66,8 @@ let natural = naturalSpan(open, heading);
 let practical = practicalSpan(open, heading);
 let clearance = clearanceAhead(terrain, session.position, session.facing);
 let lastActionAt = performance.now();
+let tapTurnsFirst = false;
+let angle = facingAngle(session.facing);
 let eyeLevel = terrain(session.position.x, session.position.y).height;
 const camera = createCamera();
 const glide = createGlide(turnMs, session.position);
@@ -86,6 +89,7 @@ let drawn = "";
 let lastFrame = performance.now();
 const render = (now: number) => {
   const shown = glide.shownAt(now);
+  angle = turnToward(angle, facingAngle(session.facing), now - lastFrame, TURN_EASING_MS);
   eyeLevel = approach(eyeLevel, terrain(session.position.x, session.position.y).height, now - lastFrame, EYE_EASING_MS);
   const span = attentiveSpan({ natural, practical, clearance }, now - lastActionAt);
   const view = camera(
@@ -96,17 +100,18 @@ const render = (now: number) => {
   lastFrame = now;
   const placement = [view.centre.x, view.centre.y, shown.x, shown.y]
     .map((v) => v * view.tilePx)
-    .concat(view.tilePx * 100, eyeLevel * 100)
+    .concat(view.tilePx * 100, eyeLevel * 100, angle * 100)
     .map(Math.round)
     .join();
   if (!dirty && placement === drawn) return;
-  drawViewport(terrain, view, { position: session.position, shown, eyeLevel }, mode);
+  drawViewport(terrain, view, { position: session.position, shown, eyeLevel, angle }, mode);
   hud.update({
     session,
     turnMs,
     tile: terrain(session.position.x, session.position.y),
     mode,
     zoom: { span, natural, modifier: zoomModifier },
+    tapTurnsFirst,
   });
   drawn = placement;
   dirty = false;
@@ -130,7 +135,8 @@ const frame = (now: number) => {
   if (now >= nextTurn) {
     const scheduled = nextTurn;
     const previous = session.position;
-    const action = input.take(now);
+    const press = input.take(now);
+    const action = press && actionFor(press, session.facing, tapTurnsFirst);
     if (action !== undefined) lastActionAt = now;
     session = playTurn(session, terrain, action);
     if (session.position !== previous) {
@@ -155,6 +161,10 @@ addEventListener("keydown", (event) => {
   if (event.code === "KeyM") map.toggle(session.position, mode);
   if (event.code === "KeyH") {
     mode = HEIGHT_MODES[(HEIGHT_MODES.indexOf(mode) + 1) % HEIGHT_MODES.length]!;
+    dirty = true;
+  }
+  if (event.code === "KeyT") {
+    tapTurnsFirst = !tapTurnsFirst;
     dirty = true;
   }
   if (event.code === "Equal" || event.code === "NumpadAdd") zoomBy(-ZOOM_STEP);

@@ -9,6 +9,11 @@ export interface Session {
   readonly blocked: Blocker | undefined;
 }
 
+export interface Action {
+  readonly kind: "face" | "step";
+  readonly direction: Direction;
+}
+
 export const startSession = (position: Point): Session => ({
   turn: 0,
   position,
@@ -16,9 +21,11 @@ export const startSession = (position: Point): Session => ({
   blocked: undefined,
 });
 
-export const playTurn = (session: Session, terrain: Terrain, direction: Direction | undefined): Session => {
+export const playTurn = (session: Session, terrain: Terrain, action: Action | undefined): Session => {
   const turn = session.turn + 1;
-  if (direction === undefined) return { ...session, turn };
+  if (action === undefined) return { ...session, turn };
+  const { kind, direction } = action;
+  if (kind === "face") return { ...session, turn, facing: direction, blocked: undefined };
   const { position } = session;
   const target = stepToward(position, direction);
   const blocked = blockerBetween(terrain(position.x, position.y), terrain(target.x, target.y));
