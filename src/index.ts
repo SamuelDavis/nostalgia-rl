@@ -1,7 +1,7 @@
 import "./index.css";
 import type { Point } from "./lib";
 import { createDirectionInput } from "./game/input";
-import { Direction } from "./game/movement";
+import { Direction, stepToward } from "./game/movement";
 import { playTurn, startSession } from "./game/session";
 import { createTerrain } from "./game/terrain";
 import { createCamera, lookOffset, modifierWithin, naturalSpan, openness, spanOf, steer } from "./view/camera";
@@ -103,11 +103,11 @@ const frame = (now: number) => {
     const previous = session.position;
     session = playTurn(session, terrain, input.take());
     if (session.position !== previous) {
-      heading = steer(heading, { x: session.position.x - previous.x, y: session.position.y - previous.y });
       open = opennessAt(session.position);
-      natural = naturalSpan(open, heading);
       syncUrl();
     }
+    heading = steer(heading, stepToward({ x: 0, y: 0 }, session.facing));
+    natural = naturalSpan(open, heading);
     dirty = true;
     nextTurn = Math.max(nextTurn + turnMs, now);
   }
