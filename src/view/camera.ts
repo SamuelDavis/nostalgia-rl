@@ -24,7 +24,10 @@ const FULL_DROP = metresToLevels(12);
 const PRACTICAL_SPANS: Spread = { up: 10, level: 14, down: 20 };
 const NOSE_SPAN = 6;
 const SPAN_PER_CLEAR_TILE = 4;
-const OBSTRUCTION_REACH = 3;
+export const SIGHT_REACH = 16;
+const SIGHT_CONE = 90;
+const SIGHT_RAY_COUNT = 9;
+const SIGHT_STEP = 0.25;
 const STEER = 0.3;
 export const SETTLE_MS = 1500;
 const LEAD = 0.25;
@@ -75,30 +78,43 @@ export const naturalSpan = (open: readonly number[], heading: Point): number =>
 export const practicalSpan = (open: readonly number[], heading: Point): number =>
   spanAcross(PRACTICAL_SPANS, opennessAhead(open, heading));
 
-export const clearanceAhead = (terrain: Terrain, from: Point, facing: Direction): number => {
-  let at = from;
-  for (let clear = 0; clear < OBSTRUCTION_REACH; clear++) {
-    const next = stepToward(at, facing);
-    const [here, there] = [terrain(at.x, at.y), terrain(next.x, next.y)];
+const SIGHT_RAYS: readonly number[] = Array.from(
+  { length: SIGHT_RAY_COUNT },
+  (_, i) => ((i / (SIGHT_RAY_COUNT - 1) - 0.5) * SIGHT_CONE * Math.PI) / 180,
+);
+
+const rotate = ({ x, y }: Point, angle: number): Point => ({
+  x: x * Math.cos(angle) - y * Math.sin(angle),
+  y: x * Math.sin(angle) + y * Math.cos(angle),
+});
+
+const clearAlong = (terrain: Terrain, from: Point, direction: Point): number => {
+  let last = from;
+  for (let t = SIGHT_STEP; t <= SIGHT_REACH; t += SIGHT_STEP) {
+    const at = { x: Math.floor(from.x + 0.5 + direction.x * t), y: Math.floor(from.y + 0.5 + direction.y * t) };
+    if (at.x === last.x && at.y === last.y) continue;
+    const [here, there] = [terrain(last.x, last.y), terrain(at.x, at.y)];
     const blocker = blockerBetween(here, there);
-    if (blocker === "cliff" && there.height < here.height) return OBSTRUCTION_REACH;
-    if (blocker) return clear;
-    at = next;
+    if (blocker === "obstacle" || (blocker === "cliff" && there.height > here.height))
+      return Math.hypot(last.x - from.x, last.y - from.y);
+    last = at;
   }
-  return OBSTRUCTION_REACH;
+  return SIGHT_REACH;
+};
+
+export const sightAhead = (terrain: Terrain, from: Point, facing: Direction): number => {
+  const ahead = stepToward({ x: 0, y: 0 }, facing);
+  return mean(SIGHT_RAYS.map((angle) => clearAlong(terrain, from, rotate(ahead, angle))));
 };
 
 interface Spans {
   readonly natural: number;
   readonly practical: number;
-  readonly clearance: number;
+  readonly sight: number;
 }
 
-const obstructedSpan = (clearance: number) =>
-  clearance < OBSTRUCTION_REACH ? NOSE_SPAN + clearance * SPAN_PER_CLEAR_TILE : Infinity;
-
-export const attentiveSpan = ({ natural, practical, clearance }: Spans, idleMs: number): number =>
-  Math.min(idleMs >= SETTLE_MS ? natural : practical, obstructedSpan(clearance));
+export const attentiveSpan = ({ natural, practical, sight }: Spans, idleMs: number): number =>
+  Math.min(idleMs >= SETTLE_MS ? natural : practical, Math.round(NOSE_SPAN + sight * SPAN_PER_CLEAR_TILE));
 
 export const lookOffset = (open: readonly number[], heading: Point): Point => {
   const lean = (axis: "x" | "y") => mean(COMPASS.map((d, i) => d[axis] * open[i]!));

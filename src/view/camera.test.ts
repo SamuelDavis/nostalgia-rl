@@ -7,12 +7,13 @@ import {
   SETTLE_MS,
   approach,
   attentiveSpan,
-  clearanceAhead,
+  SIGHT_REACH,
   createCamera,
   lookOffset,
   naturalSpan,
   openness,
   practicalSpan,
+  sightAhead,
   steer,
 } from "./camera";
 
@@ -98,23 +99,46 @@ describe("practicalSpan", () => {
 });
 
 const field =
-  (prop: (x: number) => Prop, height: (x: number) => number = () => 100): Terrain =>
-  (x) => ({
-    height: height(x),
+  (prop: (x: number, y: number) => Prop, height: (x: number, y: number) => number = () => 100): Terrain =>
+  (x, y) => ({
+    height: height(x, y),
     ground: Ground.Grass,
     water: Water.None,
-    prop: prop(x),
+    prop: prop(x, y),
     biome: Biome.Grassland,
     way: Way.None,
     cover: Cover.None,
   });
 
-describe("clearanceAhead", () => {
-  const treeAt = (at: number) => field((x) => (x === at ? Prop.Oak : Prop.None));
+describe("sightAhead", () => {
+  const open = field(() => Prop.None);
+  const wallAt = (at: number) => field((x) => (x === at ? Prop.Oak : Prop.None));
+  const scattered = (every: number) => field((x, y) => ((x * 7 + y * 3) % every === 0 ? Prop.Oak : Prop.None));
 
-  it("counts the clear tiles before the first obstacle", () => {
-    expect(clearanceAhead(treeAt(1), ORIGIN, Direction.East)).toBe(0);
-    expect(clearanceAhead(treeAt(3), ORIGIN, Direction.East)).toBe(2);
+  it("sees to its reach over open ground", () => {
+    expect(sightAhead(open, ORIGIN, Direction.East)).toBe(SIGHT_REACH);
+  });
+
+  it("is nothing with a wall in your face, and grows as you step back", () => {
+    expect(sightAhead(wallAt(1), ORIGIN, Direction.East)).toBe(0);
+    expect(sightAhead(wallAt(2), ORIGIN, Direction.East)).toBeGreaterThan(0);
+    expect(sightAhead(wallAt(3), ORIGIN, Direction.East)).toBeGreaterThan(
+      sightAhead(wallAt(2), ORIGIN, Direction.East),
+    );
+  });
+
+  it("is shortened only partly by a single obstacle ahead", () => {
+    const tree = field((x, y) => (x === 1 && y === 0 ? Prop.Oak : Prop.None));
+    const sight = sightAhead(tree, ORIGIN, Direction.East);
+    expect(sight).toBeGreaterThan(0);
+    expect(sight).toBeLessThan(SIGHT_REACH);
+  });
+
+  it("is shorter the denser the obstacles around you", () => {
+    const sparse = sightAhead(scattered(13), { x: 1, y: 1 }, Direction.East);
+    const dense = sightAhead(scattered(3), { x: 1, y: 1 }, Direction.East);
+    expect(dense).toBeLessThan(sparse);
+    expect(sparse).toBeLessThan(SIGHT_REACH);
   });
 
   const stepAt2 = (height: number) =>
@@ -123,21 +147,21 @@ describe("clearanceAhead", () => {
       (x) => (x >= 2 ? height : 100),
     );
 
-  it("treats a cliff rising ahead as an obstacle", () => {
-    expect(clearanceAhead(stepAt2(120), ORIGIN, Direction.East)).toBe(1);
+  it("is stopped by a cliff rising ahead", () => {
+    expect(sightAhead(stepAt2(120), ORIGIN, Direction.East)).toBeLessThan(2);
   });
 
   it("sees over a cliff dropping away ahead", () => {
-    expect(clearanceAhead(stepAt2(80), ORIGIN, Direction.East)).toBeGreaterThan(2);
+    expect(sightAhead(stepAt2(80), ORIGIN, Direction.East)).toBe(SIGHT_REACH);
   });
 
   it("only looks the way you face", () => {
-    expect(clearanceAhead(treeAt(1), ORIGIN, Direction.West)).toBeGreaterThan(2);
+    expect(sightAhead(wallAt(1), ORIGIN, Direction.West)).toBe(SIGHT_REACH);
   });
 });
 
 describe("attentiveSpan", () => {
-  const spans = { natural: 50, practical: 15, clearance: Infinity };
+  const spans = { natural: 50, practical: 15, sight: SIGHT_REACH };
 
   it("holds the practical view while acting and settles to the natural view when idle", () => {
     expect(attentiveSpan(spans, 0)).toBe(15);
@@ -145,9 +169,9 @@ describe("attentiveSpan", () => {
     expect(attentiveSpan(spans, SETTLE_MS)).toBe(50);
   });
 
-  it("closes in on an obstacle in your face, more the nearer it is, even when idle", () => {
-    const nose = attentiveSpan({ ...spans, clearance: 0 }, SETTLE_MS);
-    const nearby = attentiveSpan({ ...spans, clearance: 1 }, 0);
+  it("closes in as sight shortens, even when idle", () => {
+    const nose = attentiveSpan({ ...spans, sight: 0 }, SETTLE_MS);
+    const nearby = attentiveSpan({ ...spans, sight: 1 }, 0);
     expect(nose).toBeLessThan(nearby);
     expect(nearby).toBeLessThan(15);
   });

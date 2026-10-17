@@ -7,7 +7,7 @@ import { createTerrain } from "./game/terrain";
 import {
   approach,
   attentiveSpan,
-  clearanceAhead,
+  sightAhead,
   createCamera,
   lookOffset,
   modifierWithin,
@@ -64,7 +64,7 @@ let open = opennessAt(session.position);
 let heading: Point = { x: 0, y: 0 };
 let natural = naturalSpan(open, heading);
 let practical = practicalSpan(open, heading);
-let clearance = clearanceAhead(terrain, session.position, session.facing);
+let sight = sightAhead(terrain, session.position, session.facing);
 let lastActionAt = performance.now();
 let tapTurnsFirst = false;
 let angle = facingAngle(session.facing);
@@ -91,7 +91,7 @@ const render = (now: number) => {
   const shown = glide.shownAt(now);
   angle = turnToward(angle, facingAngle(session.facing), now - lastFrame, TURN_EASING_MS);
   eyeLevel = approach(eyeLevel, terrain(session.position.x, session.position.y).height, now - lastFrame, EYE_EASING_MS);
-  const span = attentiveSpan({ natural, practical, clearance }, now - lastActionAt);
+  const span = attentiveSpan({ natural, practical, sight }, now - lastActionAt);
   const view = camera(
     { position: shown, look: lookOffset(open, heading), span: spanOf(span, zoomModifier) },
     { width: canvas.clientWidth, height: canvas.clientHeight },
@@ -147,7 +147,7 @@ const frame = (now: number) => {
     heading = steer(heading, stepToward({ x: 0, y: 0 }, session.facing));
     natural = naturalSpan(open, heading);
     practical = practicalSpan(open, heading);
-    clearance = clearanceAhead(terrain, session.position, session.facing);
+    sight = sightAhead(terrain, session.position, session.facing);
     dirty = true;
     nextTurn = Math.max(nextTurn + turnMs, now);
   }
