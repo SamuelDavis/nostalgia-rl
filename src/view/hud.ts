@@ -10,7 +10,7 @@ export interface HudState {
   readonly turnMs: number;
   readonly tile: Tile;
   readonly mode: HeightMode;
-  readonly zoom: { readonly natural: number; readonly modifier: number };
+  readonly zoom: { readonly span: number; readonly natural: number; readonly modifier: number };
 }
 
 const nameOf = (values: Record<string, number>, value: number): string =>
@@ -68,7 +68,10 @@ export const createHud = (parent: HTMLElement, world: Worldgen) => {
       ["erosion", fixed(form.erosion)],
       ["peaks & valleys", fixed(form.peaksAndValleys)],
       ["height mode", mode],
-      ["view", `${zoom.natural} ${zoom.modifier < 0 ? "−" : "+"} ${Math.abs(zoom.modifier)} tiles`],
+      [
+        "view",
+        `${zoom.span} (settles ${zoom.natural}) ${zoom.modifier < 0 ? "−" : "+"} ${Math.abs(zoom.modifier)} tiles`,
+      ],
     ];
     for (const [label, value] of rows) show(label, value);
   };

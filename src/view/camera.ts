@@ -21,6 +21,8 @@ const CLOSE_SPAN = 24;
 const FAR_SPAN = 64;
 const FULL_DROP = metresToLevels(12);
 const STEER = 0.3;
+const ATTENTIVE_SHARE = 0.25;
+export const SETTLE_MS = 1500;
 const LEAD = 0.25;
 const LEAN = 0.5;
 const MAX_OFFSET = 0.35;
@@ -56,6 +58,9 @@ const opennessAhead = (open: readonly number[], heading: Point): number => {
 
 export const naturalSpan = (open: readonly number[], heading: Point): number =>
   Math.round(lerp(CLOSE_SPAN, FAR_SPAN, opennessAhead(open, heading)));
+
+export const attentiveSpan = (natural: number, idleMs: number): number =>
+  idleMs >= SETTLE_MS ? natural : Math.round(lerp(CLOSE_SPAN, natural, ATTENTIVE_SHARE));
 
 export const lookOffset = (open: readonly number[], heading: Point): Point => {
   const lean = (axis: "x" | "y") => mean(COMPASS.map((d, i) => d[axis] * open[i]!));

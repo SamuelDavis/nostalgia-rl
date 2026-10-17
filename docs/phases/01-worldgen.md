@@ -10,7 +10,7 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 
 - **Exploration:** `@` moves one tile per turn with WASD. Turns default to 100 ms in this phase so exploring is quick; the real turn length is decided with movement smoothing (see [ideas](../ideas.md#smoothed-grid-movement)). A tap between turns is buffered and acts once (latest tap wins); a held key repeats every turn. No diagonals.
 - **Presentation:** glyphs on a canvas; HTML HUD on top showing position and worldgen debug data for the player's tile; M toggles an HTML map of the field-sampled overview (`src/view/overview.ts`).
-- **Camera:** close and overhead, standing in for what you'd see first-person. It leads the heading, which each turn tick steers toward the facing (about 3 ticks to swing round; zig-zags settle diagonal), so single turns don't jerk it; zoom is recomputed every tick too, so it follows turning on the spot. Zoom follows how far the ground drops away in the heading's direction (8 compass directions, sampled 12 and 24 tiles out): looking up a slope or across a plain stays close (24 tiles across the short side), looking down a slope or off a summit opens out (up to 64). The camera also leans toward open, lower ground. The user's zoom modifier (+/−, wheel) adds tiles on top. The tile layer is drawn at the resting zoom and redraws only when the player moves, the resting zoom changes, or the view leaves an 8-tile margin; easing frames pan and scale it (zoom eases over ~600 ms), so zoom changes are continuous rather than whole-pixel steps.
+- **Camera:** close and overhead, standing in for what you'd see first-person. It leads the heading, which each turn tick steers toward the facing (about 3 ticks to swing round; zig-zags settle diagonal), so single turns don't jerk it; zoom is recomputed every tick too, so it follows turning on the spot. Zoom follows how far the ground drops away in the heading's direction (8 compass directions, sampled 12 and 24 tiles out): looking up a slope or across a plain stays close (24 tiles across the short side), looking down a slope or off a summit opens out (up to 64). The camera also leans toward open, lower ground. While the player acts, zoom holds near the close view and takes only a quarter of that widening, so navigating stays agile; after 1.5 s idle it settles to the full view. The user's zoom modifier (+/−, wheel) adds tiles on top. The tile layer is drawn at the resting zoom and redraws only when the player moves, the resting zoom changes, or the view leaves an 8-tile margin; easing frames pan and scale it (zoom eases over ~600 ms), so zoom changes are continuous rather than whole-pixel steps.
 - **Deep forest:** the first bespoke feature; dense enough (85% trees at the core) that its own paths are the way through. A canopy hides its interior from outside; standing under it reveals the floor, darkened. See [worldgen](../worldgen.md).
 - **Scale:** 1 m tiles, 0.5 m levels, compressed relief; see [ADR 0002](../adr/0002-scale.md).
 - **Height resolution:** 256 levels (was 16). At 16, the steepest natural tile rose under half a level, so cliffs could not exist and height bands were ~60 tiles wide.
@@ -30,6 +30,16 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 ## Playtest log
 
 _Record user feedback verbatim, newest first, with the commit it refers to._
+
+### 1d68d09: continuous zoom
+
+> that's pretty great, but one other camera effect: I think that if you're moving or acting, the camera should want to hover around a particular offset which scales only a little bit with height, but if you stand still/do nothing for a second or two then the camera zooms out to where it should be.
+>
+> if you see what I mean: it's hard to navigate down a mountain path when you're super zoomed out; you want the camera at a reasonable distance so you can make agile movements and navigate the terrain. However you do want a little bit of zoom scaling to help reinforce the idea that you're going up and down or that you're looking at something obscuring your view versus an open field of view.
+>
+> I think. I'm a little nervous about it. It definitely feels amazing to have these camera zoom effects: they _really_ reinforce the sense of verticality as you're going up and down small hills or mountains, and climbing to the top of `?seed=1&x=-419&y=-280` to an elevation of 0.922 and having this massive field of view was amazing. However, trying to get back down the mountain was extremely fiddly because I couldn't quite find the path where it becomes only 1 square wide.
+
+Acting now holds zoom near the close view (a quarter of the widening); idling 1.5 s settles to the full view. Paths draw on 60% of tiles, which also hides single-width mountain paths; not changed yet.
 
 ### 6bfda2b: heading and zoom per tick
 

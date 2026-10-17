@@ -4,7 +4,16 @@ import { createDirectionInput } from "./game/input";
 import { Direction, stepToward } from "./game/movement";
 import { playTurn, startSession } from "./game/session";
 import { createTerrain } from "./game/terrain";
-import { createCamera, lookOffset, modifierWithin, naturalSpan, openness, spanOf, steer } from "./view/camera";
+import {
+  attentiveSpan,
+  createCamera,
+  lookOffset,
+  modifierWithin,
+  naturalSpan,
+  openness,
+  spanOf,
+  steer,
+} from "./view/camera";
 import { createHud } from "./view/hud";
 import { createMap } from "./view/map";
 import { HEIGHT_MODES, type HeightMode } from "./view/palette";
@@ -46,6 +55,7 @@ const opennessAt = (p: Point) => openness((x, y) => terrain(x, y).height, p);
 let open = opennessAt(session.position);
 let heading: Point = { x: 0, y: 0 };
 let natural = naturalSpan(open, heading);
+let lastActionAt = performance.now();
 const camera = createCamera();
 const drawViewport = createViewport(ctx);
 
@@ -64,8 +74,9 @@ let dirty = true;
 let drawn = "";
 let lastFrame = performance.now();
 const render = (now: number) => {
+  const span = attentiveSpan(natural, now - lastActionAt);
   const view = camera(
-    { position: session.position, look: lookOffset(open, heading), span: spanOf(natural, zoomModifier) },
+    { position: session.position, look: lookOffset(open, heading), span: spanOf(span, zoomModifier) },
     { width: canvas.clientWidth, height: canvas.clientHeight },
     now - lastFrame,
   );
@@ -80,7 +91,7 @@ const render = (now: number) => {
     turnMs,
     tile: terrain(session.position.x, session.position.y),
     mode,
-    zoom: { natural, modifier: zoomModifier },
+    zoom: { span, natural, modifier: zoomModifier },
   });
   drawn = placement;
   dirty = false;
@@ -103,7 +114,9 @@ let nextTurn = performance.now() + turnMs;
 const frame = (now: number) => {
   if (now >= nextTurn) {
     const previous = session.position;
-    session = playTurn(session, terrain, input.take());
+    const action = input.take();
+    if (action !== undefined) lastActionAt = now;
+    session = playTurn(session, terrain, action);
     if (session.position !== previous) {
       open = opennessAt(session.position);
       syncUrl();

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type Point } from "../lib";
-import { approach, lookOffset, naturalSpan, openness, steer } from "./camera";
+import { SETTLE_MS, approach, attentiveSpan, lookOffset, naturalSpan, openness, steer } from "./camera";
 
 const cone = (x: number, y: number) => 200 - Math.abs(x) - Math.abs(y);
 const plain = () => 100;
@@ -62,6 +62,22 @@ describe("naturalSpan", () => {
     const summit = openness(cone, ORIGIN);
     expect(naturalSpan(summit, EAST)).toBeGreaterThan(naturalSpan(openness(plain, ORIGIN), EAST));
     expect(naturalSpan(summit, EAST)).toBe(naturalSpan(summit, WEST));
+  });
+});
+
+describe("attentiveSpan", () => {
+  const summit = naturalSpan(openness(cone, ORIGIN), EAST);
+  const level = naturalSpan(openness(plain, ORIGIN), EAST);
+
+  it("holds close to the near view while acting, widening only a little with the view", () => {
+    expect(attentiveSpan(summit, 0)).toBeLessThan(summit);
+    expect(attentiveSpan(summit, 0)).toBeGreaterThan(level);
+    expect(attentiveSpan(level, 0)).toBe(level);
+  });
+
+  it("settles to the full view after standing idle", () => {
+    expect(attentiveSpan(summit, SETTLE_MS - 1)).toBe(attentiveSpan(summit, 0));
+    expect(attentiveSpan(summit, SETTLE_MS)).toBe(summit);
   });
 });
 
