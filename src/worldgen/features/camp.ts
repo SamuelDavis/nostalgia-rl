@@ -68,13 +68,21 @@ const settle = (level: number, campLevel: number, gap: number): number => {
 };
 
 export const createCamps = ({ seed, level, biomeAt, riversNear }: CampSiting) => {
-  const deviatesBy = (p: Point, probes: readonly Point[], tolerance: number) =>
-    probes.some((o) => Math.abs(level({ x: p.x + o.x, y: p.y + o.y }) - level(p)) > tolerance);
+  const levelsAround = (p: Point, probes: readonly Point[]) => probes.map((o) => level({ x: p.x + o.x, y: p.y + o.y }));
+
+  const deviatesBy = (levels: readonly number[], from: number, tolerance: number) =>
+    levels.some((l) => Math.abs(l - from) > tolerance);
+
+  const campLevel = (p: Point) => {
+    const ring = levelsAround(p, SEAM_PROBES).sort((a, b) => a - b);
+    return ring[ring.length >> 1]!;
+  };
 
   const isSite = (p: Point): boolean => {
     const biome = biomeAt(p);
     if (biome === Biome.Ocean || biome === Biome.Beach || biome === Biome.Mountain) return false;
-    if (deviatesBy(p, FLATNESS_PROBES, CAMP_FLATNESS) || deviatesBy(p, SEAM_PROBES, SEAM_REACH)) return false;
+    if (deviatesBy(levelsAround(p, FLATNESS_PROBES), level(p), CAMP_FLATNESS)) return false;
+    if (deviatesBy(levelsAround(p, SEAM_PROBES), campLevel(p), SEAM_REACH)) return false;
     return riversNear(regionOf(p)).every((river) => distanceToRiver(river, p) > RIVER_CLEARANCE);
   };
 
@@ -122,7 +130,7 @@ export const createCamps = ({ seed, level, biomeAt, riversNear }: CampSiting) =>
     name: "camp",
     priority: 0,
     reach: CAMP_RADIUS,
-    build: (camp) => ({ camp, level: level({ x: camp.x + 0.5, y: camp.y + 0.5 }) }),
+    build: (camp) => ({ camp, level: campLevel(camp) }),
     paint: ({ camp, level: campLevel }, draft, x, y) => {
       const gap = distance({ x: x + 0.5, y: y + 0.5 }, { x: camp.x + 0.5, y: camp.y + 0.5 });
       if (gap > CAMP_RADIUS) return false;

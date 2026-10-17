@@ -124,13 +124,31 @@ describe("generateChunk", () => {
   });
 
   it("settles camps without carving cliffs", () => {
-    for (const seed of [1, 2, 3]) {
-      const world = createWorldgen(seed);
-      const { spawn } = world;
-      for (let y = spawn.y - 14; y <= spawn.y + 14; y++)
-        for (let x = spawn.x - 14; x <= spawn.x + 14; x++)
-          if (distance({ x, y }, spawn) <= 13) expectNoCarvedCliff(world, x, y);
-    }
+    const world = createWorldgen(1);
+    const camps = Array.from({ length: 25 }, (_, i) => world.campAt((i % 5) - 2, Math.floor(i / 5) - 2));
+    for (const camp of camps.filter((c) => c !== undefined))
+      for (let y = camp.y - 14; y <= camp.y + 14; y++)
+        for (let x = camp.x - 14; x <= camp.x + 14; x++)
+          if (distance({ x, y }, camp) <= 13) expectNoCarvedCliff(world, x, y);
+  });
+
+  it("settles each camp at the median level of the ground around it", () => {
+    const world = createWorldgen(1);
+    const natural = (x: number, y: number) => heightLevel(world.fields.elevation(x + 0.5, y + 0.5));
+    for (let cy = -3; cy <= 3; cy++)
+      for (let cx = -3; cx <= 3; cx++) {
+        const camp = world.campAt(cx, cy);
+        if (!camp) continue;
+        const ring = Array.from({ length: 16 }, (_, i) => {
+          const angle = (i / 16) * 2 * Math.PI;
+          return natural(Math.round(camp.x + 13 * Math.cos(angle)), Math.round(camp.y + 13 * Math.sin(angle)));
+        }).sort((a, b) => a - b);
+        const median = ring[8]!;
+        expect(
+          Math.abs(heightAt(world, camp.x, camp.y).height - median),
+          `camp at ${camp.x},${camp.y}`,
+        ).toBeLessThanOrEqual(1);
+      }
   });
 
   it("carves rivers without cliffs", () => {
