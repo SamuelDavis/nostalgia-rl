@@ -24,6 +24,7 @@ import { createViewport } from "./view/viewport";
 import { createWorldgen } from "./worldgen";
 
 const DEFAULT_TURN_MS = 100;
+const DEFAULT_REPEAT_DELAY_MS = 250;
 const URL_SYNC_DELAY_MS = 300;
 const ZOOM_STEP = 4;
 
@@ -37,10 +38,11 @@ const KEY_DIRECTIONS: Record<string, Direction> = {
 const params = new URLSearchParams(location.search);
 const seed = Number(params.get("seed") ?? 1);
 const turnMs = Number(params.get("turn") ?? DEFAULT_TURN_MS);
+const repeatDelayMs = Number(params.get("repeat") ?? DEFAULT_REPEAT_DELAY_MS);
 
 const world = createWorldgen(seed);
 const terrain = createTerrain(world);
-const input = createDirectionInput();
+const input = createDirectionInput(repeatDelayMs);
 
 const canvas = document.createElement("canvas");
 document.querySelector<HTMLDivElement>("#placeholder")!.replaceWith(canvas);
@@ -123,7 +125,7 @@ let nextTurn = performance.now() + turnMs;
 const frame = (now: number) => {
   if (now >= nextTurn) {
     const previous = session.position;
-    const action = input.take();
+    const action = input.take(now);
     if (action !== undefined) lastActionAt = now;
     session = playTurn(session, terrain, action);
     if (session.position !== previous) {
@@ -143,7 +145,7 @@ const frame = (now: number) => {
 
 addEventListener("keydown", (event) => {
   const direction = KEY_DIRECTIONS[event.code];
-  if (direction !== undefined && !event.repeat) input.press(direction);
+  if (direction !== undefined && !event.repeat) input.press(direction, performance.now());
   if (event.code === "KeyM") map.toggle(session.position, mode);
   if (event.code === "KeyH") {
     mode = HEIGHT_MODES[(HEIGHT_MODES.indexOf(mode) + 1) % HEIGHT_MODES.length]!;

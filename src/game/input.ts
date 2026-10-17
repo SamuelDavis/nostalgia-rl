@@ -1,24 +1,31 @@
 import type { Direction } from "./movement";
 
 export interface DirectionInput {
-  readonly press: (direction: Direction) => void;
+  readonly press: (direction: Direction, at: number) => void;
   readonly release: (direction: Direction) => void;
-  readonly take: () => Direction | undefined;
+  readonly take: (at: number) => Direction | undefined;
 }
 
-export const createDirectionInput = (): DirectionInput => {
-  let held: Direction[] = [];
+interface Hold {
+  readonly direction: Direction;
+  readonly since: number;
+}
+
+export const createDirectionInput = (repeatDelayMs: number): DirectionInput => {
+  let held: Hold[] = [];
   let tapped: Direction | undefined;
   return {
-    press: (direction) => {
-      held = [...held.filter((d) => d !== direction), direction];
+    press: (direction, at) => {
+      held = [...held.filter((h) => h.direction !== direction), { direction, since: at }];
       tapped = direction;
     },
     release: (direction) => {
-      held = held.filter((d) => d !== direction);
+      held = held.filter((h) => h.direction !== direction);
     },
-    take: () => {
-      const next = tapped ?? held.at(-1);
+    take: (at) => {
+      const latest = held.at(-1);
+      const repeating = latest && at - latest.since >= repeatDelayMs ? latest.direction : undefined;
+      const next = tapped ?? repeating;
       tapped = undefined;
       return next;
     },

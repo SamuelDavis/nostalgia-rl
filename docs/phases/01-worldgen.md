@@ -8,7 +8,7 @@ Consistent, seeded world generation for a Minecraft-style overworld with biomes,
 
 Judged in this phase: feel of the turn clock, readability of height, biome and terrain generation. Art style and mechanics are out of scope.
 
-- **Exploration:** `@` moves one tile per turn with WASD. Turns default to 100 ms in this phase so exploring is quick; the real turn length is still open now that movement is smoothed. A tap between turns is buffered and acts once (latest tap wins); a held key repeats every turn. No diagonals.
+- **Exploration:** `@` moves one tile per turn with WASD. Turns default to 100 ms in this phase so exploring is quick; the real turn length is still open; tune feel with step costs rather than the clock ([ideas](../ideas.md#action-costs-in-ticks)). A press is buffered and acts once on the next turn (latest press wins); a key held past the repeat delay (250 ms, URL `repeat`) then repeats every turn, like OS key repeat. Without the delay, a tap held across two 100 ms turns stepped twice. No diagonals.
 - **Presentation:** glyphs on a canvas; HTML HUD on top showing position and worldgen debug data for the player's tile; M toggles an HTML map of the field-sampled overview (`src/view/overview.ts`).
 - **Displayed motion:** game state stays on the integer grid; the view keeps its own displayed position per moving thing and glides it to each new tile over one turn. The player is drawn as a sprite over the tile layer, so the layer redraws only when the player's height or cover changes. Entities, and props once they can move, follow the same split.
 - **Camera:** close and overhead, standing in for what you'd see first-person. It leads the heading, which each turn tick steers toward the facing (about 3 ticks to swing round; zig-zags settle diagonal), so single turns don't jerk it; zoom is recomputed every tick too, so it follows turning on the spot. Zoom follows how far the ground drops away in the heading's direction (8 compass directions, sampled 12 and 24 tiles out): ground rising ahead closes it, falling ground opens it. Settled spans (tiles across the short side) run 14 looking up, 20 on level ground, 64 looking down a slope or off a summit; the camera also leans toward lower ground and away from rising ground. While the player acts, zoom holds practical spans of 10, 14 and 20 by the same measure, so navigating stays agile; after 1.5 s idle it settles. An obstacle or cliff within 3 tiles in the facing direction caps both, from 6 tiles with your nose against it, so a blocked line of sight reads as one. The user's zoom modifier (+/−, wheel) adds tiles on top. The tile layer is drawn at the resting zoom and redraws only when the player moves, the resting zoom changes, or the view leaves an 8-tile margin; easing frames pan and scale it (zoom eases over ~600 ms), so zoom changes are continuous rather than whole-pixel steps.
@@ -31,6 +31,14 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 ## Playtest log
 
 _Record user feedback verbatim, newest first, with the commit it refers to._
+
+### 6c16187: gliding player
+
+> at step=100 it's very easy when tapping a key to accidentally slide 2 spaces -- this makes it very difficult to navigate between trees or down cliff paths. What are some smart ways for dealing with that? Slowing the game down to 250 or 500 did not felt excrutiatingly slow. It seems like a default of 150 feels okay, but is there any advice on this topic?
+
+> yes, do option 1 with the URL parameter; I also think that 2 is a great idea: I can imagine lots of gameplay situations where entities will want to be slowed (e.g. going up a steep incline) or be faster by default (like a horse), etc.
+
+A tap lasting longer than the gap to the next turn counted as a hold. Added a repeat delay: 10 taps of 150 ms on clear ground now give 10 steps (15 before).
 
 ### 4c23f3f: obstacles close the view
 
