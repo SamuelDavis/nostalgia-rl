@@ -14,7 +14,7 @@ import {
 } from "../lib";
 import { biomeOf } from "./biome";
 import { seamFits } from "./camp";
-import { MACRO_SIZE, MAX_CLIMB, heightLevel } from "./constants";
+import { MACRO_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
 import { type Fields, createFields } from "./fields";
 import { MAX_RIVER_REACH, type River, traceRiver } from "./rivers";
 import { route } from "./routing";
@@ -151,6 +151,7 @@ export const createWorldgen = (seed: number): Worldgen => {
   const roadNoise = createNoise(seed, ROAD_SALT);
   const trailNoise = createNoise(seed, TRAIL_SALT);
   const level = (p: Point) => heightLevel(fields.elevation(p.x, p.y));
+  const isDry = (p: Point) => level(p) > SEA_LEVEL;
   const biomeAt = (p: Point) => biomeOf(fields.climate(p.x, p.y));
   const cellOf = (p: Point): Cell => ({
     cx: floorDiv(p.x, MACRO_SIZE),
@@ -235,16 +236,15 @@ export const createWorldgen = (seed: number): Worldgen => {
   const campAt = (cx: number, cy: number) => campAtCell({ cx, cy });
 
   const routeRoad = (from: Camp, to: Camp) =>
-    route(
-      level,
-      from,
-      to,
-      (grade, at) => {
+    route(from, to, {
+      gradeLevel: level,
+      isOpen: isDry,
+      unitCost: (grade, at) => {
         const wobble = 0.6 * (1 + roadNoise(at.x / ROAD_WOBBLE_SCALE, at.y / ROAD_WOBBLE_SCALE));
         return 1 + wobble + climbCost(grade);
       },
-      ROAD_TYPICAL_COST,
-    );
+      typicalUnitCost: ROAD_TYPICAL_COST,
+    });
 
   const roadsFromCell = memoize(
     (cell: Cell): Road[] => {
@@ -307,7 +307,12 @@ export const createWorldgen = (seed: number): Worldgen => {
             .sort((a, b) => distance(head, a) - distance(head, b))
             .slice(0, count)
             .flatMap((target) => {
-              const nodes = route(trailLevel, head, target, unitCost, TRAIL_TYPICAL_COST);
+              const nodes = route(head, target, {
+                gradeLevel: trailLevel,
+                isOpen: isDry,
+                unitCost,
+                typicalUnitCost: TRAIL_TYPICAL_COST,
+              });
               nodes?.forEach((node) => walked.add(pointKey(node)));
               return nodes ? [{ nodes }] : [];
             });

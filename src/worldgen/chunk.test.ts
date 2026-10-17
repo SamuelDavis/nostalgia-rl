@@ -144,4 +144,21 @@ describe("generateChunk", () => {
         }
     }
   });
+
+  it("keeps roads and trails off the sea", () => {
+    const world = createWorldgen(1);
+    for (const [cx, cy] of [
+      [-23, -42],
+      [-24, -42],
+      [-23, -43],
+      [0, 0],
+    ] as const) {
+      const chunk = generateChunk(world, cx, cy);
+      chunk.way.forEach((way, i) => {
+        const x = cx * CHUNK_SIZE + (i % CHUNK_SIZE) + 0.5;
+        const y = cy * CHUNK_SIZE + Math.floor(i / CHUNK_SIZE) + 0.5;
+        if (heightLevel(world.fields.elevation(x, y)) < SEA_LEVEL) expect(way, `way at ${x},${y}`).toBe(Way.None);
+      });
+    }
+  });
 });

@@ -166,7 +166,8 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
       let tileGround = groundFor(tileBiome, level, temperature + frostEdge(x / 7, y / 7) * 0.035);
       let tileFeature: Feature = Feature.None;
 
-      if (level < SEA_LEVEL) {
+      const isSea = level < SEA_LEVEL;
+      if (isSea) {
         tileWater = level < SEA_LEVEL - 1 ? Water.Deep : Water.Shallow;
         level = SEA_LEVEL - 1;
       }
@@ -194,7 +195,7 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
         channels.some(({ a, b }) => projectOntoSegment(center, a, b).distance - b.halfWidth <= 1.5);
 
       const wayDistance = (way: WaySegment) => projectOntoSegment(center, way.a, way.b).distance;
-      const way = waySegments.find((w) => wayDistance(w) <= w.halfWidth);
+      const way = isSea ? undefined : waySegments.find((w) => wayDistance(w) <= w.halfWidth);
       const nearWay = waySegments.some((w) => wayDistance(w) <= w.halfWidth + w.clearance);
       const inGlade = glades.some((glade) => distance(center, glade) <= glade.radius);
 

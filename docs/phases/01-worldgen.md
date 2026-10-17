@@ -26,6 +26,13 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 
 _Record user feedback verbatim, newest first, with the commit it refers to._
 
+### 25f0920: spline terrain
+
+> It's looking really good so far.
+> `?seed=1&x=-735&y=-1337` is interesting: a path goes across a beach and cuts into the water, creating bridge tiles. That doesn't really make sense. Maybe that needs to be fixed with the generator, perhaps it can just be fixed visually (in the sense of forest paths which appear broken but aren't)
+
+Fixed in the generator: routes tested dryness on pre-ledge height and only at nodes, and paving bridged any water. Routes now check real height at nodes and step midpoints, and ways are never laid on sea.
+
 ### 1f1f12c: ledges, trails, glades
 
 > - In general, I really like it.
