@@ -35,6 +35,13 @@ The bounded area a feature may change, never larger than its type's maximum.
 The band at a footprint's edge where a feature blends into the terrain.
 _Avoid_: threshold, border
 
+**Floor**:
+One vertical layer of a feature, at the same world coordinates as the feature's other floors.
+_Avoid_: level, z-level, storey, layer
+
+**Cover**:
+What a feature shows from outside, such as a roof, parapets, a canopy or a mineshaft head, hiding its interior until a player is inside.
+
 **Opening**:
 A place where a feature's enclosed parts meet the world, such as a cave mouth or a door.
 _Avoid_: entrance, portal
