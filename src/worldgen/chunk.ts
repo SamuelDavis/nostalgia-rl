@@ -1,10 +1,10 @@
 import { Cover, Prop, Ground, Water, Way } from "./terrain";
-import { type Point, distance, floorDiv, hash, hashString, projectOntoSegment, unit } from "../lib";
+import { type Point, distance, hash, hashString, projectOntoSegment, unit } from "../lib";
 import { BIOMES, biomeOf } from "./biome";
 import { type TileDraft, paintInOrder } from "./features/feature";
-import { CHUNK_SIZE, REGION_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
+import { CHUNK_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
 import type { RiverNode } from "./rivers";
-import { overlaps } from "./region";
+import { overlaps, regionOf } from "./region";
 import type { Worldgen } from "./world";
 
 export interface Chunk {
@@ -54,10 +54,7 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
   const { seed, fields } = world;
   const originX = cx * CHUNK_SIZE;
   const originY = cy * CHUNK_SIZE;
-  const region = {
-    cx: floorDiv(originX, REGION_SIZE),
-    cy: floorDiv(originY, REGION_SIZE),
-  };
+  const region = regionOf({ x: originX, y: originY });
   const reach = 8;
   const near = (p: Point, margin: number) =>
     p.x >= originX - margin &&
@@ -67,7 +64,7 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
   const segmentNear = (a: Point, b: Point, margin: number) =>
     near({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, margin + distance(a, b) / 2);
 
-  const rivers = world.riversNear(region.cx, region.cy);
+  const rivers = world.riversNear(region);
   const channels: Channel[] = rivers.flatMap((river) =>
     river.nodes.flatMap((a, i) => {
       const b = river.nodes[i + 1];
@@ -90,12 +87,12 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
       }),
     );
   const waySegments = [
-    ...segmentsOf(world.roadsNear(region.cx, region.cy), Way.Road, ROAD_HALF_WIDTH, ROAD_CLEARANCE),
-    ...segmentsOf(world.trailsNear(region.cx, region.cy), Way.Path, TRAIL_HALF_WIDTH, TRAIL_CLEARANCE),
+    ...segmentsOf(world.roadsNear(region), Way.Road, ROAD_HALF_WIDTH, ROAD_CLEARANCE),
+    ...segmentsOf(world.trailsNear(region), Way.Path, TRAIL_HALF_WIDTH, TRAIL_CLEARANCE),
   ];
-  const glades = world.gladesNear(region.cx, region.cy).filter((glade) => near(glade, glade.radius));
+  const glades = world.gladesNear(region).filter((glade) => near(glade, glade.radius));
   const features = world
-    .featuresNear(region.cx, region.cy)
+    .featuresNear(region)
     .filter(({ bounds }) =>
       overlaps(bounds, { minX: originX, minY: originY, maxX: originX + CHUNK_SIZE, maxY: originY + CHUNK_SIZE }),
     );

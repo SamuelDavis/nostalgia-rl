@@ -1,17 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { SEA_LEVEL, heightLevel } from "./constants";
 import { createFields } from "./fields";
+import { regionsAround } from "./region";
 import { traceRiver } from "./rivers";
 
 const seeds = [1, 2, 3];
-const regions = Array.from({ length: 81 }, (_, i) => ({
-  cx: (i % 9) - 4,
-  cy: Math.floor(i / 9) - 4,
-}));
+const regions = regionsAround({ rx: 0, ry: 0 }, 4);
 
 const riversFor = (seed: number) => {
   const fields = createFields(seed);
-  return regions.flatMap(({ cx, cy }) => traceRiver(seed, fields, cx, cy) ?? []);
+  return regions.flatMap((region) => traceRiver(seed, fields, region) ?? []);
 };
 
 describe("traceRiver", () => {
@@ -21,8 +19,8 @@ describe("traceRiver", () => {
 
   it("is deterministic", () => {
     const fields = createFields(1);
-    const a = regions.map(({ cx, cy }) => traceRiver(1, fields, cx, cy));
-    const b = regions.map(({ cx, cy }) => traceRiver(1, createFields(1), cx, cy));
+    const a = regions.map((region) => traceRiver(1, fields, region));
+    const b = regions.map((region) => traceRiver(1, createFields(1), region));
     expect(a).toEqual(b);
   });
 

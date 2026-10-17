@@ -8,6 +8,8 @@ import {
   type Bounds,
   biomeOf,
   heightLevel,
+  regionOf,
+  regionsAround,
 } from "../worldgen";
 import {
   type HeightMode,
@@ -71,28 +73,26 @@ const squareAround = (radius: number): Point[] =>
 
 export const markPixels = ({ radius }: Mark): Point[] => squareAround(radius);
 
-const regionsWithin = (world: Worldgen, center: Point, radius: number) => {
-  const middle = world.regionOf(center);
-  return squareAround(Math.ceil(radius / REGION_SIZE)).map((o) => ({ cx: middle.cx + o.x, cy: middle.cy + o.y }));
-};
+const regionsWithin = (center: Point, radius: number) =>
+  regionsAround(regionOf(center), Math.ceil(radius / REGION_SIZE));
 
 const lineMarks = (lines: readonly { readonly nodes: readonly Point[] }[], color: Rgb): Mark[] =>
   lines.flatMap(({ nodes }) => nodes.map((point) => ({ point, color, radius: 0 })));
 
 export const overviewFeatureMarks = (world: Worldgen, center: Point, radius: number): Mark[] =>
-  regionsWithin(world, center, radius).flatMap(({ cx, cy }) => {
-    const camp = world.campAt(cx, cy);
+  regionsWithin(center, radius).flatMap((region) => {
+    const camp = world.campAt(region);
     return [
-      ...world.deepForestsIn(cx, cy).flatMap(({ layout }) => featureMarks(layout.glade, GLADE_MARK)),
+      ...world.deepForestsIn(region).flatMap(({ layout }) => featureMarks(layout.glade, GLADE_MARK)),
       ...(camp ? featureMarks(camp, CAMP_MARK) : []),
     ];
   });
 
 export const overviewMarks = (world: Worldgen, center: Point, radius: number): Mark[] => [
-  ...regionsWithin(world, center, radius).flatMap(({ cx, cy }) => [
-    ...lineMarks(world.riversNear(cx, cy), RIVER_MARK),
-    ...lineMarks(world.trailsNear(cx, cy), TRAIL_MARK),
-    ...lineMarks(world.roadsFrom(cx, cy), ROAD_MARK),
+  ...regionsWithin(center, radius).flatMap((region) => [
+    ...lineMarks(world.riversNear(region), RIVER_MARK),
+    ...lineMarks(world.trailsNear(region), TRAIL_MARK),
+    ...lineMarks(world.roadsFrom(region), ROAD_MARK),
   ]),
   ...overviewFeatureMarks(world, center, radius),
 ];
@@ -101,7 +101,7 @@ const isWithin = (p: Point, { minX, minY, maxX, maxY }: Bounds) =>
   p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY;
 
 export const createOverviewTint = (world: Worldgen, center: Point, radius: number) => {
-  const forests = regionsWithin(world, center, radius).flatMap(({ cx, cy }) => world.deepForestsIn(cx, cy));
+  const forests = regionsWithin(center, radius).flatMap(world.deepForestsIn);
   return (color: Rgb, p: Point): Rgb =>
     forests.some(({ bounds, layout }) => isWithin(p, bounds) && layout.contains(p))
       ? mix(color, DEEP_FOREST_AREA, DEEP_FOREST_TINT)

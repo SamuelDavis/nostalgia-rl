@@ -107,18 +107,18 @@ export const createCamps = ({ seed, level, biomeAt, riversNear }: CampSiting) =>
   const spawnRegion = regionOf(spawn);
 
   const at = memoize(
-    ({ cx, cy }: Region): Camp | undefined => {
-      if (cx === spawnRegion.cx && cy === spawnRegion.cy) return spawn;
-      const nearSpawn = Math.abs(cx - spawnRegion.cx) <= 1 && Math.abs(cy - spawnRegion.cy) <= 1;
-      if (!nearSpawn && unit(hash(seed, SALT, cx, cy)) > CAMP_CHANCE) return undefined;
+    ({ rx, ry }: Region): Camp | undefined => {
+      if (rx === spawnRegion.rx && ry === spawnRegion.ry) return spawn;
+      const nearSpawn = Math.abs(rx - spawnRegion.rx) <= 1 && Math.abs(ry - spawnRegion.ry) <= 1;
+      if (!nearSpawn && unit(hash(seed, SALT, rx, ry)) > CAMP_CHANCE) return undefined;
       for (let attempt = 0; attempt < CAMP_ATTEMPTS; attempt++) {
         const p = {
           x:
-            cx * REGION_SIZE + intBetween(CAMP_MARGIN, REGION_SIZE - CAMP_MARGIN, hash(seed, SALT, cx, cy, attempt, 1)),
+            rx * REGION_SIZE + intBetween(CAMP_MARGIN, REGION_SIZE - CAMP_MARGIN, hash(seed, SALT, rx, ry, attempt, 1)),
           y:
-            cy * REGION_SIZE + intBetween(CAMP_MARGIN, REGION_SIZE - CAMP_MARGIN, hash(seed, SALT, cx, cy, attempt, 2)),
+            ry * REGION_SIZE + intBetween(CAMP_MARGIN, REGION_SIZE - CAMP_MARGIN, hash(seed, SALT, rx, ry, attempt, 2)),
         };
-        if (distance(p, spawn) > CAMP_SPACING && isSite(p)) return { ...p, id: hash(seed, SALT, cx, cy) };
+        if (distance(p, spawn) > CAMP_SPACING && isSite(p)) return { ...p, id: hash(seed, SALT, rx, ry) };
       }
       return undefined;
     },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type Point, projectOntoSegment, memoize } from "../lib";
-import { type Trail, Way, createWorldgen, findPeak } from "../worldgen";
+import { type Trail, Way, createWorldgen, findPeak, regionsAround } from "../worldgen";
 import { blockerBetween } from "./movement";
 import { type Terrain, createTerrain } from "./terrain";
 
@@ -14,6 +14,7 @@ const NEIGHBOURS: readonly Point[] = [
 ];
 
 const CORRIDOR = 3;
+const ORIGIN = { rx: 0, ry: 0 };
 
 const tileOf = (p: Point): Point => ({ x: Math.floor(p.x), y: Math.floor(p.y) });
 
@@ -46,11 +47,10 @@ const walksAlong = (terrain: Terrain, trail: Trail): boolean => {
 
 describe("trails", () => {
   it("lead walkers to their far end, over ledges by stairs and rivers by bridge", { tags: "slow" }, () => {
-    const regions = Array.from({ length: 9 }, (_, i) => ({ cx: (i % 3) - 1, cy: Math.floor(i / 3) - 1 }));
-    const mountainRegion = Array.from({ length: 289 }, (_, i) => ({
-      cx: (i % 17) - 8,
-      cy: Math.floor(i / 17) - 8,
-    })).find(({ cx, cy }) => findPeak(worldOf(1).fields, cx, cy) !== undefined)!;
+    const regions = regionsAround(ORIGIN, 1);
+    const mountainRegion = regionsAround(ORIGIN, 8).find(
+      (region) => findPeak(worldOf(1).fields, region) !== undefined,
+    )!;
     const cases = [
       ...[1, 2, 3].flatMap((seed) => regions.map((region) => ({ seed, region }))),
       { seed: 1, region: mountainRegion },
@@ -59,7 +59,7 @@ describe("trails", () => {
     for (const { seed, region } of cases) {
       const world = worldOf(seed);
       const terrain = createTerrain(world);
-      for (const trail of world.trailsNear(region.cx, region.cy)) {
+      for (const trail of world.trailsNear(region)) {
         const { x, y } = tileOf(trail.nodes[0]!);
         expect(walksAlong(terrain, trail), `seed ${seed}, trail from ${x},${y}`).toBe(true);
         walked++;

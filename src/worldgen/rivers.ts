@@ -1,6 +1,7 @@
 import { type Point, distance, projectOntoSegment, createNoise, hash, hashString, intBetween, unit } from "../lib";
 import { REGION_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
 import type { Fields } from "./fields";
+import type { Region } from "./region";
 
 export interface RiverNode extends Point {
   readonly level: number;
@@ -52,16 +53,17 @@ const downhill = ({ drainage }: Fields, p: Point): Point =>
     drainage(p.x, p.y - GRADIENT_SPAN) - drainage(p.x, p.y + GRADIENT_SPAN),
   );
 
-const sourceOf = (seed: number, cx: number, cy: number): Point | undefined => {
-  if (unit(hash(seed, SALT, cx, cy)) > SOURCE_CHANCE) return undefined;
+const sourceOf = (seed: number, { rx, ry }: Region): Point | undefined => {
+  if (unit(hash(seed, SALT, rx, ry)) > SOURCE_CHANCE) return undefined;
   return {
-    x: cx * REGION_SIZE + intBetween(MARGIN, REGION_SIZE - MARGIN, hash(seed, SALT, cx, cy, 1)),
-    y: cy * REGION_SIZE + intBetween(MARGIN, REGION_SIZE - MARGIN, hash(seed, SALT, cx, cy, 2)),
+    x: rx * REGION_SIZE + intBetween(MARGIN, REGION_SIZE - MARGIN, hash(seed, SALT, rx, ry, 1)),
+    y: ry * REGION_SIZE + intBetween(MARGIN, REGION_SIZE - MARGIN, hash(seed, SALT, rx, ry, 2)),
   };
 };
 
-export const traceRiver = (seed: number, fields: Fields, cx: number, cy: number): River | undefined => {
-  const source = sourceOf(seed, cx, cy);
+export const traceRiver = (seed: number, fields: Fields, region: Region): River | undefined => {
+  const { rx, ry } = region;
+  const source = sourceOf(seed, region);
   if (!source) return undefined;
   const sourceLevel = heightLevel(fields.elevation(source.x, source.y));
   if (sourceLevel < MIN_SOURCE_LEVEL) return undefined;
@@ -111,7 +113,7 @@ export const traceRiver = (seed: number, fields: Fields, cx: number, cy: number)
       x: mouth.x,
       y: mouth.y,
       level: mouth.level,
-      radius: intBetween(5, 12, hash(seed, SALT, cx, cy, 3)),
+      radius: intBetween(5, 12, hash(seed, SALT, rx, ry, 3)),
     },
   };
 };

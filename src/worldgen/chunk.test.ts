@@ -3,7 +3,10 @@ import { distance, floorDiv, hash, memoize } from "../lib";
 import { describe, expect, it } from "vitest";
 import { type Chunk, generateChunk, tileIndex } from "./chunk";
 import { CHUNK_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
+import { regionOf, regionsAround } from "./region";
 import { createWorldgen } from "./world";
+
+const ORIGIN = { rx: 0, ry: 0 };
 
 const worldOf = memoize(createWorldgen, String, 8);
 
@@ -87,9 +90,9 @@ describe("generateChunk", () => {
   it("carves rivers as water", () => {
     const world = worldOf(1);
     const rivers =
-      Array.from({ length: 49 }, (_, i) => world.riversNear((i % 7) - 3, Math.floor(i / 7) - 3)).find(
-        (found) => found.length > 0,
-      ) ?? [];
+      regionsAround(ORIGIN, 3)
+        .map(world.riversNear)
+        .find((found) => found.length > 0) ?? [];
     expect(rivers.length).toBeGreaterThan(0);
     for (const river of rivers)
       for (const node of river.nodes.slice(0, -1)) {
@@ -100,8 +103,7 @@ describe("generateChunk", () => {
 
   it("paves roads and bridges rivers", () => {
     const world = worldOf(1);
-    const { cx, cy } = world.regionOf(world.spawn);
-    const roads = world.roadsNear(cx, cy);
+    const roads = world.roadsNear(regionOf(world.spawn));
     expect(roads.length).toBeGreaterThan(0);
     for (const road of roads)
       for (const node of road.nodes) {
@@ -127,7 +129,7 @@ describe("generateChunk", () => {
 
   it("settles camps without carving cliffs", () => {
     const world = worldOf(1);
-    const camps = Array.from({ length: 25 }, (_, i) => world.campAt((i % 5) - 2, Math.floor(i / 5) - 2));
+    const camps = regionsAround(ORIGIN, 2).map(world.campAt);
     for (const camp of camps.filter((c) => c !== undefined))
       for (let y = camp.y - 14; y <= camp.y + 14; y++)
         for (let x = camp.x - 14; x <= camp.x + 14; x++)
@@ -137,27 +139,25 @@ describe("generateChunk", () => {
   it("settles each camp at the median level of the ground around it", () => {
     const world = worldOf(1);
     const natural = (x: number, y: number) => heightLevel(world.fields.elevation(x + 0.5, y + 0.5));
-    for (let cy = -3; cy <= 3; cy++)
-      for (let cx = -3; cx <= 3; cx++) {
-        const camp = world.campAt(cx, cy);
-        if (!camp) continue;
-        const ring = Array.from({ length: 16 }, (_, i) => {
-          const angle = (i / 16) * 2 * Math.PI;
-          return natural(Math.round(camp.x + 13 * Math.cos(angle)), Math.round(camp.y + 13 * Math.sin(angle)));
-        }).sort((a, b) => a - b);
-        const median = ring[8]!;
-        expect(
-          Math.abs(heightAt(world, camp.x, camp.y).height - median),
-          `camp at ${camp.x},${camp.y}`,
-        ).toBeLessThanOrEqual(1);
-      }
+    for (const region of regionsAround(ORIGIN, 3)) {
+      const camp = world.campAt(region);
+      if (!camp) continue;
+      const ring = Array.from({ length: 16 }, (_, i) => {
+        const angle = (i / 16) * 2 * Math.PI;
+        return natural(Math.round(camp.x + 13 * Math.cos(angle)), Math.round(camp.y + 13 * Math.sin(angle)));
+      }).sort((a, b) => a - b);
+      const median = ring[8]!;
+      expect(
+        Math.abs(heightAt(world, camp.x, camp.y).height - median),
+        `camp at ${camp.x},${camp.y}`,
+      ).toBeLessThanOrEqual(1);
+    }
   });
 
   it("carves rivers without cliffs", () => {
     for (const seed of [1, 2, 3]) {
       const world = worldOf(seed);
-      const { cx, cy } = world.regionOf(world.spawn);
-      for (const river of world.riversNear(cx, cy))
+      for (const river of world.riversNear(regionOf(world.spawn)))
         for (const node of river.nodes.slice(1, -1)) {
           const x = Math.floor(node.x);
           for (let y = Math.floor(node.y) - 6; y <= Math.floor(node.y) + 6; y++) expectNoCarvedCliff(world, x, y);

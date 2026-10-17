@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type Point, distance } from "../lib";
-import { Cover, type DeepForestLayout, Water, Way, createWorldgen } from "../worldgen";
+import { Cover, type DeepForestLayout, Water, Way, createWorldgen, regionOf, regionsAround } from "../worldgen";
 import { blockerBetween } from "./movement";
 import { createTerrain } from "./terrain";
 
@@ -13,15 +13,15 @@ const NEIGHBOURS: readonly Point[] = [
 
 const world = createWorldgen(1);
 const terrain = createTerrain(world);
-const forests = Array.from({ length: 169 }, (_, i) => world.deepForestsIn((i % 13) - 6, Math.floor(i / 13) - 6)).flat();
+const forests = regionsAround({ rx: 0, ry: 0 }, 6).flatMap(world.deepForestsIn);
 
 const key = (p: Point) => `${p.x},${p.y}`;
 const centre = (p: Point) => ({ x: p.x + 0.5, y: p.y + 0.5 });
 const tileOf = (p: Point): Point => ({ x: Math.floor(p.x), y: Math.floor(p.y) });
 
 const regionDistance = (a: { anchor: Point }, b: { anchor: Point }) => {
-  const [ra, rb] = [world.regionOf(a.anchor), world.regionOf(b.anchor)];
-  return Math.abs(ra.cx - rb.cx) + Math.abs(ra.cy - rb.cy);
+  const [ra, rb] = [regionOf(a.anchor), regionOf(b.anchor)];
+  return Math.abs(ra.rx - rb.rx) + Math.abs(ra.ry - rb.ry);
 };
 
 const reachable = (start: Point, layouts: readonly DeepForestLayout[]): Set<string> => {

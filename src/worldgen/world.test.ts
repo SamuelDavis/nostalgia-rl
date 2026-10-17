@@ -1,15 +1,14 @@
 import { distance, memoize } from "../lib";
 import { describe, expect, it } from "vitest";
 import { SEA_LEVEL, heightLevel } from "./constants";
+import { regionOf, regionsAround } from "./region";
 import { createWorldgen } from "./world";
 
 const worldOf = memoize(createWorldgen, String, 8);
 
 const seeds = [1, 2, 3, 4, 5];
-const regions = Array.from({ length: 25 }, (_, i) => ({
-  cx: (i % 5) - 2,
-  cy: Math.floor(i / 5) - 2,
-}));
+const ORIGIN = { rx: 0, ry: 0 };
+const regions = regionsAround(ORIGIN, 2);
 
 describe("createWorldgen", () => {
   it("places a flat, dry world spawn near the origin", () => {
@@ -24,16 +23,16 @@ describe("createWorldgen", () => {
   it("puts the world spawn camp in its macro region", () => {
     for (const seed of seeds) {
       const world = worldOf(seed);
-      const { cx, cy } = world.regionOf(world.spawn);
-      expect(world.campAt(cx, cy)).toMatchObject(world.spawn);
+      expect(world.campAt(regionOf(world.spawn))).toMatchObject(world.spawn);
     }
   });
 
   it("links the world spawn by road", () => {
     for (const seed of seeds) {
       const world = worldOf(seed);
-      const { cx, cy } = world.regionOf(world.spawn);
-      const roads = world.roadsNear(cx, cy).filter((r) => r.from === world.spawn || r.to === world.spawn);
+      const roads = world
+        .roadsNear(regionOf(world.spawn))
+        .filter((r) => r.from === world.spawn || r.to === world.spawn);
       expect(roads.length).toBeGreaterThan(0);
     }
   });
@@ -41,7 +40,7 @@ describe("createWorldgen", () => {
   it("connects roads between camps over land", () => {
     for (const seed of seeds) {
       const world = worldOf(seed);
-      const roads = regions.flatMap(({ cx, cy }) => world.roadsFrom(cx, cy));
+      const roads = regions.flatMap(world.roadsFrom);
       expect(roads.length).toBeGreaterThan(0);
       for (const road of roads) {
         expect(distance(road.nodes[0]!, road.from)).toBeLessThan(4);
@@ -56,7 +55,7 @@ describe("createWorldgen", () => {
     const a = createWorldgen(9);
     const b = createWorldgen(9);
     expect(a.spawn).toEqual(b.spawn);
-    expect(a.campAt(1, 1)).toEqual(b.campAt(1, 1));
-    expect(a.roadsFrom(0, 0)).toEqual(b.roadsFrom(0, 0));
+    expect(a.campAt({ rx: 1, ry: 1 })).toEqual(b.campAt({ rx: 1, ry: 1 }));
+    expect(a.roadsFrom(ORIGIN)).toEqual(b.roadsFrom(ORIGIN));
   });
 });

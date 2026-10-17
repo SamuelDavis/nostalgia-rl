@@ -2,7 +2,17 @@ import { floorDiv } from "../lib";
 import { Direction, isSwimming } from "../game/movement";
 import type { Session } from "../game/session";
 import type { Tile } from "../game/terrain";
-import { Biome, CHUNK_SIZE, METRES_PER_LEVEL, Prop, Ground, SEA_LEVEL, Water, type Worldgen } from "../worldgen";
+import {
+  Biome,
+  CHUNK_SIZE,
+  METRES_PER_LEVEL,
+  Prop,
+  Ground,
+  SEA_LEVEL,
+  Water,
+  type Worldgen,
+  regionOf,
+} from "../worldgen";
 import type { HeightMode } from "./palette";
 
 export interface HudState {
@@ -46,13 +56,13 @@ export const createHud = (parent: HTMLElement, world: Worldgen) => {
     const { x, y } = session.position;
     const { elevation, temperature, moisture, drainage, landform } = world.fields;
     const form = landform(x + 0.5, y + 0.5);
-    const region = world.regionOf({ x, y });
+    const region = regionOf({ x, y });
     const rows: [string, string][] = [
       ["seed", String(world.seed)],
       ["turn", `${turn} @ ${turnMs} ms`],
       ["position", `${x}, ${y}`],
       ["chunk", `${floorDiv(x, CHUNK_SIZE)}, ${floorDiv(y, CHUNK_SIZE)}`],
-      ["region", `${region.cx}, ${region.cy}`],
+      ["region", `${region.rx}, ${region.ry}`],
       ["facing", nameOf(Direction, facing)],
       ["tap", tapTurnsFirst ? "turns, then steps" : "steps"],
       ["blocked", blocked ?? "—"],

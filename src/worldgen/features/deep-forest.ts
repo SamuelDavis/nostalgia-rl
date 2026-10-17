@@ -122,9 +122,9 @@ const cellIndex = (col: number, row: number) => row * CELLS_PER_SIDE + col;
 
 const isCellOnGrid = (col: number, row: number) => col >= 0 && col < CELLS_PER_SIDE && row >= 0 && row < CELLS_PER_SIDE;
 
-const cellTile = ({ cx, cy }: Region, index: number): Point => ({
-  x: cx * REGION_SIZE + (index % CELLS_PER_SIDE) * CELL + CELL / 2,
-  y: cy * REGION_SIZE + Math.floor(index / CELLS_PER_SIDE) * CELL + CELL / 2,
+const cellTile = ({ rx, ry }: Region, index: number): Point => ({
+  x: rx * REGION_SIZE + (index % CELLS_PER_SIDE) * CELL + CELL / 2,
+  y: ry * REGION_SIZE + Math.floor(index / CELLS_PER_SIDE) * CELL + CELL / 2,
 });
 
 const tileCentre = (p: Point): Point => ({ x: Math.floor(p.x) + 0.5, y: Math.floor(p.y) + 0.5 });
@@ -260,7 +260,7 @@ export const createDeepForests = ({ seed, level, forestness, campAt, waysNear }:
         const heart = heartOf(cells);
         return {
           ...cellTile(region, heart),
-          id: hash(seed, SALT, region.cx, region.cy, heart),
+          id: hash(seed, SALT, region.rx, region.ry, heart),
           region,
           cells,
           footprintCells: new Set([...cells, ...ring]),
@@ -273,8 +273,8 @@ export const createDeepForests = ({ seed, level, forestness, campAt, waysNear }:
   );
 
   const isInFootprint = (forest: DeepForest, p: Point) => {
-    const col = Math.floor((p.x - forest.region.cx * REGION_SIZE) / CELL);
-    const row = Math.floor((p.y - forest.region.cy * REGION_SIZE) / CELL);
+    const col = Math.floor((p.x - forest.region.rx * REGION_SIZE) / CELL);
+    const row = Math.floor((p.y - forest.region.ry * REGION_SIZE) / CELL);
     return isCellOnGrid(col, row) && forest.footprintCells.has(cellIndex(col, row)) && !isInCamp(forest, p);
   };
 
@@ -285,7 +285,7 @@ export const createDeepForests = ({ seed, level, forestness, campAt, waysNear }:
 
   const linksOf = (forest: DeepForest): Link[] =>
     NEIGHBOURS.flatMap((o) =>
-      partsIn({ cx: forest.region.cx + o.x, cy: forest.region.cy + o.y }).flatMap((other) => {
+      partsIn({ rx: forest.region.rx + o.x, ry: forest.region.ry + o.y }).flatMap((other) => {
         const step = o.x + o.y;
         const edge = (part: DeepForest, k: number, side: number) => {
           const last = CELLS_PER_SIDE - 1;
