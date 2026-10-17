@@ -36,16 +36,16 @@ describe("createGlide", () => {
 });
 
 describe("facingAngle", () => {
-  it("rotates clockwise from the glyph's natural westward facing", () => {
-    expect(facingAngle(Direction.West)).toBe(0);
-    expect(facingAngle(Direction.North)).toBe(Math.PI / 2);
-    expect(facingAngle(Direction.East)).toBe(Math.PI);
+  it("rotates clockwise from the glyph's natural eastward facing", () => {
+    expect(facingAngle(Direction.East)).toBe(0);
+    expect(facingAngle(Direction.South)).toBe(Math.PI / 2);
+    expect(facingAngle(Direction.West)).toBe(Math.PI);
   });
 });
 
 describe("turnToward", () => {
   it("turns part of the way, the short way round", () => {
-    const turned = turnToward(0, facingAngle(Direction.South), 30, 100);
+    const turned = turnToward(0, facingAngle(Direction.North), 30, 100);
     expect(turned).toBeLessThan(0);
     expect(turned).toBeGreaterThan(-Math.PI / 2);
   });

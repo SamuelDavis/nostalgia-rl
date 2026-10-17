@@ -60,8 +60,8 @@ Peers will generate terrain independently, so results must be bit-identical acro
 - `--seed N`: the world seed.
 - `--x X --y Y`: the centre, in tiles.
 - `--size PX`: the image size in pixels.
-- `--scale S`: tiles per pixel. The default biome layer samples the fields directly and overlays rivers, roads, and camps; it's good for overviews at scale 4–32.
-- `--layer tiles`: renders real chunk output (ground, water, props, ways), and needs `--scale 1`.
+- `--scale S`: tiles per pixel. The default biome layer samples the fields directly and overlays rivers, roads, trails and features (deep forests tinted, camps and glades marked); it's good for overviews at scale 4–32.
+- `--layer tiles`: renders real chunk output (ground, water, props, ways, canopy shaded) with features marked, and needs `--scale 1`.
 - `--height shade|tint`: height rendering, as in the game's height modes (`src/view/palette.ts`).
 
 All tuning constants sit at the top of each source file.

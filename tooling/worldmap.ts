@@ -2,6 +2,8 @@ import { parseArgs } from "node:util";
 import { floorDiv, memoize } from "../src/lib";
 import {
   CHUNK_SIZE,
+  type Chunk,
+  Cover,
   Prop,
   Ground,
   Water,
@@ -11,7 +13,14 @@ import {
   heightLevel,
   tileIndex,
 } from "../src/worldgen";
-import { fieldColor, overviewMarks } from "../src/view/overview";
+import {
+  type Mark,
+  createOverviewTint,
+  fieldColor,
+  markPixels,
+  overviewFeatureMarks,
+  overviewMarks,
+} from "../src/view/overview";
 import {
   HEIGHT_MODES,
   type HeightMode,
@@ -19,6 +28,7 @@ import {
   hillshade,
   propColor,
   groundColor,
+  shade,
   surfaceColor,
   waterColor,
   wayColor,
@@ -57,17 +67,23 @@ const generatedChunk = memoize(
   ({ cx, cy }) => `${cx},${cy}`,
   CHUNK_CACHE,
 );
-const chunkAt = (x: number, y: number) =>
-  generatedChunk({ cx: floorDiv(x, CHUNK_SIZE), cy: floorDiv(y, CHUNK_SIZE) });
+const chunkAt = (x: number, y: number) => generatedChunk({ cx: floorDiv(x, CHUNK_SIZE), cy: floorDiv(y, CHUNK_SIZE) });
 
 const heightAt = (x: number, y: number) => {
   const chunk = chunkAt(x, y);
   return chunk.height[tileIndex(x - chunk.cx * CHUNK_SIZE, y - chunk.cy * CHUNK_SIZE)]!;
 };
 
+const CANOPY_SHADE = 0.55;
+
 const tileColor = (x: number, y: number): Rgb => {
   const chunk = chunkAt(x, y);
   const i = tileIndex(x - chunk.cx * CHUNK_SIZE, y - chunk.cy * CHUNK_SIZE);
+  const color = uncoveredColor(chunk, i, x, y);
+  return chunk.cover[i] === Cover.None ? color : shade(color, CANOPY_SHADE);
+};
+
+const uncoveredColor = (chunk: Chunk, i: number, x: number, y: number): Rgb => {
   const prop = chunk.prop[i] as Prop;
   const water = chunk.water[i] as Water;
   if (prop !== Prop.None) return propColor[prop];
@@ -79,23 +95,33 @@ const tileColor = (x: number, y: number): Rgb => {
   return surfaceColor(mode, groundColor[chunk.ground[i] as Ground], height, light);
 };
 
+const center = { x: centerX, y: centerY };
+const radius = (size * scale) / 2;
+const isTiles = values.layer === "tiles";
+const tint = createOverviewTint(world, center, radius);
+
 const overlay = new Map<string, Rgb>();
-if (values.layer !== "tiles")
-  for (const { point, color } of overviewMarks(world, { x: centerX, y: centerY }, (size * scale) / 2))
-    overlay.set(
-      `${Math.round((point.x - centerX) / scale + size / 2)},${Math.round((point.y - centerY) / scale + size / 2)}`,
-      color,
-    );
+const marks: Mark[] = isTiles ? overviewFeatureMarks(world, center, radius) : overviewMarks(world, center, radius);
+for (const mark of marks) {
+  const px = Math.round((mark.point.x - centerX) / scale + size / 2);
+  const py = Math.round((mark.point.y - centerY) / scale + size / 2);
+  for (const o of markPixels(mark)) overlay.set(`${px + o.x},${py + o.y}`, mark.color);
+}
 
 writePng(values.out!, size, size, (px, py) => {
   const { x, y } = worldAt(px, py);
-  return values.layer === "tiles"
-    ? tileColor(Math.floor(x), Math.floor(y))
-    : (overlay.get(`${px},${py}`) ??
-        fieldColor(mode, world.fields.conditions(x, y), {
-          westLevel: heightLevel(world.fields.elevation(x - scale, y)),
-          northLevel: heightLevel(world.fields.elevation(x, y - scale)),
-          spacing: scale,
-        }));
+  return (
+    overlay.get(`${px},${py}`) ??
+    (isTiles
+      ? tileColor(Math.floor(x), Math.floor(y))
+      : tint(
+          fieldColor(mode, world.fields.conditions(x, y), {
+            westLevel: heightLevel(world.fields.elevation(x - scale, y)),
+            northLevel: heightLevel(world.fields.elevation(x, y - scale)),
+            spacing: scale,
+          }),
+          { x, y },
+        ))
+  );
 });
 console.log(`wrote ${values.out}`);

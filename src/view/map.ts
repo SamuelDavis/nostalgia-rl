@@ -1,11 +1,12 @@
 import type { Point } from "../lib";
 import { type Worldgen, heightLevel } from "../worldgen";
-import { fieldColor, overviewMarks } from "./overview";
+import { createOverviewTint, fieldColor, overviewMarks } from "./overview";
 import { type HeightMode, css } from "./palette";
 
 const MAP_PX = 256;
 const TILES_PER_PX = 4;
 const ROWS_PER_FRAME = 16;
+const MAP_RADIUS = (MAP_PX * TILES_PER_PX) / 2;
 const PLAYER_MARK = "#ff3030";
 
 export const createMap = (parent: HTMLElement, world: Worldgen) => {
@@ -23,10 +24,10 @@ export const createMap = (parent: HTMLElement, world: Worldgen) => {
   });
 
   const drawMarks = (center: Point) => {
-    for (const { point, color } of overviewMarks(world, center, (MAP_PX * TILES_PER_PX) / 2)) {
+    for (const { point, color, radius } of overviewMarks(world, center, MAP_RADIUS)) {
       const { px, py } = toPixel(center, point);
       ctx.fillStyle = css(color);
-      ctx.fillRect(px, py, 1, 1);
+      ctx.fillRect(px - radius, py - radius, 2 * radius + 1, 2 * radius + 1);
     }
     ctx.fillStyle = PLAYER_MARK;
     ctx.fillRect(MAP_PX / 2 - 3, MAP_PX / 2 - 1, 7, 3);
@@ -35,6 +36,7 @@ export const createMap = (parent: HTMLElement, world: Worldgen) => {
 
   const draw = (center: Point, mode: HeightMode) => {
     const id = ++render;
+    const tint = createOverviewTint(world, center, MAP_RADIUS);
     const image = ctx.createImageData(MAP_PX, MAP_PX);
     let row = 0;
     let previous: number[] = [];
@@ -43,17 +45,21 @@ export const createMap = (parent: HTMLElement, world: Worldgen) => {
       for (const end = Math.min(MAP_PX, row + ROWS_PER_FRAME); row < end; row++) {
         const levels: number[] = [];
         for (let col = 0; col < MAP_PX; col++) {
-          const conditions = world.fields.conditions(
-            center.x + (col - MAP_PX / 2) * TILES_PER_PX,
-            center.y + (row - MAP_PX / 2) * TILES_PER_PX,
-          );
+          const at = {
+            x: center.x + (col - MAP_PX / 2) * TILES_PER_PX,
+            y: center.y + (row - MAP_PX / 2) * TILES_PER_PX,
+          };
+          const conditions = world.fields.conditions(at.x, at.y);
           const level = heightLevel(conditions.elevation);
           levels.push(level);
-          const [r, g, b] = fieldColor(mode, conditions, {
-            westLevel: levels[col - 1] ?? level,
-            northLevel: previous[col] ?? level,
-            spacing: TILES_PER_PX,
-          });
+          const [r, g, b] = tint(
+            fieldColor(mode, conditions, {
+              westLevel: levels[col - 1] ?? level,
+              northLevel: previous[col] ?? level,
+              spacing: TILES_PER_PX,
+            }),
+            at,
+          );
           image.data.set([r, g, b, 255], (row * MAP_PX + col) * 4);
         }
         previous = levels;

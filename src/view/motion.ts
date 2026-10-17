@@ -19,14 +19,14 @@ export const createGlide = (durationMs: number, start: Point) => {
   return { shownAt, moveTo };
 };
 
-const QUARTER_TURNS_FROM_WEST: Record<Direction, number> = {
-  [Direction.West]: 0,
-  [Direction.North]: 1,
-  [Direction.East]: 2,
-  [Direction.South]: 3,
+const QUARTER_TURNS_FROM_EAST: Record<Direction, number> = {
+  [Direction.East]: 0,
+  [Direction.South]: 1,
+  [Direction.West]: 2,
+  [Direction.North]: 3,
 };
 
-export const facingAngle = (facing: Direction): number => (QUARTER_TURNS_FROM_WEST[facing] * Math.PI) / 2;
+export const facingAngle = (facing: Direction): number => (QUARTER_TURNS_FROM_EAST[facing] * Math.PI) / 2;
 
 export const turnToward = (angle: number, target: number, elapsedMs: number, easingMs: number): number => {
   const shortest = mod(target - angle + Math.PI, 2 * Math.PI) - Math.PI;
