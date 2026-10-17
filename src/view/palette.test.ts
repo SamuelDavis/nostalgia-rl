@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contourBetween, hillshade, relativeHeightShade } from "./palette";
+import { contourBetween, hillshade, reliefTint } from "./palette";
 
 describe("hillshade", () => {
   it("leaves flat ground unchanged", () => {
@@ -31,20 +31,22 @@ describe("contourBetween", () => {
   });
 });
 
-describe("relativeHeightShade", () => {
-  const fromEye = relativeHeightShade(100);
+describe("reliefTint", () => {
+  const alpha = (rise: number) => reliefTint(rise)[3];
 
-  it("leaves ground at eye level unchanged", () => {
-    expect(fromEye(100)).toBe(1);
+  it("leaves ground at eye level untouched", () => {
+    expect(alpha(0)).toBe(0);
   });
 
   it("lightens ground above the eye and darkens ground below it", () => {
-    expect(fromEye(102)).toBeGreaterThan(1);
-    expect(fromEye(98)).toBeLessThan(1);
+    expect(reliefTint(4).slice(0, 3)).toEqual([255, 255, 255]);
+    expect(reliefTint(-4).slice(0, 3)).toEqual([0, 0, 0]);
   });
 
-  it("stops changing a few metres away from eye level", () => {
-    expect(fromEye(140)).toBe(fromEye(200));
-    expect(fromEye(60)).toBe(fromEye(0));
+  it("keeps telling ledges apart however far above or below they are", () => {
+    expect(alpha(16)).toBeGreaterThan(alpha(8));
+    expect(alpha(32)).toBeGreaterThan(alpha(16));
+    expect(alpha(-32)).toBeGreaterThan(alpha(-16));
+    expect(alpha(1000)).toBeLessThan(1);
   });
 });

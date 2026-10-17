@@ -8,6 +8,7 @@ import {
   approach,
   attentiveSpan,
   clearanceAhead,
+  createCamera,
   lookOffset,
   naturalSpan,
   openness,
@@ -171,5 +172,20 @@ describe("approach", () => {
     expect(short).toBeGreaterThan(0);
     expect(long).toBeGreaterThan(short);
     expect(long).toBeLessThan(10);
+  });
+});
+
+describe("createCamera", () => {
+  it("keeps the subject at the same place on screen while only the zoom changes", () => {
+    const camera = createCamera();
+    const screen = { width: 1000, height: 600 };
+    const subject = { position: { x: 10, y: 20 }, look: { x: 0.25, y: 0 } };
+    const onScreen = (span: number, elapsedMs: number) => {
+      const { centre, tilePx } = camera({ ...subject, span }, screen, elapsedMs);
+      return (subject.position.x + 0.5 - centre.x) * tilePx;
+    };
+    onScreen(14, 0);
+    const settled = onScreen(14, 5000);
+    for (let frame = 0; frame < 30; frame++) expect(onScreen(40, 16)).toBeCloseTo(settled);
   });
 });

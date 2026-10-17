@@ -17,9 +17,10 @@ import {
   type Contour,
   type HeightMode,
   type HeightShade,
+  UNSHADED,
   type Rgb,
   contourBetween,
-  relativeHeightShade,
+  reliefTint,
   coverColor,
   css,
   hillshade,
@@ -175,6 +176,7 @@ const drawSprite = (
 export interface Player {
   readonly position: Point;
   readonly shown: Point;
+  readonly eyeLevel: number;
 }
 
 interface TileWindow {
@@ -189,9 +191,9 @@ const drawTiles = (
   ctx: CanvasRenderingContext2D,
   source: Terrain,
   { left, top, columns, rows, cellPx }: TileWindow,
-  eye: Tile,
+  isInside: boolean,
   mode: HeightMode,
-): void => {
+): Float32Array => {
   const terrain = snapshot(
     source,
     left - SNAPSHOT_MARGIN,
@@ -203,21 +205,22 @@ const drawTiles = (
 
   setGlyphFont(ctx, cellPx);
 
-  const isInside = eye.cover !== Cover.None;
-  const heightShade = relativeHeightShade(eye.height);
   const isHidden = (tile: Tile) => !isInside && tile.cover !== Cover.None;
   const lightAt = createLighting(terrain, left, top, columns, rows);
   const lookAt = (tile: Tile, x: number, y: number): Look => {
     if (tile.cover !== Cover.None && !isInside) return coverLook(tile.cover, lightAt(x, y), x, y);
     if (isThreshold(terrain, x, y, tile)) return THRESHOLD;
-    const look = isCliffFace(terrain, x, y, tile) ? CLIFF_FACE : lookOf(tile, mode, lightAt(x, y), heightShade, x, y);
+    const look = isCliffFace(terrain, x, y, tile) ? CLIFF_FACE : lookOf(tile, mode, lightAt(x, y), UNSHADED, x, y);
     return tile.cover === Cover.None ? look : underCover(look);
   };
+  const reliefLevels = new Float32Array(columns * rows);
   for (let y = top; y < top + rows; y++)
     for (let x = left; x < left + columns; x++) {
       const { px, py } = screen(x, y);
       const tile = terrain(x, y);
       const look = lookAt(tile, x, y);
+      reliefLevels[(y - top) * columns + x - left] =
+        isHidden(tile) || tile.water !== Water.None ? Number.NaN : tile.height;
       ctx.fillStyle = css(look.background);
       ctx.fillRect(px, py, cellPx, cellPx);
       const stairs = !isHidden(tile) && hasStairs(terrain, x, y, tile);
@@ -272,15 +275,32 @@ const drawTiles = (
       }
     }
   ctx.stroke();
+  return reliefLevels;
 };
 
-const LAYER_SNAP = 8;
-const snapToLayer = (edge: number) => Math.floor(edge / LAYER_SNAP) * LAYER_SNAP;
+const LAYER_MARGIN = 8;
+const LAYER_RESOLUTIONS = [8, 11, 16, 23, 32, 45, 64, 91, 128];
 
 interface Drawn {
   readonly area: TileWindow;
   readonly key: string;
+  readonly reliefLevels: Float32Array;
 }
+
+const paintRelief = (
+  relief: CanvasRenderingContext2D,
+  { columns, rows }: TileWindow,
+  levels: Float32Array,
+  eyeLevel: number,
+) => {
+  const image = relief.createImageData(columns, rows);
+  levels.forEach((level, i) => {
+    if (Number.isNaN(level)) return;
+    const [r, g, b, a] = reliefTint(level - eyeLevel);
+    image.data.set([r, g, b, Math.round(a * 255)], i * 4);
+  });
+  relief.putImageData(image, 0, 0);
+};
 
 const covers = (area: TileWindow, left: number, top: number, columns: number, rows: number) =>
   area.left <= left &&
@@ -290,34 +310,50 @@ const covers = (area: TileWindow, left: number, top: number, columns: number, ro
 
 export const createViewport = (ctx: CanvasRenderingContext2D) => {
   const layer = document.createElement("canvas").getContext("2d")!;
+  const relief = document.createElement("canvas").getContext("2d")!;
   let drawn: Drawn | undefined;
+  let reliefPainted = "";
   return (terrain: Terrain, { centre, tilePx, restingTilePx }: View, player: Player, mode: HeightMode): void => {
     const { clientWidth: width, clientHeight: height } = ctx.canvas;
     const visibleLeft = centre.x - width / 2 / tilePx;
     const visibleTop = centre.y - height / 2 / tilePx;
     const eye = terrain(player.position.x, player.position.y);
-    const key = [restingTilePx, devicePixelRatio, eye.height, eye.cover, mode].join();
+    const cellPx = LAYER_RESOLUTIONS.find((px) => px >= restingTilePx) ?? restingTilePx;
+    const key = [cellPx, devicePixelRatio, eye.cover, mode].join();
     const isCurrent =
       drawn?.key === key && covers(drawn.area, visibleLeft, visibleTop, width / tilePx, height / tilePx);
     if (!isCurrent) {
       const widestTilePx = Math.min(tilePx, restingTilePx);
       const area: TileWindow = {
-        left: snapToLayer(visibleLeft),
-        top: snapToLayer(visibleTop),
-        columns: Math.ceil(width / widestTilePx) + 1 + LAYER_SNAP,
-        rows: Math.ceil(height / widestTilePx) + 1 + LAYER_SNAP,
-        cellPx: restingTilePx,
+        left: Math.floor(visibleLeft) - LAYER_MARGIN,
+        top: Math.floor(visibleTop) - LAYER_MARGIN,
+        columns: Math.ceil(width / widestTilePx) + 1 + 2 * LAYER_MARGIN,
+        rows: Math.ceil(height / widestTilePx) + 1 + 2 * LAYER_MARGIN,
+        cellPx,
       };
-      layer.canvas.width = Math.round(area.columns * restingTilePx * devicePixelRatio);
-      layer.canvas.height = Math.round(area.rows * restingTilePx * devicePixelRatio);
+      layer.canvas.width = Math.round(area.columns * cellPx * devicePixelRatio);
+      layer.canvas.height = Math.round(area.rows * cellPx * devicePixelRatio);
       layer.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-      drawTiles(layer, terrain, area, eye, mode);
-      drawn = { area, key };
+      const reliefLevels = drawTiles(layer, terrain, area, eye.cover !== Cover.None, mode);
+      relief.canvas.width = area.columns;
+      relief.canvas.height = area.rows;
+      drawn = { area, key, reliefLevels };
+      reliefPainted = "";
     }
-    const { area } = drawn!;
+    const { area, reliefLevels } = drawn!;
     const originX = Math.round(width / 2 - (centre.x - area.left) * tilePx);
     const originY = Math.round(height / 2 - (centre.y - area.top) * tilePx);
     ctx.drawImage(layer.canvas, originX, originY, area.columns * tilePx, area.rows * tilePx);
+    if (mode === "shade") {
+      const eyeLevel = player.eyeLevel.toFixed(2);
+      if (reliefPainted !== eyeLevel) {
+        paintRelief(relief, area, reliefLevels, player.eyeLevel);
+        reliefPainted = eyeLevel;
+      }
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(relief.canvas, originX, originY, area.columns * tilePx, area.rows * tilePx);
+      ctx.imageSmoothingEnabled = true;
+    }
     const toScreen = (p: number, centreAt: number, extent: number) => extent / 2 + (p - centreAt) * tilePx;
     drawSprite(
       ctx,

@@ -10,12 +10,10 @@ export const createGlide = (durationMs: number, start: Point) => {
   let to = start;
   let startedAt = -Infinity;
   const shownAt = (now: number) => between(from, to, (now - startedAt) / durationMs);
-  return (target: Point, now: number): Point => {
-    if (target.x !== to.x || target.y !== to.y) {
-      from = shownAt(now);
-      to = target;
-      startedAt = now;
-    }
-    return shownAt(now);
+  const moveTo = (target: Point, at: number) => {
+    from = shownAt(at);
+    to = target;
+    startedAt = at;
   };
+  return { shownAt, moveTo };
 };

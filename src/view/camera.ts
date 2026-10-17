@@ -120,18 +120,25 @@ interface Subject {
 }
 
 export const createCamera = () => {
-  let current: { centre: Point; tilePx: number } | undefined;
+  let current: { followed: Point; look: Point; tilePx: number } | undefined;
   return (subject: Subject, screen: Extent, elapsedMs: number): View => {
     const restingTilePx = Math.max(1, Math.round(Math.min(screen.width, screen.height) / subject.span));
     const easedTilePx = current ? approach(current.tilePx, restingTilePx, elapsedMs, ZOOM_EASING_MS) : restingTilePx;
     const tilePx = Math.abs(easedTilePx - restingTilePx) < RESTING_PX_TOLERANCE ? restingTilePx : easedTilePx;
-    const target = {
-      x: subject.position.x + 0.5 + (subject.look.x * screen.width) / tilePx,
-      y: subject.position.y + 0.5 + (subject.look.y * screen.height) / tilePx,
+    const pan = (from: Point, to: Point): Point =>
+      current
+        ? { x: approach(from.x, to.x, elapsedMs, PAN_EASING_MS), y: approach(from.y, to.y, elapsedMs, PAN_EASING_MS) }
+        : to;
+    const followed = pan(current?.followed ?? subject.position, {
+      x: subject.position.x + 0.5,
+      y: subject.position.y + 0.5,
+    });
+    const look = pan(current?.look ?? subject.look, subject.look);
+    current = { followed, look, tilePx };
+    const centre = {
+      x: followed.x + (look.x * screen.width) / tilePx,
+      y: followed.y + (look.y * screen.height) / tilePx,
     };
-    const pan = (from: number, to: number) => approach(from, to, elapsedMs, PAN_EASING_MS);
-    const centre = current ? { x: pan(current.centre.x, target.x), y: pan(current.centre.y, target.y) } : target;
-    current = { centre, tilePx };
     return { centre, tilePx, restingTilePx };
   };
 };

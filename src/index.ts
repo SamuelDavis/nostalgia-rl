@@ -5,6 +5,7 @@ import { Direction, stepToward } from "./game/movement";
 import { playTurn, startSession } from "./game/session";
 import { createTerrain } from "./game/terrain";
 import {
+  approach,
   attentiveSpan,
   clearanceAhead,
   createCamera,
@@ -27,6 +28,7 @@ const DEFAULT_TURN_MS = 100;
 const DEFAULT_REPEAT_DELAY_MS = 250;
 const URL_SYNC_DELAY_MS = 300;
 const ZOOM_STEP = 4;
+const EYE_EASING_MS = 300;
 
 const KEY_DIRECTIONS: Record<string, Direction> = {
   KeyW: Direction.North,
@@ -63,6 +65,7 @@ let natural = naturalSpan(open, heading);
 let practical = practicalSpan(open, heading);
 let clearance = clearanceAhead(terrain, session.position, session.facing);
 let lastActionAt = performance.now();
+let eyeLevel = terrain(session.position.x, session.position.y).height;
 const camera = createCamera();
 const glide = createGlide(turnMs, session.position);
 const drawViewport = createViewport(ctx);
@@ -82,7 +85,8 @@ let dirty = true;
 let drawn = "";
 let lastFrame = performance.now();
 const render = (now: number) => {
-  const shown = glide(session.position, now);
+  const shown = glide.shownAt(now);
+  eyeLevel = approach(eyeLevel, terrain(session.position.x, session.position.y).height, now - lastFrame, EYE_EASING_MS);
   const span = attentiveSpan({ natural, practical, clearance }, now - lastActionAt);
   const view = camera(
     { position: shown, look: lookOffset(open, heading), span: spanOf(span, zoomModifier) },
@@ -92,11 +96,11 @@ const render = (now: number) => {
   lastFrame = now;
   const placement = [view.centre.x, view.centre.y, shown.x, shown.y]
     .map((v) => v * view.tilePx)
-    .concat(view.tilePx * 100)
+    .concat(view.tilePx * 100, eyeLevel * 100)
     .map(Math.round)
     .join();
   if (!dirty && placement === drawn) return;
-  drawViewport(terrain, view, { position: session.position, shown }, mode);
+  drawViewport(terrain, view, { position: session.position, shown, eyeLevel }, mode);
   hud.update({
     session,
     turnMs,
@@ -124,11 +128,13 @@ const resize = () => {
 let nextTurn = performance.now() + turnMs;
 const frame = (now: number) => {
   if (now >= nextTurn) {
+    const scheduled = nextTurn;
     const previous = session.position;
     const action = input.take(now);
     if (action !== undefined) lastActionAt = now;
     session = playTurn(session, terrain, action);
     if (session.position !== previous) {
+      glide.moveTo(session.position, scheduled);
       open = opennessAt(session.position);
       syncUrl();
     }

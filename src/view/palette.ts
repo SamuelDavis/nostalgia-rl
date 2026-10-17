@@ -1,4 +1,3 @@
-import { clamp } from "../lib";
 import { Biome, Cover, Prop, Ground, HEIGHT_LEVELS, SEA_LEVEL, Water, Way, metresToLevels } from "../worldgen";
 
 export type Rgb = readonly [number, number, number];
@@ -8,8 +7,9 @@ const INDEX_INTERVAL = CONTOUR_INTERVAL * 5;
 const RELIEF_EXAGGERATION = 1;
 const LIGHT = { x: -0.25 * Math.SQRT2, y: -0.25 * Math.SQRT2, z: 0.5 * Math.sqrt(3) };
 const DEEPEST_SHADOW = 0.6;
-const RELATIVE_REACH = metresToLevels(4);
-const RELATIVE_STRENGTH = 0.35;
+const RELIEF_REACH = metresToLevels(4);
+const RELIEF_LIGHTEN = 0.35;
+const RELIEF_DARKEN = 0.5;
 
 export const biomeColor: Record<Biome, Rgb> = {
   [Biome.Ocean]: [40, 70, 140],
@@ -101,10 +101,14 @@ export type HeightShade = (level: number) => number;
 export const absoluteHeightShade: HeightShade = (level) =>
   0.5 + (0.6 * (level - SEA_LEVEL)) / (HEIGHT_LEVELS - SEA_LEVEL);
 
-export const relativeHeightShade =
-  (eyeLevel: number): HeightShade =>
-  (level) =>
-    1 + RELATIVE_STRENGTH * clamp((level - eyeLevel) / RELATIVE_REACH, -1, 1);
+export const UNSHADED: HeightShade = () => 1;
+
+export type Rgba = readonly [number, number, number, number];
+
+export const reliefTint = (rise: number): Rgba => {
+  const relief = rise / (Math.abs(rise) + RELIEF_REACH);
+  return relief >= 0 ? [255, 255, 255, RELIEF_LIGHTEN * relief] : [0, 0, 0, -RELIEF_DARKEN * relief];
+};
 
 export const css = ([r, g, b]: Rgb): string => `rgb(${r | 0} ${g | 0} ${b | 0})`;
 
