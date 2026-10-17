@@ -32,6 +32,15 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 
 _Record user feedback verbatim, newest first, with the commit it refers to._
 
+### cf9033b: code review (after the model reported a cold chunk routes roads from 9×9 regions)
+
+> Something I was thinking about; you say ways and ways are the slowest part: Is it possible to chunk up roads, paths, also rivers and perhaps other elements in such a way that they can be _partial_ and more spacially bounded? I mentioned this earlier when talking about treating them like features... I believe that ways can still be deterministic but the improved speed and perhaps other virtues might come from placing way/way/river/etc nodes in more places. It might be possible even to have a "wayness" field? Or compute it from other fields. The idea is that when you put down a deep forest feature and it has 3 enterances, you just know you have 3 child way nodes which naturally connect to the centeral way feature node, and then rather than trying to find another nearby feature like a camp and building a potentially infintely long way, you're actually only scanning one or two tiles to just find the next partial way
+
+> I think the idea that roads can end (you'd want fuzzing at least in the graphics) is actually a feature, not a bug, as long as it's relatively rare.
+> Also, surely camps can own a child way feature node and then other way features should be connecting to it; so you're not ending up with straight roads, but you are ending up with connections.
+>
+> The reason I'm worrying about rivers is because they're shockingly rare and seem very random, I feel like a dedicated feature algorithm can help fix that.
+
 ### f40f6da: mountainness
 
 > This idea of keeping deep forests clear of peaks and camps kind of doesn't make sense: deep forests should appear whereever "forestness" reaches a certain threshold (like how "mountainness" is now a concept), right?
