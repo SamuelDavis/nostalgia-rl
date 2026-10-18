@@ -119,7 +119,7 @@ const clearAlong = (terrain: Terrain, from: Point, direction: Point, eye: number
       const [here, there] = [terrain(last.x, last.y), terrain(to.x, to.y)];
       const blocker = blockerBetween(here, there);
       const top = there.height + (blocker === "obstacle" ? OBSTACLE_HEIGHTS[there.prop] : 0);
-      return blocker !== undefined && top > eye;
+      return blocker !== undefined && top >= eye;
     };
     const isCorner = at.x !== last.x && at.y !== last.y;
     const throughCorner = isCorner && blocks({ x: at.x, y: last.y }) && blocks({ x: last.x, y: at.y });

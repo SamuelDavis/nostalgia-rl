@@ -134,7 +134,7 @@ describe("sightAhead", () => {
     expect(sight).toBeLessThan(SIGHT_REACH);
   });
 
-  it("sees over obstacles whose tops are below eye level", () => {
+  it("sees over obstacles whose tops are below eye level, not at it", () => {
     const below = (drop: number, prop: Prop) =>
       field(
         (x) => (x >= 2 ? prop : Prop.None),
@@ -143,6 +143,7 @@ describe("sightAhead", () => {
     expect(sightAhead(below(16, Prop.Pine), ORIGIN, Direction.East).distance).toBeCloseTo(SIGHT_REACH);
     expect(sightAhead(below(2, Prop.Boulder), ORIGIN, Direction.East).distance).toBeCloseTo(SIGHT_REACH);
     expect(sightAhead(below(2, Prop.Pine), ORIGIN, Direction.East).distance).toBeLessThan(2);
+    expect(sightAhead(below(9, Prop.Pine), ORIGIN, Direction.East).distance).toBeLessThan(2);
   });
 
   it("sees across a dip back to ground no higher than its eye", () => {
