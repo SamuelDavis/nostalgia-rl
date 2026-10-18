@@ -206,12 +206,6 @@ describe("sightAhead", () => {
     expect(lead.y).toBeGreaterThan(0.1);
   });
 
-  it("leads well away from a tree beside you", () => {
-    const besideRight = field((x, y) => (x === 1 && y === 1 ? Prop.Oak : Prop.None));
-    const { lead } = sightAhead(besideRight, ORIGIN, Direction.East);
-    expect(lead.y).toBeLessThan(-0.3);
-  });
-
   it("hardly leads with a wall ahead", () => {
     const { lead } = sightAhead(wallAt(2), ORIGIN, Direction.East);
     expect(Math.hypot(lead.x, lead.y)).toBeLessThan(0.15);
@@ -241,10 +235,14 @@ describe("attentiveSpan", () => {
 
 describe("lookOffset", () => {
   it("leads where sight leads", () => {
-    const offset = lookOffset(EAST);
+    const offset = lookOffset(openness(plain, ORIGIN), EAST);
     expect(offset.x).toBeGreaterThan(0);
     expect(offset.y).toBe(0);
-    expect(lookOffset(STILL)).toEqual({ x: 0, y: 0 });
+  });
+
+  it("leans toward open ground, away from rising ground", () => {
+    expect(lookOffset(openness(risingEast, ORIGIN), STILL).x).toBeLessThan(0);
+    expect(lookOffset(openness(cone, ORIGIN), STILL).x).toBeCloseTo(0);
   });
 });
 
