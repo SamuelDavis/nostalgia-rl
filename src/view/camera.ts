@@ -1,7 +1,7 @@
 import { type Direction, blockerBetween, stepToward } from "../game/movement";
 import type { Terrain } from "../game/terrain";
 import { type Point, clamp, lerp } from "../lib";
-import { metresToLevels } from "../worldgen";
+import { Prop, metresToLevels } from "../worldgen";
 
 export interface Extent {
   readonly width: number;
@@ -28,6 +28,27 @@ export const SIGHT_REACH = 24;
 const SIGHT_CONE = 90;
 const SIGHT_RAY_COUNT = 9;
 const SIGHT_STEP = 0.25;
+const EYE_HEIGHT = metresToLevels(1.5);
+const OBSTACLE_HEIGHTS: Record<Prop, number> = {
+  [Prop.None]: 0,
+  [Prop.Oak]: metresToLevels(6),
+  [Prop.Pine]: metresToLevels(6),
+  [Prop.Cactus]: metresToLevels(2),
+  [Prop.Bush]: metresToLevels(1),
+  [Prop.Boulder]: metresToLevels(1),
+  [Prop.Flowers]: 0,
+  [Prop.Tuft]: 0,
+  [Prop.Tent]: metresToLevels(2),
+  [Prop.Campfire]: metresToLevels(0.5),
+  [Prop.Bridge]: 0,
+  [Prop.Rock]: Infinity,
+  [Prop.Stalagmite]: metresToLevels(2),
+  [Prop.CaveMouth]: Infinity,
+  [Prop.RampDown]: 0,
+  [Prop.RampUp]: 0,
+  [Prop.Ramp]: 0,
+  [Prop.CaveExit]: 0,
+};
 const STEER = 0.3;
 export const SETTLE_MS = 1500;
 const LEAD = 0.25;
@@ -88,7 +109,7 @@ const rotate = ({ x, y }: Point, angle: number): Point => ({
   y: x * Math.sin(angle) + y * Math.cos(angle),
 });
 
-const clearAlong = (terrain: Terrain, from: Point, direction: Point): number => {
+const clearAlong = (terrain: Terrain, from: Point, direction: Point, eye: number): number => {
   let last = from;
   for (let t = SIGHT_STEP; t <= SIGHT_REACH; t += SIGHT_STEP) {
     const at = { x: Math.floor(from.x + 0.5 + direction.x * t), y: Math.floor(from.y + 0.5 + direction.y * t) };
@@ -96,7 +117,8 @@ const clearAlong = (terrain: Terrain, from: Point, direction: Point): number => 
     const blocks = (to: Point) => {
       const [here, there] = [terrain(last.x, last.y), terrain(to.x, to.y)];
       const blocker = blockerBetween(here, there);
-      return blocker === "obstacle" || (blocker === "cliff" && there.height > here.height);
+      const top = there.height + (blocker === "obstacle" ? OBSTACLE_HEIGHTS[there.prop] : 0);
+      return blocker !== undefined && top > eye;
     };
     const isCorner = at.x !== last.x && at.y !== last.y;
     const throughCorner = isCorner && blocks({ x: at.x, y: last.y }) && blocks({ x: last.x, y: at.y });
@@ -108,7 +130,8 @@ const clearAlong = (terrain: Terrain, from: Point, direction: Point): number => 
 
 export const sightAhead = (terrain: Terrain, from: Point, facing: Direction): number => {
   const ahead = stepToward({ x: 0, y: 0 }, facing);
-  const nearness = mean(SIGHT_RAYS.map((angle) => 1 / (1 + clearAlong(terrain, from, rotate(ahead, angle)))));
+  const eye = terrain(from.x, from.y).height + EYE_HEIGHT;
+  const nearness = mean(SIGHT_RAYS.map((angle) => 1 / (1 + clearAlong(terrain, from, rotate(ahead, angle), eye))));
   return 1 / nearness - 1;
 };
 

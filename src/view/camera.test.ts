@@ -134,6 +134,25 @@ describe("sightAhead", () => {
     expect(sight).toBeLessThan(SIGHT_REACH);
   });
 
+  it("sees over obstacles whose tops are below eye level", () => {
+    const below = (drop: number, prop: Prop) =>
+      field(
+        (x) => (x >= 2 ? prop : Prop.None),
+        (x) => (x >= 2 ? 100 - drop : 100),
+      );
+    expect(sightAhead(below(16, Prop.Pine), ORIGIN, Direction.East)).toBeCloseTo(SIGHT_REACH);
+    expect(sightAhead(below(2, Prop.Boulder), ORIGIN, Direction.East)).toBeCloseTo(SIGHT_REACH);
+    expect(sightAhead(below(2, Prop.Pine), ORIGIN, Direction.East)).toBeLessThan(2);
+  });
+
+  it("sees across a dip back to ground no higher than its eye", () => {
+    const dip = field(
+      () => Prop.None,
+      (x) => (x === 1 ? 84 : 101),
+    );
+    expect(sightAhead(dip, ORIGIN, Direction.East)).toBeCloseTo(SIGHT_REACH);
+  });
+
   it("does not slip between obstacles that meet at a corner", () => {
     const diagonalWall = field((x, y) => (x + y === 3 ? Prop.Oak : Prop.None));
     expect(sightAhead(diagonalWall, ORIGIN, Direction.East)).toBeLessThan(3);
