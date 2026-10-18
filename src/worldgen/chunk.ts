@@ -83,6 +83,7 @@ const generateFloorChunk = (world: Worldgen, layer: CaveFloor, cx: number, cy: n
   const floor = world.caveFloorOf(layer);
   const height = new Int16Array(TILES);
   const prop = new Uint8Array(TILES);
+  const ground = new Uint8Array(TILES);
   for (let i = 0; i < TILES; i++) {
     const p = { x: cx * CHUNK_SIZE + (i % CHUNK_SIZE), y: cy * CHUNK_SIZE + Math.floor(i / CHUNK_SIZE) };
     const isInterior = floor?.isChamber(p) && AROUND.every((o) => floor.isChamber({ x: p.x + o.x, y: p.y + o.y }));
@@ -90,13 +91,14 @@ const generateFloorChunk = (world: Worldgen, layer: CaveFloor, cx: number, cy: n
     height[i] = floor?.levelAt(p) ?? 0;
     const mark = floor?.markAt(p);
     prop[i] = !floor?.isOpen(p) ? Prop.Rock : mark ? MARK_PROPS[mark] : isStalagmite ? Prop.Stalagmite : Prop.None;
+    ground[i] = floor?.isWorked(p) ? Ground.Dressed : Ground.Rock;
   }
   return {
     layer,
     cx,
     cy,
     height,
-    ground: new Uint8Array(TILES).fill(Ground.Rock),
+    ground,
     water: new Uint8Array(TILES).fill(Water.None),
     prop,
     biome: new Uint8Array(TILES).fill(Biome.Mountain),

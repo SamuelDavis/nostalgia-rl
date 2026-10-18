@@ -6,28 +6,31 @@ import { regionsAround } from "../region";
 import { createWorldgen } from "../world";
 import { createCaveFloors } from "./floor";
 import { createJunctions } from "./junctions";
-import { CEILING, RAMP_LINK, createCavePlans } from "./plan";
+import { CEILING, createCavePlans } from "./plan";
 import { createCaveSiting } from "./siting";
 
-const caveWorldOf = memoize(
-  (seed: number) => {
-    const { fields } = createWorldgen(seed);
-    const siting = createCaveSiting({ seed, fields, peakOf: (r) => findPeak(fields, r) });
-    const plans = createCavePlans({ seed, fields, caveOwning: siting.caveOwning });
-    const { junctionsOf } = createJunctions({ seed, fields, siting, plans });
-    const floors = createCaveFloors({ seed, fields, caveOwning: siting.caveOwning, plans, junctionsOf });
-    return {
-      fields,
-      siting,
-      plans,
-      floors,
-      junctionsOf,
-      caves: regionsAround({ rx: 0, ry: 0 }, 3).flatMap(siting.cavesIn),
-    };
-  },
-  String,
-  4,
-);
+const caveWorldWith = (wayness: number) =>
+  memoize(
+    (seed: number) => {
+      const { fields } = createWorldgen(seed);
+      const siting = createCaveSiting({ seed, fields, peakOf: (r) => findPeak(fields, r) });
+      const plans = createCavePlans({ seed, fields, caveOwning: siting.caveOwning, waynessAt: () => wayness });
+      const { junctionsOf } = createJunctions({ seed, fields, siting, plans });
+      const floors = createCaveFloors({ seed, fields, caveOwning: siting.caveOwning, plans, junctionsOf });
+      return {
+        fields,
+        siting,
+        plans,
+        floors,
+        junctionsOf,
+        caves: regionsAround({ rx: 0, ry: 0 }, 3).flatMap(siting.cavesIn),
+      };
+    },
+    String,
+    4,
+  );
+const caveWorldOf = caveWorldWith(0);
+const mineWorldOf = caveWorldWith(1);
 
 const NEIGHBOURS: readonly Point[] = [
   { x: 1, y: 0 },
@@ -107,12 +110,68 @@ describe("cave floors", () => {
     const cave = caves.find((c) => plans.planOf(c).bottom < 0)!;
     const ramp = plans.rampBelow(cave, 0)!;
     const [upper, lower] = [floors.floorOf(cave, 0), floors.floorOf(cave, -1)];
+    const { link } = ramp;
     ramp.tiles.forEach((tile, i) => {
-      expect(upper.isOpen(tile)).toBe(i < RAMP_LINK);
-      expect(lower.isOpen(tile)).toBe(i >= RAMP_LINK);
-      expect((i < RAMP_LINK ? upper : lower).levelAt(tile)).toBe(tile.level);
-      expect(upper.markAt(tile)).toBe(i === RAMP_LINK - 1 ? "down" : i < RAMP_LINK ? "slope" : undefined);
-      expect(lower.markAt(tile)).toBe(i === RAMP_LINK ? "up" : i > RAMP_LINK ? "slope" : undefined);
+      expect(upper.isOpen(tile)).toBe(i < link);
+      expect(lower.isOpen(tile)).toBe(i >= link);
+      expect((i < link ? upper : lower).levelAt(tile)).toBe(tile.level);
+      expect(upper.markAt(tile)).toBe(i === link - 1 ? "down" : i < link ? "slope" : undefined);
+      expect(lower.markAt(tile)).toBe(i === link ? "up" : i > link ? "slope" : undefined);
     });
+  });
+
+  it("connect a mine's way in to its stairs on every floor it works", { tags: "slow" }, () => {
+    for (const seed of [1, 2]) {
+      const { plans, floors, junctionsOf, caves } = mineWorldOf(seed);
+      for (const cave of caves) {
+        const plan = plans.planOf(cave);
+        if (!plan.mine) continue;
+        for (let floor = plan.mine.top; floor >= plan.mine.bottom; floor--) {
+          const layout = floors.floorOf(cave, floor);
+          const [below, above] = [floors.stairBelow(cave, floor), floors.stairBelow(cave, floor + 1)];
+          const ends = [
+            ...(floor === 0 ? [plan.mouth.inside] : []),
+            ...(below ? [below.tiles[0]!] : []),
+            ...(above ? [above.tiles.at(-1)!] : []),
+            ...junctionsOf(cave)
+              .filter((j) => j.floor === floor)
+              .map((j) => j.tiles[0]!),
+          ];
+          if (ends.length === 0) continue;
+          const reached = reachableFrom(ends[0]!, layout.isOpen, layout.levelAt);
+          for (const end of ends) expect(reached.has(`${end.x},${end.y}`), `cave ${cave.id} floor ${floor}`).toBe(true);
+          expect(layout.openTiles().some(layout.isWorked)).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("join most of a mine's floors by stairs", () => {
+    const { plans, floors, caves } = mineWorldOf(1);
+    const mined = caves.map(plans.planOf).filter((plan) => plan.mine);
+    const joins = mined.flatMap(({ cave, mine }) =>
+      Array.from({ length: mine!.top - mine!.bottom }, (_, i) => floors.stairBelow(cave, mine!.top - i)),
+    );
+    expect(mined.length).toBeGreaterThan(0);
+    expect(joins.filter(Boolean).length / joins.length).toBeGreaterThan(0.8);
+  });
+
+  it("lays each stair as a short flight within climbing steps, its halves on their own floors", () => {
+    const { plans, floors, caves } = mineWorldOf(1);
+    const cave = caves.find((c) => plans.planOf(c).mine && floors.stairBelow(c, 0))!;
+    const stair = floors.stairBelow(cave, 0)!;
+    const [upper, lower] = [floors.floorOf(cave, 0), floors.floorOf(cave, -1)];
+    expect(stair.tiles).toHaveLength(9);
+    expect(stair.tiles[0]!.level).toBe(plans.planOf(cave).baseOf(0));
+    expect(stair.tiles.at(-1)!.level).toBe(plans.planOf(cave).baseOf(-1));
+    stair.tiles.forEach((tile, i) => {
+      const next = stair.tiles[i + 1];
+      if (next) expect(Math.abs(tile.level - next.level)).toBeLessThanOrEqual(MAX_CLIMB);
+      expect(upper.isOpen(tile)).toBe(i < stair.link);
+      expect(lower.isOpen(tile)).toBe(i >= stair.link);
+      expect((i < stair.link ? upper : lower).levelAt(tile)).toBe(tile.level);
+    });
+    expect(upper.markAt(stair.tiles[stair.link - 1]!)).toBe("down");
+    expect(lower.markAt(stair.tiles[stair.link]!)).toBe("up");
   });
 });

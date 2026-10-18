@@ -58,7 +58,10 @@ What a feature shows from outside, such as a roof, parapets, a canopy or a mines
 A natural feature inside a mountain: winding passages and caverns on several floors.
 
 **Mine**:
-A feature dug by people inside a cave: tunnels, shafts and worked rooms. A cave's child feature.
+A feature dug by people into a cave: square rooms and straight corridors cut along the cave's own chambers and passages, reaching floors deeper than the cave. A cave's child feature, entered by a portal in place of the cave's mouth.
+
+**Stairs**:
+A short, steep flight that miners dug from one floor of a mine to the next.
 
 **Ramp**:
 A sloping tunnel that leads from one floor of a cave to the next.

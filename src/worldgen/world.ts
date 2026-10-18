@@ -11,7 +11,7 @@ import { type Fields, createFields } from "./fields";
 import { type River, createRivers } from "./rivers";
 import { type Bounds, type Region, overlaps, regionBounds, regionKey, regionsAround } from "./region";
 import { findPeak } from "./landmarks";
-import { type WayLink, createWays } from "./ways";
+import { type WayLink, createWayness, createWays } from "./ways";
 import { createCaves } from "./caves/caves";
 import type { FloorLayout } from "./caves/floor";
 import type { Opening } from "./features/deep-forest";
@@ -27,6 +27,7 @@ export interface Worldgen {
   readonly deepForestsIn: (region: Region) => readonly PlacedFeature<DeepForestLayout>[];
   readonly featuresNear: (region: Region) => readonly PlacedFeature[];
   readonly caveMouthsIn: (region: Region) => readonly Opening[];
+  readonly mineEntrancesIn: (region: Region) => readonly Opening[];
   readonly caveFloorOf: (layer: CaveFloor) => FloorLayout | undefined;
   readonly linkAcross: (layer: Layer, from: Point, to: Point) => Layer | undefined;
 }
@@ -60,7 +61,7 @@ export const createWorldgen = (seed: number): Worldgen => {
   };
 
   const peakOf = memoize((region: Region) => findPeak(fields, region), regionKey, REGION_CACHE);
-  const caves = createCaves({ seed, fields, peakOf });
+  const caves = createCaves({ seed, fields, peakOf, waynessAt: createWayness({ fields, campAt: campAtRegion }) });
   const ways = createWays({
     seed,
     fields,
@@ -70,6 +71,7 @@ export const createWorldgen = (seed: number): Worldgen => {
       ...deepForests.partsIn(region).flatMap(deepForests.guaranteedOpeningsOf),
       ...caves.openingsIn(region),
     ],
+    entrancesIn: caves.entrancesIn,
   });
 
   const deepForests = createDeepForests({
@@ -113,6 +115,7 @@ export const createWorldgen = (seed: number): Worldgen => {
     deepForestsIn: (region) => deepForestPlacer.placedIn(region),
     featuresNear: featuresNearRegion,
     caveMouthsIn: caves.openingsIn,
+    mineEntrancesIn: caves.entrancesIn,
     caveFloorOf: caves.floorOf,
     linkAcross: caves.linkAcross,
   };

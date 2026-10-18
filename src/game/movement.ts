@@ -35,6 +35,7 @@ const SOLID: ReadonlySet<Prop> = new Set([
   Prop.Rock,
   Prop.Stalagmite,
   Prop.CaveMouth,
+  Prop.MineEntrance,
 ]);
 
 export const isTrail = ({ way }: Footing): boolean => way !== Way.None;

@@ -74,7 +74,10 @@ const isThreshold = (terrain: Terrain, x: number, y: number, tile: Tile): boolea
 const CLIFF_FACE: Look = { background: [72, 64, 60], glyph: "", color: [0, 0, 0] };
 const FACE_MIN_CLIFF_SIDES = 3;
 
+const ENTRANCES: ReadonlySet<Prop> = new Set([Prop.CaveMouth, Prop.MineEntrance]);
+
 const isCliffFace = (terrain: Terrain, x: number, y: number, tile: Tile): boolean =>
+  !ENTRANCES.has(tile.prop) &&
   NEIGHBOURS.filter((o) => isCliff(tile, terrain(x + o.x, y + o.y))).length >= FACE_MIN_CLIFF_SIDES;
 
 const hasStairs = (terrain: Terrain, x: number, y: number, tile: Tile): boolean =>

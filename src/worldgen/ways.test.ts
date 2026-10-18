@@ -50,4 +50,19 @@ describe("way network", () => {
       expect(camps.filter(isJoined).length / camps.length).toBeGreaterThan(0.9);
     }
   });
+
+  it("leads a road to every mine entrance, not just to the network's edge", () => {
+    for (const seed of [1, 2, 3]) {
+      const world = worldOf(seed);
+      const entrances = regionsAround(ORIGIN, 4).flatMap(world.mineEntrancesIn);
+      const roadsFrom = (p: Point) =>
+        world
+          .waysNear(regionOf(p))
+          .filter((link) => link.way === Way.Road && distance(link.nodes[0]!, p) === 0 && link.fades.length === 0);
+      expect(entrances.length).toBeGreaterThan(0);
+      expect(
+        entrances.filter(({ outside }) => roadsFrom(outside).length > 0).length / entrances.length,
+      ).toBeGreaterThan(0.9);
+    }
+  });
 });

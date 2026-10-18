@@ -12,7 +12,7 @@ const junctionWorldOf = memoize(
   (seed: number) => {
     const { fields } = createWorldgen(seed);
     const siting = createCaveSiting({ seed, fields, peakOf: (r) => findPeak(fields, r) });
-    const plans = createCavePlans({ seed, fields, caveOwning: siting.caveOwning });
+    const plans = createCavePlans({ seed, fields, caveOwning: siting.caveOwning, waynessAt: () => 0 });
     const junctions = createJunctions({ seed, fields, siting, plans });
     return { fields, siting, plans, junctions, caves: regionsAround({ rx: 0, ry: 0 }, 5).flatMap(siting.cavesIn) };
   },

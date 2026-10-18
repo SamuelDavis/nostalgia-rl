@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type Point, distance } from "../lib";
 import { type Layer, SURFACE, createWorldgen, findPeak, layerKey, regionsAround } from "../worldgen";
+import { createWayness } from "../worldgen/ways";
 import { type Cave, createCaves } from "../worldgen/caves/caves";
 import { TERRITORY_RADIUS } from "../worldgen/caves/siting";
 import { blockerBetween } from "./movement";
@@ -15,7 +16,12 @@ const NEIGHBOURS: readonly Point[] = [
 
 const SEED = 1;
 const world = createWorldgen(SEED);
-const caves = createCaves({ seed: SEED, fields: world.fields, peakOf: (r) => findPeak(world.fields, r) });
+const caves = createCaves({
+  seed: SEED,
+  fields: world.fields,
+  peakOf: (r) => findPeak(world.fields, r),
+  waynessAt: createWayness(world),
+});
 const nearby = regionsAround({ rx: 0, ry: 0 }, 4).flatMap(caves.cavesIn);
 const { terrainOn, linkAcross } = generatedLayers(world);
 
@@ -54,5 +60,12 @@ describe("caves", () => {
     const [junction] = caves.junctionsOf(cave);
     const reached = floorsReachedFrom(cave, [cave, junction!.other.cave]);
     expect(reached).toContain(layerKey(junction!.other));
+  });
+
+  it("lead walkers in at a mine's entrance and down every floor it works", { tags: "slow" }, () => {
+    const cave = nearby.find((c) => caves.planOf(c).mine)!;
+    const { top, bottom } = caves.planOf(cave).mine!;
+    const reached = floorsReachedFrom(cave, [cave]);
+    for (let floor = top; floor >= bottom; floor--) expect(reached).toContain(layerKey({ cave, floor }));
   });
 });

@@ -23,6 +23,7 @@ export const propGlyph: Record<Prop, string> = {
   [Prop.RampDown]: ">",
   [Prop.RampUp]: "<",
   [Prop.Ramp]: STAIRS_GLYPH,
+  [Prop.MineEntrance]: "Π",
 };
 
 export const coverGlyph: Record<Exclude<Cover, typeof Cover.None>, string> = {
@@ -35,6 +36,7 @@ export const groundGlyph: Record<Ground, string> = {
   [Ground.Sand]: "·",
   [Ground.Rock]: ":",
   [Ground.Snow]: "·",
+  [Ground.Dressed]: "·",
 };
 
 export const wayGlyph: Record<Exclude<Way, typeof Way.None>, string> = {

@@ -5,12 +5,11 @@ import { SURFACE } from "../layer";
 import { regionsAround } from "../region";
 import { createWorldgen } from "../world";
 import { createCaves } from "./caves";
-import { RAMP_LINK } from "./plan";
 
 const cavesOf = memoize(
   (seed: number) => {
     const { fields } = createWorldgen(seed);
-    return createCaves({ seed, fields, peakOf: (r) => findPeak(fields, r) });
+    return createCaves({ seed, fields, peakOf: (r) => findPeak(fields, r), waynessAt: () => 0 });
   },
   String,
   2,
@@ -33,7 +32,7 @@ describe("caves", () => {
 
   it("links a ramp's halves to the floors above and below", () => {
     const ramp = caves.rampBelow(cave, 0)!;
-    const [upper, lower] = [ramp.tiles[RAMP_LINK - 1]!, ramp.tiles[RAMP_LINK]!];
+    const [upper, lower] = [ramp.tiles[ramp.link - 1]!, ramp.tiles[ramp.link]!];
     expect(caves.linkAcross(top, upper, lower)).toEqual({ cave, floor: -1 });
     expect(caves.linkAcross({ cave, floor: -1 }, lower, upper)).toEqual(top);
     expect(caves.linkAcross(top, lower, upper)).toBeUndefined();

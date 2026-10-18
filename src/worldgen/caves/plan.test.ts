@@ -8,15 +8,18 @@ import { CEILING, FLOOR_SPACING, createCavePlans } from "./plan";
 import { createCaveSiting } from "./siting";
 
 const worldOf = memoize(createWorldgen, String, 4);
+const EMPTY = 0;
+const BUSY = 1;
 const plansOf = memoize(
-  (seed: number) => {
+  ([seed, wayness]: readonly [number, number]) => {
     const { fields } = worldOf(seed);
     const siting = createCaveSiting({ seed, fields, peakOf: (r) => findPeak(fields, r) });
     const caves = regionsAround({ rx: 0, ry: 0 }, 5).flatMap(siting.cavesIn);
-    return { fields, siting, caves, plans: createCavePlans({ seed, fields, caveOwning: siting.caveOwning }) };
+    const plans = createCavePlans({ seed, fields, caveOwning: siting.caveOwning, waynessAt: () => wayness });
+    return { fields, siting, caves, plans };
   },
   String,
-  4,
+  8,
 );
 
 const isCardinalStep = (a: { x: number; y: number }, b: { x: number; y: number }) =>
@@ -24,8 +27,13 @@ const isCardinalStep = (a: { x: number; y: number }, b: { x: number; y: number }
 
 describe("cave plans", () => {
   it("opens one mouth on the cave's slope, level with the ground outside", () => {
-    for (const seed of [1, 2, 3]) {
-      const { fields, siting, caves, plans } = plansOf(seed);
+    for (const key of [
+      [1, EMPTY],
+      [2, EMPTY],
+      [3, EMPTY],
+      [1, BUSY],
+    ] as const) {
+      const { fields, siting, caves, plans } = plansOf(key);
       for (const cave of caves) {
         const { mouth } = plans.planOf(cave);
         expect(isCardinalStep(mouth.inside, mouth.outside)).toBe(true);
@@ -37,7 +45,7 @@ describe("cave plans", () => {
   });
 
   it("stacks floors a fixed spacing apart around the mouth floor", () => {
-    const { caves, plans } = plansOf(1);
+    const { caves, plans } = plansOf([1, EMPTY]);
     for (const cave of caves) {
       const plan = plans.planOf(cave);
       expect(plan.top).toBeGreaterThanOrEqual(0);
@@ -49,7 +57,7 @@ describe("cave plans", () => {
 
   it("joins each floor to the one below by a ramp under rock, within climbing steps", () => {
     for (const seed of [1, 2, 3]) {
-      const { fields, siting, caves, plans } = plansOf(seed);
+      const { fields, siting, caves, plans } = plansOf([seed, EMPTY]);
       for (const cave of caves) {
         const plan = plans.planOf(cave);
         for (let floor = plan.top; floor > plan.bottom; floor--) {
@@ -73,5 +81,38 @@ describe("cave plans", () => {
         }
       }
     }
+  });
+
+  it("digs no mines in empty country, and some under half the caves in busy country", () => {
+    const mined = (wayness: number) => {
+      const { caves, plans } = plansOf([1, wayness]);
+      return caves.filter((cave) => plans.planOf(cave).mine).length / caves.length;
+    };
+    expect(mined(EMPTY)).toBe(0);
+    expect(mined(BUSY)).toBeGreaterThan(0.3);
+    expect(mined(BUSY)).toBeLessThan(0.7);
+  });
+
+  it("juts a mine's portal three tiles out of the mountain", () => {
+    const { caves, plans } = plansOf([1, BUSY]);
+    for (const cave of caves) {
+      const { mouth, mine } = plans.planOf(cave);
+      if (!mine) continue;
+      expect(mouth.portal).toHaveLength(3);
+      mouth.portal.forEach((p, i) => expect(isCardinalStep(p, mouth.portal[i + 1] ?? mouth.outside)).toBe(true));
+      expect(mouth.inside).toEqual(mouth.portal.at(-1));
+      expect(mouth.passage.at(-1)).toEqual(mouth.inside);
+    }
+  });
+
+  it("digs mines past the cave's lowest floor, and above its highest only where the mountain has room", () => {
+    const { caves, plans } = plansOf([1, BUSY]);
+    const plansWithMines = caves.map(plans.planOf).filter((plan) => plan.mine);
+    for (const { mine, top, bottom, baseOf, cave } of plansWithMines) {
+      expect(mine!.bottom).toBeLessThan(bottom);
+      expect(mine!.top).toBeGreaterThanOrEqual(top);
+      expect(baseOf(mine!.top) + CEILING).toBeLessThanOrEqual(cave.level);
+    }
+    expect(plansWithMines.some(({ mine, top }) => mine!.top > top)).toBe(true);
   });
 });

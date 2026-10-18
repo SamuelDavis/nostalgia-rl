@@ -33,9 +33,15 @@ export interface WaySiting {
   readonly campAt: (region: Region) => Point | undefined;
   readonly peakOf: (region: Region) => Point | undefined;
   readonly openingsIn: (region: Region) => readonly Opening[];
+  readonly entrancesIn: (region: Region) => readonly Opening[];
 }
 
-const NodeKind = { Lattice: 0, Camp: 1, Peak: 2, Opening: 3, Stub: 4 } as const;
+export interface WaynessInput {
+  readonly fields: Fields;
+  readonly campAt: (region: Region) => Point | undefined;
+}
+
+const NodeKind = { Lattice: 0, Camp: 1, Peak: 2, Opening: 3, Stub: 4, Entrance: 5 } as const;
 type NodeKind = (typeof NodeKind)[keyof typeof NodeKind];
 
 interface WayNode extends Point {
@@ -71,6 +77,7 @@ const REACH: Record<NodeKind, number> = {
   [NodeKind.Peak]: 2 * CELL,
   [NodeKind.Opening]: CELL,
   [NodeKind.Stub]: 0,
+  [NodeKind.Entrance]: 3 * CELL,
 };
 const STUB_LENGTH = 40;
 const MAX_REACH = REACH[NodeKind.Camp];
@@ -80,7 +87,7 @@ const WAY_MARGIN = 8;
 const WOBBLE_SCALE = 48;
 const TYPICAL_UNIT_COST = 2;
 const NEAR_CELLS = Math.ceil((MAX_REACH + ROUTE_MARGIN + WAY_MARGIN) / CELL);
-const OPENING_CELLS = Math.ceil((REACH[NodeKind.Opening] + ROUTE_MARGIN + WAY_MARGIN) / CELL);
+const cellsReachedFrom = (kind: NodeKind) => Math.ceil((REACH[kind] + ROUTE_MARGIN + WAY_MARGIN) / CELL);
 const CACHE = 1 << 14;
 
 const nodeKey = ({ x, y }: Point) => `${x},${y}`;
@@ -116,17 +123,20 @@ const headingOf = ({ inside, outside }: Opening): Point => {
   return { x: (outside.x - inside.x) / length, y: (outside.y - inside.y) / length };
 };
 
-export const createWays = ({ seed, fields, campAt, peakOf, openingsIn }: WaySiting) => {
-  const wobble = createNoise(seed, SALT);
-  const level = (p: Point) => heightLevel(fields.elevation(p.x, p.y));
-  const trailLevel = (p: Point) => heightLevel(fields.elevationBeforeLedges(p.x, p.y));
-  const isDry = (p: Point) => level(p) > SEA_LEVEL;
-
-  const waynessAt = (p: Point) => {
+export const createWayness =
+  ({ fields, campAt }: WaynessInput) =>
+  (p: Point): number => {
     const camps = regionsAround(regionOfCell(cellOf(p)), 1).flatMap((r) => campAt(r) ?? []);
     const pull = Math.max(0, ...camps.map((camp) => 1 - distance(camp, p) / CAMP_PULL_RANGE));
     return BIOME_WAYNESS[biomeOf(fields.conditions(p.x, p.y))] + CAMP_PULL * pull;
   };
+
+export const createWays = ({ seed, fields, campAt, peakOf, openingsIn, entrancesIn }: WaySiting) => {
+  const wobble = createNoise(seed, SALT);
+  const level = (p: Point) => heightLevel(fields.elevation(p.x, p.y));
+  const trailLevel = (p: Point) => heightLevel(fields.elevationBeforeLedges(p.x, p.y));
+  const isDry = (p: Point) => level(p) > SEA_LEVEL;
+  const waynessAt = createWayness({ fields, campAt });
 
   const nodesIn = memoize(
     (cell: Cell): WayNode[] => {
@@ -196,7 +206,8 @@ export const createWays = ({ seed, fields, campAt, peakOf, openingsIn }: WaySiti
   const linkOf = memoize(
     ([from, to]: readonly [WayNode, WayNode]): WayLink | undefined => {
       const isRoad =
-        from.kind === NodeKind.Camp || to.kind === NodeKind.Camp || Math.min(from.wayness, to.wayness) >= ROAD_WAYNESS;
+        [from.kind, to.kind].some((kind) => kind === NodeKind.Camp || kind === NodeKind.Entrance) ||
+        Math.min(from.wayness, to.wayness) >= ROAD_WAYNESS;
       const nodes = route(from, to, {
         gradeLevel: isRoad ? level : trailLevel,
         isOpen: isDry,
@@ -220,24 +231,31 @@ export const createWays = ({ seed, fields, campAt, peakOf, openingsIn }: WaySiti
       .filter((other) => !picks(other, node) || node.key < other.key)
       .map((other) => [node, other] as const);
 
-  const openingNodesIn = memoize(
-    (cell: Cell): WayNode[] =>
-      regionsAround(regionOfCell(cell), 1)
-        .flatMap(openingsIn)
-        .filter(({ outside }) => isInCell(outside, cell))
-        .map((opening) => ({
-          ...opening.outside,
-          key: nodeKey(opening.outside),
-          kind: NodeKind.Opening,
-          wayness: 0,
-          heading: headingOf(opening),
-        })),
-    cellKey,
-    CACHE,
-  );
+  const openingNodesOf = (openingsOf: (region: Region) => readonly Opening[], kind: NodeKind) => {
+    const nodesInCell = memoize(
+      (cell: Cell): WayNode[] =>
+        regionsAround(regionOfCell(cell), 1)
+          .flatMap(openingsOf)
+          .filter(({ outside }) => isInCell(outside, cell))
+          .map((opening) => ({
+            ...opening.outside,
+            key: nodeKey(opening.outside),
+            kind,
+            wayness: 0,
+            heading: headingOf(opening),
+          })),
+      cellKey,
+      CACHE,
+    );
+    return (region: Region) => cellsOfRegion(region, cellsReachedFrom(kind)).flatMap(nodesInCell);
+  };
+  const openingNodesNear = [
+    openingNodesOf(openingsIn, NodeKind.Opening),
+    openingNodesOf(entrancesIn, NodeKind.Entrance),
+  ];
 
   const attachmentOf = (opening: WayNode): readonly [WayNode, WayNode] => {
-    const [nearest] = nodesWithin(opening, REACH[NodeKind.Opening])
+    const [nearest] = nodesWithin(opening, REACH[opening.kind])
       .filter((node) => !isDeadEnd(node))
       .sort((a, b) => distance(opening, a) - distance(opening, b));
     return [opening, nearest ?? stubOf(opening)];
@@ -248,7 +266,7 @@ export const createWays = ({ seed, fields, campAt, peakOf, openingsIn }: WaySiti
       const bounds = regionBounds(region);
       return [
         ...cellsOfRegion(region, NEAR_CELLS).flatMap(nodesIn).flatMap(ownedLinks),
-        ...cellsOfRegion(region, OPENING_CELLS).flatMap(openingNodesIn).map(attachmentOf),
+        ...openingNodesNear.flatMap((nodesNear) => nodesNear(region)).map(attachmentOf),
       ]
         .filter((pair) => overlaps(boundsOf(pair, ROUTE_MARGIN + WAY_MARGIN), bounds))
         .flatMap((pair) => linkOf(pair) ?? [])
