@@ -52,7 +52,6 @@ const OBSTACLE_HEIGHTS: Record<Prop, number> = {
 const STEER = 0.3;
 export const SETTLE_MS = 1500;
 const LEAD = 0.25;
-const LEAN = 0.5;
 const MAX_OFFSET = 0.35;
 const PAN_EASING_MS = 250;
 const ZOOM_EASING_MS = 600;
@@ -105,6 +104,9 @@ const SIGHT_RAYS: readonly number[] = Array.from(
   (_, i) => ((i / (SIGHT_RAY_COUNT - 1) - 0.5) * SIGHT_CONE * Math.PI) / 180,
 );
 
+const FORWARD_REACH = SIGHT_REACH * sum(SIGHT_RAYS.map(Math.cos));
+const SIDE_REACH = SIGHT_REACH * sum(SIGHT_RAYS.map((angle) => Math.max(0, Math.sin(angle))));
+
 const rotate = ({ x, y }: Point, angle: number): Point => ({
   x: x * Math.cos(angle) - y * Math.sin(angle),
   y: x * Math.sin(angle) + y * Math.cos(angle),
@@ -139,14 +141,13 @@ export const sightAhead = (terrain: Terrain, from: Point, facing: Direction): Si
   const eye = terrain(from.x, from.y).height + EYE_HEIGHT;
   const lines = SIGHT_RAYS.map((angle) => {
     const direction = rotate(ahead, angle);
-    return { direction, clear: clearAlong(terrain, from, direction, eye), weight: Math.cos(2 * angle) };
+    return { angle, clear: clearAlong(terrain, from, direction, eye), weight: Math.cos(2 * angle) };
   });
   const nearness = sum(lines.map(({ clear, weight }) => weight / (1 + clear))) / sum(lines.map(({ weight }) => weight));
-  const reach = sum(SIGHT_RAYS.map(Math.cos)) * SIGHT_REACH;
-  const lead = {
-    x: sum(lines.map(({ direction, clear }) => direction.x * clear)) / reach,
-    y: sum(lines.map(({ direction, clear }) => direction.y * clear)) / reach,
-  };
+  const forward = sum(lines.map(({ angle, clear }) => Math.cos(angle) * clear)) / FORWARD_REACH;
+  const side = sum(lines.map(({ angle, clear }) => Math.sin(angle) * clear)) / SIDE_REACH;
+  const across = rotate(ahead, Math.PI / 2);
+  const lead = { x: ahead.x * forward + across.x * side, y: ahead.y * forward + across.y * side };
   return { distance: 1 / nearness - 1, lead };
 };
 
@@ -159,13 +160,10 @@ interface Spans {
 export const attentiveSpan = ({ natural, practical, sight }: Spans, idleMs: number): number =>
   Math.min(idleMs >= SETTLE_MS ? natural : practical, Math.round(NOSE_SPAN + sight * SPAN_PER_CLEAR_TILE));
 
-export const lookOffset = (open: readonly number[], lead: Point): Point => {
-  const lean = (axis: "x" | "y") => mean(COMPASS.map((d, i) => d[axis] * open[i]!));
-  return {
-    x: clamp(lead.x * LEAD + lean("x") * LEAN, -MAX_OFFSET, MAX_OFFSET),
-    y: clamp(lead.y * LEAD + lean("y") * LEAN, -MAX_OFFSET, MAX_OFFSET),
-  };
-};
+export const lookOffset = (lead: Point): Point => ({
+  x: clamp(lead.x * LEAD, -MAX_OFFSET, MAX_OFFSET),
+  y: clamp(lead.y * LEAD, -MAX_OFFSET, MAX_OFFSET),
+});
 
 export const approach = (current: number, target: number, elapsedMs: number, easingMs: number): number =>
   target + (current - target) * Math.exp(-elapsedMs / easingMs);
