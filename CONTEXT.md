@@ -60,6 +60,12 @@ A natural feature inside a mountain: winding passages and caverns on several flo
 **Mine**:
 A feature dug by people inside a cave: tunnels, shafts and worked rooms. A cave's child feature.
 
+**Ramp**:
+A sloping tunnel that leads from one floor of a cave to the next.
+
+**Junction**:
+Where floors of two neighbouring caves meet underground.
+
 **Opening**:
 A place where a feature's enclosed parts meet the world, such as a cave mouth or a door.
 
