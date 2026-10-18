@@ -35,6 +35,10 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 
 _Record user feedback verbatim, newest first, with the commit it refers to._
 
+### bfbb376: mines
+
+> this is amazing, I love it
+
 ### 4375696: sideways lead reverted
 
 > Walking from `?seed=1&x=12&y=-53` to `?seed=1&x=12&y=-54` to `?seed=1&x=12&y=-55` the camera zoom goes 12, 10, 11. At 12,-55 I'm _generally closer_ to visual impediments, and yet it zoomed out a little bit?
