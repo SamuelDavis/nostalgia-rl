@@ -14,7 +14,7 @@ const flat: Terrain = () => ({
   cover: Cover.None,
 });
 const walledEast: Terrain = (x, y) => (x > 0 ? { ...flat(x, y), prop: Prop.Boulder } : flat(x, y));
-const cave: CaveFloor = { cave: 7, floor: 0 };
+const cave: CaveFloor = { cave: { x: 7, y: 7 }, floor: 0 };
 const mouthEast = {
   terrainOn: (layer: typeof SURFACE | CaveFloor) => (layer === SURFACE ? walledEast : flat),
   linkAcross: (_: unknown, from: { x: number }, to: { x: number }) => (from.x === 0 && to.x === 1 ? cave : undefined),

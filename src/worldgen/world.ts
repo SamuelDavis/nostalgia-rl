@@ -12,6 +12,10 @@ import { type River, createRivers } from "./rivers";
 import { type Bounds, type Region, overlaps, regionBounds, regionKey, regionsAround } from "./region";
 import { findPeak } from "./landmarks";
 import { type WayLink, createWays } from "./ways";
+import { createCaves } from "./caves/caves";
+import type { FloorLayout } from "./caves/floor";
+import type { Opening } from "./features/deep-forest";
+import type { CaveFloor, Layer } from "./layer";
 
 export interface Worldgen {
   readonly seed: number;
@@ -22,6 +26,9 @@ export interface Worldgen {
   readonly waysNear: (region: Region) => readonly WayLink[];
   readonly deepForestsIn: (region: Region) => readonly PlacedFeature<DeepForestLayout>[];
   readonly featuresNear: (region: Region) => readonly PlacedFeature[];
+  readonly caveMouthsIn: (region: Region) => readonly Opening[];
+  readonly caveFloorOf: (layer: CaveFloor) => FloorLayout | undefined;
+  readonly linkAcross: (layer: Layer, from: Point, to: Point) => Layer | undefined;
 }
 
 const REGION_CACHE = 4096;
@@ -53,12 +60,16 @@ export const createWorldgen = (seed: number): Worldgen => {
   };
 
   const peakOf = memoize((region: Region) => findPeak(fields, region), regionKey, REGION_CACHE);
+  const caves = createCaves({ seed, fields, peakOf });
   const ways = createWays({
     seed,
     fields,
     campAt: campAtRegion,
     peakOf,
-    openingsIn: (region) => deepForests.partsIn(region).flatMap(deepForests.guaranteedOpeningsOf),
+    openingsIn: (region) => [
+      ...deepForests.partsIn(region).flatMap(deepForests.guaranteedOpeningsOf),
+      ...caves.openingsIn(region),
+    ],
   });
 
   const deepForests = createDeepForests({
@@ -73,10 +84,11 @@ export const createWorldgen = (seed: number): Worldgen => {
     return camp ? [camp] : [];
   });
   const deepForestPlacer = placer(deepForests.type, deepForests.partsIn);
+  const caveMouthPlacer = placer(caves.type, caves.cavesIn);
   const placers: readonly {
     readonly reach: number;
     readonly placedIn: (region: Region, within: Bounds) => readonly PlacedFeature[];
-  }[] = [deepForestPlacer, campPlacer];
+  }[] = [deepForestPlacer, campPlacer, caveMouthPlacer];
 
   const featuresNearRegion = memoize(
     (region: Region): PlacedFeature[] =>
@@ -100,5 +112,8 @@ export const createWorldgen = (seed: number): Worldgen => {
     waysNear: ways.near,
     deepForestsIn: (region) => deepForestPlacer.placedIn(region),
     featuresNear: featuresNearRegion,
+    caveMouthsIn: caves.openingsIn,
+    caveFloorOf: caves.floorOf,
+    linkAcross: caves.linkAcross,
   };
 };

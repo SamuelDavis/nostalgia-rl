@@ -1,10 +1,10 @@
 import "./index.css";
-import { type Point, memoize } from "./lib";
+import type { Point } from "./lib";
 import { actionFor, createDirectionInput } from "./game/input";
 import { Direction, stepToward } from "./game/movement";
 import { playTurn, startSession } from "./game/session";
 import { createChunkStore } from "./game/chunk-store";
-import { type Layers, createTerrain } from "./game/terrain";
+import { layersOf } from "./game/terrain";
 import type { ChunkRequest } from "./chunk-worker";
 import {
   approach,
@@ -25,7 +25,7 @@ import { directionAt } from "./view/tap";
 import { createMap } from "./view/map";
 import { HEIGHT_MODES, type HeightMode } from "./view/palette";
 import { createViewport } from "./view/viewport";
-import { type Chunk, CHUNK_SIZE, type Layer, chunkOn, createWorldgen, layerKey } from "./worldgen";
+import { type Chunk, CHUNK_SIZE, chunkOn, createWorldgen } from "./worldgen";
 
 const DEFAULT_TURN_MS = 100;
 const DEFAULT_REPEAT_DELAY_MS = 50;
@@ -34,7 +34,6 @@ const ZOOM_STEP = 4;
 const EYE_EASING_MS = 300;
 const TURN_EASING_MS = 60;
 const PREFETCH_SPANS = 2;
-const LAYER_CACHE = 16;
 
 const KEY_DIRECTIONS: Record<string, Direction> = {
   KeyW: Direction.North,
@@ -55,10 +54,7 @@ const chunks = createChunkStore(
   (layer, cx, cy) => worker.postMessage({ seed, layer, cx, cy } satisfies ChunkRequest),
 );
 worker.addEventListener("message", ({ data }: MessageEvent<Chunk>) => chunks.receive(data));
-const layers: Layers = {
-  terrainOn: memoize((layer: Layer) => createTerrain((cx, cy) => chunks.chunkAt(layer, cx, cy)), layerKey, LAYER_CACHE),
-  linkAcross: () => undefined,
-};
+const layers = layersOf(world, chunks.chunkAt);
 const input = createDirectionInput(repeatDelayMs);
 
 const canvas = document.createElement("canvas");
@@ -117,7 +113,7 @@ const render = (now: number) => {
     .map(Math.round)
     .join();
   if (!dirty && placement === drawn) return;
-  drawViewport(here(), view, { position: session.position, shown, eyeLevel, angle }, mode);
+  drawViewport(here(), view, { layer: session.layer, position: session.position, shown, eyeLevel, angle }, mode);
   hud.update({
     session,
     turnMs,

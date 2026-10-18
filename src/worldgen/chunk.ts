@@ -1,4 +1,4 @@
-import { Cover, Prop, Ground, Water, Way } from "./terrain";
+import { Biome, Cover, Prop, Ground, Water, Way } from "./terrain";
 import { type Point, distance, hash, hashString, projectOntoSegment, unit } from "../lib";
 import { BIOMES, biomeOf } from "./biome";
 import { type TileDraft, paintInOrder } from "./features/feature";
@@ -7,7 +7,7 @@ import type { RiverNode } from "./rivers";
 import { overlaps, regionOf } from "./region";
 import type { LinkedWay } from "./ways";
 import type { Worldgen } from "./world";
-import { type Layer, SURFACE, layerKey } from "./layer";
+import { type CaveFloor, type Layer, SURFACE } from "./layer";
 
 export interface Chunk {
   readonly layer: Layer;
@@ -35,6 +35,18 @@ export const FADE_LENGTH = 24;
 const FADE_SALT = hashString("way fades");
 const VEGETATION_SALT = hashString("vegetation");
 const DECORATION_SALT = hashString("decoration");
+const STALAGMITE_SALT = hashString("stalagmites");
+const STALAGMITE_SHARE = 0.04;
+const AROUND: readonly Point[] = [
+  { x: 1, y: 0 },
+  { x: 1, y: 1 },
+  { x: 0, y: 1 },
+  { x: -1, y: 1 },
+  { x: -1, y: 0 },
+  { x: -1, y: -1 },
+  { x: 0, y: -1 },
+  { x: 1, y: -1 },
+];
 
 interface Channel {
   readonly a: RiverNode;
@@ -57,9 +69,32 @@ interface Pool extends Point {
 
 const bankLevel = (bed: number, gap: number): number => Math.floor(bed + gap * BANK_SLOPE);
 
-export const chunkOn = (world: Worldgen, layer: Layer, cx: number, cy: number): Chunk => {
-  if (layer !== SURFACE) throw new Error(`no generator for ${layerKey(layer)}`);
-  return generateChunk(world, cx, cy);
+export const chunkOn = (world: Worldgen, layer: Layer, cx: number, cy: number): Chunk =>
+  layer === SURFACE ? generateChunk(world, cx, cy) : generateFloorChunk(world, layer, cx, cy);
+
+const generateFloorChunk = (world: Worldgen, layer: CaveFloor, cx: number, cy: number): Chunk => {
+  const floor = world.caveFloorOf(layer);
+  const height = new Int16Array(TILES);
+  const prop = new Uint8Array(TILES);
+  for (let i = 0; i < TILES; i++) {
+    const p = { x: cx * CHUNK_SIZE + (i % CHUNK_SIZE), y: cy * CHUNK_SIZE + Math.floor(i / CHUNK_SIZE) };
+    const isInterior = floor?.isChamber(p) && AROUND.every((o) => floor.isChamber({ x: p.x + o.x, y: p.y + o.y }));
+    const isStalagmite = isInterior && unit(hash(world.seed, STALAGMITE_SALT, p.x, p.y)) < STALAGMITE_SHARE;
+    height[i] = floor?.levelAt(p) ?? 0;
+    prop[i] = !floor?.isOpen(p) ? Prop.Rock : isStalagmite ? Prop.Stalagmite : Prop.None;
+  }
+  return {
+    layer,
+    cx,
+    cy,
+    height,
+    ground: new Uint8Array(TILES).fill(Ground.Rock),
+    water: new Uint8Array(TILES).fill(Water.None),
+    prop,
+    biome: new Uint8Array(TILES).fill(Biome.Mountain),
+    way: new Uint8Array(TILES).fill(Way.None),
+    cover: new Uint8Array(TILES).fill(Cover.None),
+  };
 };
 
 export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk => {

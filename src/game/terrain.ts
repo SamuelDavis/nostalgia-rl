@@ -1,16 +1,17 @@
-import { type Point, floorDiv } from "../lib";
+import { type Point, floorDiv, memoize } from "../lib";
 import {
   type Biome,
   CHUNK_SIZE,
+  type Chunk,
   type Cover,
   type Prop,
   type Ground,
   type Layer,
-  SURFACE,
   type Water,
   type Way,
   type Worldgen,
-  generateChunk,
+  chunkOn,
+  layerKey,
   tileIndex,
 } from "../worldgen";
 import { type ChunkAt, createChunkStore } from "./chunk-store";
@@ -24,6 +25,8 @@ export interface Tile {
   readonly way: Way;
   readonly cover: Cover;
 }
+
+const LAYER_CACHE = 16;
 
 export type Terrain = (x: number, y: number) => Tile;
 
@@ -53,10 +56,16 @@ export const createTerrain =
     };
   };
 
-export const generatedTerrain = (world: Worldgen): Terrain => {
-  const chunks = createChunkStore(
-    (_, cx, cy) => generateChunk(world, cx, cy),
-    () => {},
+export const layersOf = (world: Worldgen, chunkAt: (layer: Layer, cx: number, cy: number) => Chunk): Layers => ({
+  terrainOn: memoize((layer: Layer) => createTerrain((cx, cy) => chunkAt(layer, cx, cy)), layerKey, LAYER_CACHE),
+  linkAcross: world.linkAcross,
+});
+
+export const generatedLayers = (world: Worldgen): Layers =>
+  layersOf(
+    world,
+    createChunkStore(
+      (layer, cx, cy) => chunkOn(world, layer, cx, cy),
+      () => {},
+    ).chunkAt,
   );
-  return createTerrain((cx, cy) => chunks.chunkAt(SURFACE, cx, cy));
-};

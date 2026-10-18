@@ -35,6 +35,7 @@ const ROAD_MARK: Rgb = [120, 70, 30];
 const TRAIL_MARK: Rgb = [235, 215, 160];
 const CAMP_MARK: Rgb = [255, 140, 0];
 const GLADE_MARK: Rgb = [170, 255, 120];
+const CAVE_MARK: Rgb = [40, 30, 25];
 const FEATURE_OUTLINE: Rgb = [0, 0, 0];
 const FEATURE_RADIUS = 2;
 const DEEP_FOREST_AREA: Rgb = [8, 30, 14];
@@ -86,6 +87,7 @@ export const overviewFeatureMarks = (world: Worldgen, center: Point, radius: num
     return [
       ...world.deepForestsIn(region).flatMap(({ layout }) => featureMarks(layout.glade, GLADE_MARK)),
       ...(camp ? featureMarks(camp, CAMP_MARK) : []),
+      ...world.caveMouthsIn(region).flatMap(({ inside }) => featureMarks(inside, CAVE_MARK)),
     ];
   });
 

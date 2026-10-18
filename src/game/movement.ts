@@ -25,7 +25,17 @@ interface Footing {
   readonly prop: Prop;
 }
 
-const SOLID: ReadonlySet<Prop> = new Set([Prop.Oak, Prop.Pine, Prop.Cactus, Prop.Boulder, Prop.Tent, Prop.Campfire]);
+const SOLID: ReadonlySet<Prop> = new Set([
+  Prop.Oak,
+  Prop.Pine,
+  Prop.Cactus,
+  Prop.Boulder,
+  Prop.Tent,
+  Prop.Campfire,
+  Prop.Rock,
+  Prop.Stalagmite,
+  Prop.CaveMouth,
+]);
 
 export const isTrail = ({ way }: Footing): boolean => way !== Way.None;
 

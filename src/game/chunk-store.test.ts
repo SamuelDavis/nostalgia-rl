@@ -3,7 +3,7 @@ import { CHUNK_SIZE, type Chunk, type Layer, SURFACE, layerKey } from "../worldg
 import { chunksAround, createChunkStore } from "./chunk-store";
 
 const chunkOf = (cx: number, cy: number, layer: Layer = SURFACE) => ({ layer, cx, cy }) as Chunk;
-const FLOOR = { cave: 1, floor: -2 };
+const FLOOR = { cave: { x: 1, y: 1 }, floor: -2 };
 
 const storeWith = () => {
   const generated: string[] = [];
@@ -49,7 +49,7 @@ describe("createChunkStore", () => {
     store.chunkAt(FLOOR, 0, 0);
     store.chunkAt(FLOOR, 0, 0);
     store.prefetch(FLOOR, { x: 16, y: 16 }, 0);
-    expect(generated).toEqual(["1:-2 0,0"]);
+    expect(generated).toEqual(["1,1:-2 0,0"]);
     expect(requested).toEqual([]);
   });
 });

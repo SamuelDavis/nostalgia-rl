@@ -16,6 +16,9 @@ export const propGlyph: Record<Prop, string> = {
   [Prop.Tent]: "▲",
   [Prop.Campfire]: "☼",
   [Prop.Bridge]: "#",
+  [Prop.Rock]: "",
+  [Prop.Stalagmite]: "^",
+  [Prop.CaveMouth]: "∩",
 };
 
 export const coverGlyph: Record<Exclude<Cover, typeof Cover.None>, string> = {

@@ -2,7 +2,7 @@ import { type Point, hash, hashString, unit } from "../lib";
 import type { View } from "./camera";
 import { isCliff, isStairs, isTrail } from "../game/movement";
 import type { Terrain, Tile } from "../game/terrain";
-import { Cover, Prop, Water, Way } from "../worldgen";
+import { Cover, type Layer, Prop, Water, Way, layerKey } from "../worldgen";
 import {
   PLAYER_GLYPH,
   STAIRS_GLYPH,
@@ -123,6 +123,7 @@ const createLighting = (terrain: Terrain, left: number, top: number, columns: nu
 const lookOf = (tile: Tile, mode: HeightMode, light: number, heightShade: HeightShade, x: number, y: number): Look => {
   const surface = tile.way === Way.Road ? wayColor[Way.Road] : groundColor[tile.ground];
   const surfaceBackground = () => surfaceColor(mode, surface, tile.height, light, heightShade);
+  if (tile.prop === Prop.Rock) return { background: propColor[Prop.Rock], glyph: "", color: propColor[Prop.Rock] };
   if (tile.prop !== Prop.None) {
     const background = tile.water === Water.None ? surfaceBackground() : waterColor[tile.water];
     return { background, glyph: propGlyph[tile.prop], color: propColor[tile.prop] };
@@ -179,6 +180,7 @@ const drawSprite = (
 };
 
 export interface Player {
+  readonly layer: Layer;
   readonly position: Point;
   readonly shown: Point;
   readonly eyeLevel: number;
@@ -327,7 +329,7 @@ export const createViewport = (ctx: CanvasRenderingContext2D) => {
     const visibleLeft = centre.x - width / 2 / tilePx;
     const visibleTop = centre.y - height / 2 / tilePx;
     const eye = terrain(player.position.x, player.position.y);
-    const key = [devicePixelRatio, eye.cover, mode].join();
+    const key = [devicePixelRatio, eye.cover, mode, layerKey(player.layer)].join();
     const isSharp = (cellPx: number) =>
       (tilePx > restingTilePx || tilePx <= cellPx * MAX_UPSCALE) &&
       (tilePx !== restingTilePx || cellPx === resolutionFor(restingTilePx));

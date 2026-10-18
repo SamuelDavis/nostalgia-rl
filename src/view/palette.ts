@@ -54,6 +54,9 @@ export const propColor: Record<Prop, Rgb> = {
   [Prop.Tent]: [200, 60, 40],
   [Prop.Campfire]: [255, 160, 0],
   [Prop.Bridge]: [120, 80, 40],
+  [Prop.Rock]: [28, 24, 22],
+  [Prop.Stalagmite]: [160, 150, 140],
+  [Prop.CaveMouth]: [20, 16, 14],
 };
 
 const HYPSOMETRIC_STOPS: readonly (readonly [elevation: number, color: Rgb])[] = [

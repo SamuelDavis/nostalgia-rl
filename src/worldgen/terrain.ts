@@ -38,5 +38,8 @@ export const Prop = {
   Tent: 8,
   Campfire: 9,
   Bridge: 10,
+  Rock: 11,
+  Stalagmite: 12,
+  CaveMouth: 13,
 } as const;
 export type Prop = (typeof Prop)[keyof typeof Prop];

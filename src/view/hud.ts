@@ -9,6 +9,7 @@ import {
   Prop,
   Ground,
   SEA_LEVEL,
+  SURFACE,
   Water,
   type Worldgen,
   regionOf,
@@ -80,6 +81,12 @@ export const createHud = (parent: HTMLElement, world: Worldgen, controls: readon
       ["position", `${x}, ${y}`],
       ["chunk", `${floorDiv(x, CHUNK_SIZE)}, ${floorDiv(y, CHUNK_SIZE)}`],
       ["region", `${region.rx}, ${region.ry}`],
+      [
+        "floor",
+        session.layer === SURFACE
+          ? "surface"
+          : `${session.layer.floor} of cave at ${session.layer.cave.x}, ${session.layer.cave.y}`,
+      ],
       ["facing", nameOf(Direction, facing)],
       ["tap", tapTurnsFirst ? "turns, then steps" : "steps"],
       ["blocked", blocked ?? "—"],
