@@ -60,6 +60,7 @@ export const propColor: Record<Prop, Rgb> = {
   [Prop.RampDown]: [235, 215, 170],
   [Prop.RampUp]: [235, 215, 170],
   [Prop.Ramp]: [180, 165, 135],
+  [Prop.CaveExit]: [255, 235, 180],
 };
 
 const HYPSOMETRIC_STOPS: readonly (readonly [elevation: number, color: Rgb])[] = [

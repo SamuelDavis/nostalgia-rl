@@ -95,6 +95,13 @@ describe("cave floors", () => {
     expect(exposed / open).toBeLessThan(0.02);
   });
 
+  it("marks the mouth on the floor it opens from", () => {
+    const { plans, floors, caves } = caveWorldOf(1);
+    const cave = caves[0]!;
+    const { inside } = plans.planOf(cave).mouth;
+    expect(floors.floorOf(cave, 0).markAt(inside)).toBe("exit");
+  });
+
   it("leaves each ramp half to its own floor", () => {
     const { plans, floors, caves } = caveWorldOf(1);
     const cave = caves.find((c) => plans.planOf(c).bottom < 0)!;
@@ -104,8 +111,8 @@ describe("cave floors", () => {
       expect(upper.isOpen(tile)).toBe(i < RAMP_LINK);
       expect(lower.isOpen(tile)).toBe(i >= RAMP_LINK);
       expect((i < RAMP_LINK ? upper : lower).levelAt(tile)).toBe(tile.level);
-      expect(upper.rampAt(tile)).toBe(i === RAMP_LINK - 1 ? "down" : i < RAMP_LINK ? "slope" : undefined);
-      expect(lower.rampAt(tile)).toBe(i === RAMP_LINK ? "up" : i > RAMP_LINK ? "slope" : undefined);
+      expect(upper.markAt(tile)).toBe(i === RAMP_LINK - 1 ? "down" : i < RAMP_LINK ? "slope" : undefined);
+      expect(lower.markAt(tile)).toBe(i === RAMP_LINK ? "up" : i > RAMP_LINK ? "slope" : undefined);
     });
   });
 });

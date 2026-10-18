@@ -40,6 +40,10 @@ _Record user feedback verbatim, newest first, with the commit it refers to._
 
 Ramps are drawn as stairs (`≡`), with Rogue's `>` on the tile that steps down to the next floor and `<` on the tile that steps back up. A whole ramp of `>` or `<` read as arrows pointing along the ramp, often the wrong way.
 
+> the exits to caves should also have a dedicated symbol, sharing the symbol of the enterance
+
+The exit tile inside shows the mouth's `∩`, pale like daylight where the mouth outside is dark. It is walkable; the mouth on the surface stays solid so the cave is entered only across the link.
+
 ### 1ea8663: chunks in a worker
 
 > It feels very good.

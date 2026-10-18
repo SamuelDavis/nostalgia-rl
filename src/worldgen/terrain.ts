@@ -44,5 +44,6 @@ export const Prop = {
   RampDown: 14,
   RampUp: 15,
   Ramp: 16,
+  CaveExit: 17,
 } as const;
 export type Prop = (typeof Prop)[keyof typeof Prop];
