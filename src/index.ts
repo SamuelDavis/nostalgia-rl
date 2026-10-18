@@ -100,9 +100,9 @@ const render = (now: number) => {
   const shown = glide.shownAt(now);
   angle = turnToward(angle, facingAngle(session.facing), now - lastFrame, TURN_EASING_MS);
   eyeLevel = approach(eyeLevel, here()(session.position.x, session.position.y).height, now - lastFrame, EYE_EASING_MS);
-  const span = attentiveSpan({ natural, practical, sight }, now - lastActionAt);
+  const span = attentiveSpan({ natural, practical, sight: sight.distance }, now - lastActionAt);
   const view = camera(
-    { position: shown, look: lookOffset(open, heading), span: spanOf(span, zoomModifier) },
+    { position: shown, look: lookOffset(open, sight.lead), span: spanOf(span, zoomModifier) },
     { width: canvas.clientWidth, height: canvas.clientHeight },
     now - lastFrame,
   );

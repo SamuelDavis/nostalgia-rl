@@ -67,7 +67,8 @@ interface Spread {
 }
 
 const dot = (a: Point, b: Point) => a.x * b.x + a.y * b.y;
-const mean = (values: readonly number[]) => values.reduce((sum, v) => sum + v, 0) / values.length;
+const sum = (values: readonly number[]) => values.reduce((total, v) => total + v, 0);
+const mean = (values: readonly number[]) => sum(values) / values.length;
 
 export const openness = (levelAt: (x: number, y: number) => number, at: Point): readonly number[] => {
   const eye = levelAt(at.x, at.y);
@@ -128,11 +129,25 @@ const clearAlong = (terrain: Terrain, from: Point, direction: Point, eye: number
   return SIGHT_REACH;
 };
 
-export const sightAhead = (terrain: Terrain, from: Point, facing: Direction): number => {
+export interface Sight {
+  readonly distance: number;
+  readonly lead: Point;
+}
+
+export const sightAhead = (terrain: Terrain, from: Point, facing: Direction): Sight => {
   const ahead = stepToward({ x: 0, y: 0 }, facing);
   const eye = terrain(from.x, from.y).height + EYE_HEIGHT;
-  const nearness = mean(SIGHT_RAYS.map((angle) => 1 / (1 + clearAlong(terrain, from, rotate(ahead, angle), eye))));
-  return 1 / nearness - 1;
+  const lines = SIGHT_RAYS.map((angle) => {
+    const direction = rotate(ahead, angle);
+    return { direction, clear: clearAlong(terrain, from, direction, eye), weight: Math.cos(2 * angle) };
+  });
+  const nearness = sum(lines.map(({ clear, weight }) => weight / (1 + clear))) / sum(lines.map(({ weight }) => weight));
+  const reach = sum(SIGHT_RAYS.map(Math.cos)) * SIGHT_REACH;
+  const lead = {
+    x: sum(lines.map(({ direction, clear }) => direction.x * clear)) / reach,
+    y: sum(lines.map(({ direction, clear }) => direction.y * clear)) / reach,
+  };
+  return { distance: 1 / nearness - 1, lead };
 };
 
 interface Spans {
@@ -144,11 +159,11 @@ interface Spans {
 export const attentiveSpan = ({ natural, practical, sight }: Spans, idleMs: number): number =>
   Math.min(idleMs >= SETTLE_MS ? natural : practical, Math.round(NOSE_SPAN + sight * SPAN_PER_CLEAR_TILE));
 
-export const lookOffset = (open: readonly number[], heading: Point): Point => {
+export const lookOffset = (open: readonly number[], lead: Point): Point => {
   const lean = (axis: "x" | "y") => mean(COMPASS.map((d, i) => d[axis] * open[i]!));
   return {
-    x: clamp(heading.x * LEAD + lean("x") * LEAN, -MAX_OFFSET, MAX_OFFSET),
-    y: clamp(heading.y * LEAD + lean("y") * LEAN, -MAX_OFFSET, MAX_OFFSET),
+    x: clamp(lead.x * LEAD + lean("x") * LEAN, -MAX_OFFSET, MAX_OFFSET),
+    y: clamp(lead.y * LEAD + lean("y") * LEAN, -MAX_OFFSET, MAX_OFFSET),
   };
 };
 
