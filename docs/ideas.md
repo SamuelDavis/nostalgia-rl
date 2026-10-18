@@ -25,3 +25,7 @@ Close the view in dense trees, as the camera already closes when looking uphill.
 ## Action costs in ticks
 
 Keep the turn clock short and give each action a cost in ticks, so speed varies per action and entity: slower up steep inclines, faster on a horse. Decouples responsiveness and network budget (the tick) from pace (the cost).
+
+## Feature interiors on the map
+
+The map is a surface overview: it marks where features are (a deep forest's extent and glade, a cave's mouth) but not their insides. It could also show the interior of the feature the player is in, such as a deep forest's paths or the current cave floor.
