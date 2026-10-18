@@ -61,10 +61,7 @@ A natural feature inside a mountain: winding passages and caverns on several flo
 A feature dug by people into a cave: square rooms and straight corridors cut along the cave's own chambers and passages, reaching floors deeper than the cave. A cave's child feature, entered by a portal in place of the cave's mouth.
 
 **Yard**:
-The terrace levelled in front of a mine's portal, holding its spoil heap and the buildings the mine needs.
-
-**Spoil heap**:
-The mound of waste rock a mine has tipped beside its yard, larger the deeper the mine.
+The terrace levelled in front of a mine's portal, holding the buildings the mine needs.
 
 **Stairs**:
 A short, steep flight that miners dug from one floor of a mine to the next.

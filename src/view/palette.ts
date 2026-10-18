@@ -27,7 +27,6 @@ export const groundColor: Record<Ground, Rgb> = {
   [Ground.Rock]: [130, 120, 115],
   [Ground.Snow]: [235, 240, 245],
   [Ground.Dressed]: [165, 158, 148],
-  [Ground.Spoil]: [160, 140, 105],
 };
 
 export const wayColor: Record<Exclude<Way, typeof Way.None>, Rgb> = {

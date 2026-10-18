@@ -7,17 +7,12 @@ import { type WayLink, isOnWay } from "../ways";
 import type { CavePlan, Mouth } from "./plan";
 import { type Cave, TERRITORY_RADIUS } from "./siting";
 
-export interface Heap extends Point {
-  readonly radius: number;
-}
-
 export interface MineYard {
   readonly mouth: Mouth;
   readonly floors: number;
   readonly isWild: boolean;
   readonly half: number;
   readonly depth: number;
-  readonly heap: Heap;
   readonly props: readonly PlacedProp[];
 }
 
@@ -37,10 +32,7 @@ const FIRST_COLUMN = ROAD_HALF + 2;
 const MIN_HALF = 4;
 const MIN_DEPTH = 6;
 const SEAM = 8;
-const HEAP_RADIUS = 3;
-const HEAP_RADIUS_PER_FLOOR = 0.5;
-const HEAP_RISE = 1;
-const YARD_REACH = 48;
+const YARD_REACH = 32;
 const CACHE = 1024;
 
 const outwardOf = ({ inside, outside }: Mouth): Point => ({ x: outside.x - inside.x, y: outside.y - inside.y });
@@ -91,22 +83,20 @@ export const createMineYards = ({ seed, planOf, waynessAt, waysNear }: MineYardI
           columnOf(isWild ? [Prop.Bunkhouse, Prop.Campfire] : [], -side, mouth),
         ].flat();
         const props = columns.map(({ prop }) => prop).filter((prop) => !tilesOf(prop).some((p) => isOnWay(links, p)));
-        return { side, columns, props };
+        return { columns, props };
       };
       const preferred = hash(seed, SALT, cave.id) % 2 === 0 ? 1 : -1;
-      const { side, columns, props } = [layOut(preferred), layOut(-preferred)].reduce((a, b) =>
+      const { columns, props } = [layOut(preferred), layOut(-preferred)].reduce((a, b) =>
         b.props.length > a.props.length ? b : a,
       );
       const half = Math.max(MIN_HALF, ...columns.map(({ extent }) => FIRST_COLUMN + extent.u));
       const depth = Math.max(MIN_DEPTH, ...columns.map(({ end }) => end + 1));
-      const radius = HEAP_RADIUS + floors * HEAP_RADIUS_PER_FLOOR;
       return {
         mouth,
         floors,
         isWild,
         half,
         depth,
-        heap: { ...worldAt(mouth, -side * half, depth + Math.ceil(radius)), radius },
         props,
       };
     },
@@ -119,37 +109,20 @@ export const createMineYards = ({ seed, planOf, waynessAt, waysNear }: MineYardI
     priority: PRIORITY,
     reach: TERRITORY_RADIUS + YARD_REACH,
     bounds: (cave) => {
-      const { mouth, half, depth, heap } = yardOf(cave);
-      const r = heap.radius;
-      return boundsOf(
-        [
-          worldAt(mouth, -half, 1),
-          worldAt(mouth, half, depth),
-          { x: heap.x - r, y: heap.y - r },
-          { x: heap.x + r, y: heap.y + r },
-        ],
-        SEAM,
-      );
+      const { mouth, half, depth } = yardOf(cave);
+      return boundsOf([worldAt(mouth, -half, 1), worldAt(mouth, half, depth)], SEAM);
     },
     build: yardOf,
-    paint: ({ mouth, half, depth, heap, props }, draft, x, y) => {
+    paint: ({ mouth, half, depth, props }, draft, x, y) => {
       const p = { x, y };
       const { u, v } = localOf(mouth, p);
       if (v < 1) return false;
       const gap = distance({ x: Math.max(0, Math.abs(u) - half), y: Math.max(0, v - depth) }, { x: 0, y: 0 });
-      const isHeap = gap > 0 && distance(p, heap) < heap.radius;
-      if (gap > SEAM && !isHeap) return false;
-      if (gap <= SEAM) draft.height = settle(draft.height, mouth.level, gap);
-      if (gap > 0 && !isHeap) return false;
+      if (gap > SEAM) return false;
+      draft.height = settle(draft.height, mouth.level, gap);
+      if (gap > 0) return false;
       draft.water = Water.None;
       draft.cover = Cover.None;
-      if (isHeap) {
-        draft.height += Math.round(HEAP_RISE * (heap.radius - distance(p, heap)));
-        draft.ground = Ground.Spoil;
-        draft.prop = Prop.None;
-        draft.part = 0;
-        return true;
-      }
       const prop = props.find((placed) => partOf(placed, p) !== undefined);
       draft.ground = Ground.Dirt;
       draft.prop = prop?.kind ?? Prop.None;

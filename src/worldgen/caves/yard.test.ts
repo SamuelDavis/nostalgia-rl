@@ -4,7 +4,7 @@ import { generateChunk, tileIndex } from "../chunk";
 import { CHUNK_SIZE } from "../constants";
 import { partOf, tilesOf } from "../props";
 import { regionsAround } from "../region";
-import { Ground, Prop, Way } from "../terrain";
+import { Prop, Way } from "../terrain";
 import { createWorldgen } from "../world";
 import { BIG_MINE_FLOORS } from "./yard";
 
@@ -43,22 +43,6 @@ describe("mine yards", () => {
             expect(tileAt(seed, x, y).height, `yard at ${mouth.outside.x},${mouth.outside.y}`).toBe(mouth.level);
           }
       }
-  });
-
-  it("tips a spoil heap beside every yard, larger for deeper mines", { tags: "slow" }, () => {
-    for (const seed of SEEDS) {
-      const yards = yardsOf(seed);
-      expect(yards.length).toBeGreaterThan(0);
-      for (const { heap } of yards) {
-        let spoil = 0;
-        const r = Math.ceil(heap.radius);
-        for (let y = heap.y - r; y <= heap.y + r; y++)
-          for (let x = heap.x - r; x <= heap.x + r; x++) if (tileAt(seed, x, y).ground === Ground.Spoil) spoil++;
-        expect(spoil).toBeGreaterThan(0);
-      }
-      for (const a of yards)
-        for (const b of yards) if (a.floors > b.floors) expect(a.heap.radius).toBeGreaterThan(b.heap.radius);
-    }
   });
 
   it("stocks big mines with sheds and stockpiles, and houses wild ones' miners", () => {

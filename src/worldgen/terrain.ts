@@ -15,7 +15,6 @@ export const Ground = {
   Rock: 3,
   Snow: 4,
   Dressed: 5,
-  Spoil: 6,
 } as const;
 export type Ground = (typeof Ground)[keyof typeof Ground];
 

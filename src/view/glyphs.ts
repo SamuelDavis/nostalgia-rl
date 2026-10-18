@@ -53,7 +53,6 @@ export const groundGlyph: Record<Ground, string> = {
   [Ground.Rock]: ":",
   [Ground.Snow]: "·",
   [Ground.Dressed]: "·",
-  [Ground.Spoil]: "∴",
 };
 
 export const wayGlyph: Record<Exclude<Way, typeof Way.None>, string> = {
