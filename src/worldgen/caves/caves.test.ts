@@ -9,7 +9,7 @@ import { createCaves } from "./caves";
 const cavesOf = memoize(
   (seed: number) => {
     const { fields } = createWorldgen(seed);
-    return createCaves({ seed, fields, peakOf: (r) => findPeak(fields, r), waynessAt: () => 0 });
+    return createCaves({ seed, fields, peakOf: (r) => findPeak(fields, r), waynessAt: () => 0, waysNear: () => [] });
   },
   String,
   2,

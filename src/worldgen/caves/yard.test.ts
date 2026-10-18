@@ -1,0 +1,89 @@
+import { describe, expect, it } from "vitest";
+import { floorDiv, memoize } from "../../lib";
+import { generateChunk, tileIndex } from "../chunk";
+import { CHUNK_SIZE } from "../constants";
+import { partOf, tilesOf } from "../props";
+import { regionsAround } from "../region";
+import { Ground, Prop, Way } from "../terrain";
+import { createWorldgen } from "../world";
+import { BIG_MINE_FLOORS } from "./yard";
+
+const worldOf = memoize(createWorldgen, String, 4);
+const chunkOf = memoize(
+  ({ seed, cx, cy }: { seed: number; cx: number; cy: number }) => generateChunk(worldOf(seed), cx, cy),
+  ({ seed, cx, cy }) => `${seed},${cx},${cy}`,
+  256,
+);
+const tileAt = (seed: number, x: number, y: number) => {
+  const chunk = chunkOf({ seed, cx: floorDiv(x, CHUNK_SIZE), cy: floorDiv(y, CHUNK_SIZE) });
+  const i = tileIndex(x - chunk.cx * CHUNK_SIZE, y - chunk.cy * CHUNK_SIZE);
+  return {
+    height: chunk.height[i]!,
+    ground: chunk.ground[i]!,
+    prop: chunk.prop[i]!,
+    part: chunk.part[i]!,
+    way: chunk.way[i]!,
+  };
+};
+
+const SEEDS = [1, 2, 3];
+const yardsOf = (seed: number) =>
+  [...new Set(regionsAround({ rx: 0, ry: 0 }, 4).flatMap(worldOf(seed).mineYardsIn))].map(({ layout }) => layout);
+
+describe("mine yards", () => {
+  it("levels a terrace at the portal's level in front of every mine", { tags: "slow" }, () => {
+    for (const seed of SEEDS)
+      for (const { mouth, half, depth } of yardsOf(seed)) {
+        const outward = { x: mouth.outside.x - mouth.inside.x, y: mouth.outside.y - mouth.inside.y };
+        const lateral = { x: -outward.y, y: outward.x };
+        for (let v = 1; v <= depth; v++)
+          for (let u = -half; u <= half; u++) {
+            const x = mouth.inside.x + lateral.x * u + outward.x * v;
+            const y = mouth.inside.y + lateral.y * u + outward.y * v;
+            expect(tileAt(seed, x, y).height, `yard at ${mouth.outside.x},${mouth.outside.y}`).toBe(mouth.level);
+          }
+      }
+  });
+
+  it("tips a spoil heap beside every yard, larger for deeper mines", { tags: "slow" }, () => {
+    for (const seed of SEEDS) {
+      const yards = yardsOf(seed);
+      expect(yards.length).toBeGreaterThan(0);
+      for (const { heap } of yards) {
+        let spoil = 0;
+        const r = Math.ceil(heap.radius);
+        for (let y = heap.y - r; y <= heap.y + r; y++)
+          for (let x = heap.x - r; x <= heap.x + r; x++) if (tileAt(seed, x, y).ground === Ground.Spoil) spoil++;
+        expect(spoil).toBeGreaterThan(0);
+      }
+      for (const a of yards)
+        for (const b of yards) if (a.floors > b.floors) expect(a.heap.radius).toBeGreaterThan(b.heap.radius);
+    }
+  });
+
+  it("stocks big mines with sheds and stockpiles, and houses wild ones' miners", () => {
+    const yards = SEEDS.flatMap(yardsOf);
+    const kindsOf = (yard: (typeof yards)[number]) => yard.props.map(({ kind }) => kind);
+    for (const yard of yards) {
+      const expected: Prop[] = [
+        ...(yard.floors >= BIG_MINE_FLOORS ? [Prop.Stockpile, Prop.Shed] : []),
+        ...(yard.isWild ? [Prop.Bunkhouse, Prop.Campfire] : []),
+      ];
+      expect(kindsOf(yard).every((kind) => expected.includes(kind))).toBe(true);
+    }
+    expect(yards.some((yard) => kindsOf(yard).includes(Prop.Shed))).toBe(true);
+    expect(yards.some((yard) => kindsOf(yard).includes(Prop.Bunkhouse))).toBe(true);
+  });
+
+  it("builds every prop whole and off the ways", { tags: "slow" }, () => {
+    for (const seed of SEEDS)
+      for (const { props } of yardsOf(seed))
+        for (const prop of props)
+          for (const p of tilesOf(prop)) {
+            const tile = tileAt(seed, p.x, p.y);
+            expect(tile.prop).toBe(prop.kind);
+            expect(tile.part).toBe(partOf(prop, p));
+            expect(tile.way).toBe(Way.None);
+          }
+  });
+});

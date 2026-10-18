@@ -49,6 +49,9 @@ const OBSTACLE_HEIGHTS: Record<Prop, number> = {
   [Prop.Ramp]: 0,
   [Prop.CaveExit]: 0,
   [Prop.MineEntrance]: Infinity,
+  [Prop.Shed]: metresToLevels(3),
+  [Prop.Stockpile]: metresToLevels(2),
+  [Prop.Bunkhouse]: metresToLevels(4),
 };
 const STEER = 0.3;
 export const SETTLE_MS = 1500;

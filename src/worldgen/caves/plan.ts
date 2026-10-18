@@ -22,7 +22,6 @@ export interface LevelledTile extends Point {
 export interface Mouth {
   readonly outside: Point;
   readonly inside: Point;
-  readonly portal: readonly Point[];
   readonly passage: readonly Point[];
   readonly level: number;
 }
@@ -65,7 +64,6 @@ export const RAMP_GAP = 4;
 const MINE_CHANCE = 0.75;
 const EMPTY_WAYNESS = 0.2;
 const BUSY_WAYNESS = 0.5;
-const PORTAL_LENGTH = 3;
 const MAX_MINE_FLOORS_BELOW = 6;
 const MAX_MINE_FLOORS_ABOVE = 3;
 const CACHE = 1024;
@@ -131,23 +129,10 @@ export const createCavePlans = ({ seed, fields, caveOwning, waynessAt }: CavePla
         outward,
         PASSAGE_LENGTH + 1,
       );
-      return { inside, outside, portal: [inside], passage, level: level(outside) };
+      return { inside, outside, passage, level: level(outside) };
     });
     const valid = attempts.filter((m) => m.passage.every((p) => isOwnedBy(cave, p)) && m.level < level(m.inside));
     return valid.find((m) => m.level <= target) ?? valid[0] ?? attempts.reduce((a, b) => (b.level < a.level ? b : a));
-  };
-
-  const dugOut = ({ inside, outside, passage }: Mouth): Mouth => {
-    const outward = { x: outside.x - inside.x, y: outside.y - inside.y };
-    const portal = stepsFrom(inside, outward, PORTAL_LENGTH);
-    const entrance = { x: inside.x + outward.x * PORTAL_LENGTH, y: inside.y + outward.y * PORTAL_LENGTH };
-    return {
-      inside: portal.at(-1)!,
-      outside: entrance,
-      portal,
-      passage: stepsFrom(passage[0]!, outward, passage.length + PORTAL_LENGTH - 1),
-      level: level(entrance),
-    };
   };
 
   const isMined = (cave: Cave, { outside }: Mouth) =>
@@ -187,9 +172,8 @@ export const createCavePlans = ({ seed, fields, caveOwning, waynessAt }: CavePla
 
   planOf = memoize(
     (cave: Cave): CavePlan => {
-      const natural = mouthOf(cave);
-      const isMine = isMined(cave, natural);
-      const mouth = isMine ? dugOut(natural) : natural;
+      const mouth = mouthOf(cave);
+      const isMine = isMined(cave, mouth);
       const baseOf = (floor: number) => mouth.level + floor * FLOOR_SPACING;
       const top = Math.max(0, Math.floor((cave.level - CEILING - mouth.level) / FLOOR_SPACING) - 1);
       const bottom = -countBiasedLow(MAX_FLOORS_BELOW, hash(cave.id, 3));

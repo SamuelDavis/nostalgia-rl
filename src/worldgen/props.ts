@@ -9,6 +9,9 @@ export interface PlacedProp {
 const TILE: Point = { x: 1, y: 1 };
 const FOOTPRINTS: Partial<Record<Prop, Point>> = {
   [Prop.Tent]: { x: 2, y: 2 },
+  [Prop.Shed]: { x: 3, y: 4 },
+  [Prop.Stockpile]: { x: 4, y: 4 },
+  [Prop.Bunkhouse]: { x: 10, y: 5 },
 };
 
 export const footprintOf = (kind: Prop): Point => FOOTPRINTS[kind] ?? TILE;

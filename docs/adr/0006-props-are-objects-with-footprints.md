@@ -8,4 +8,4 @@ The user drew the line: forests and mines are terrain a feature makes, while a t
 
 - A chunk stores a part per tile beside the prop; the view draws each part with its own glyph.
 - A prop is placed whole or not at all: whoever places it checks every tile of its footprint, across chunk seams.
-- Orientation comes with the first prop that isn't square.
+- Props keep their footprint's orientation in the world: a bunkhouse is 10×5 whichever way its yard faces, and layouts work around it. Turning props comes when a layout needs it.

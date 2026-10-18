@@ -93,18 +93,6 @@ describe("cave plans", () => {
     expect(mined(BUSY)).toBeLessThan(0.7);
   });
 
-  it("juts a mine's portal three tiles out of the mountain", () => {
-    const { caves, plans } = plansOf([1, BUSY]);
-    for (const cave of caves) {
-      const { mouth, mine } = plans.planOf(cave);
-      if (!mine) continue;
-      expect(mouth.portal).toHaveLength(3);
-      mouth.portal.forEach((p, i) => expect(isCardinalStep(p, mouth.portal[i + 1] ?? mouth.outside)).toBe(true));
-      expect(mouth.inside).toEqual(mouth.portal.at(-1));
-      expect(mouth.passage.at(-1)).toEqual(mouth.inside);
-    }
-  });
-
   it("digs mines past the cave's lowest floor, and above its highest only where the mountain has room", () => {
     const { caves, plans } = plansOf([1, BUSY]);
     const plansWithMines = caves.map(plans.planOf).filter((plan) => plan.mine);

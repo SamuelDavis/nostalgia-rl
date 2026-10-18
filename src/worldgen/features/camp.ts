@@ -1,11 +1,11 @@
-import { type Point, distance, hash, hashString, intBetween, memoize, projectOntoSegment, unit } from "../../lib";
+import { type Point, distance, hash, hashString, intBetween, memoize, unit } from "../../lib";
 import { MAX_CLIMB, REGION_SIZE, metresToLevels } from "../constants";
 import { type PlacedProp, partOf, tilesOf } from "../props";
 import { type Region, boundsOf, regionKey, regionOf, regionsAround } from "../region";
 import { type River, distanceToRiver } from "../rivers";
 import { Biome, Ground, Prop, Water } from "../terrain";
-import { WAY_SHAPES, type WayLink } from "../ways";
-import type { Anchor, FeatureType } from "./feature";
+import { type WayLink, isOnWay } from "../ways";
+import { type Anchor, type FeatureType, settle } from "./feature";
 
 export type Camp = Anchor;
 
@@ -72,11 +72,6 @@ const SEAM_PROBES: readonly Point[] = [
   { x: b!, y: -a! },
 ]);
 
-const settle = (level: number, campLevel: number, gap: number): number => {
-  const slack = Math.ceil(Math.max(0, gap - CAMP_YARD)) * MAX_CLIMB;
-  return Math.min(campLevel + slack, Math.max(campLevel - slack, level));
-};
-
 export const createCamps = ({ seed, level, biomeAt, riversNear, waysNear }: CampSiting) => {
   const levelsAround = (p: Point, probes: readonly Point[]) => probes.map((o) => level({ x: p.x + o.x, y: p.y + o.y }));
 
@@ -136,14 +131,6 @@ export const createCamps = ({ seed, level, biomeAt, riversNear, waysNear }: Camp
     REGION_CACHE,
   );
 
-  const isOnWay = (links: readonly WayLink[], p: Point) =>
-    links.some(({ nodes, way }) =>
-      nodes.some((a, i) => {
-        const b = nodes[i + 1];
-        return b && projectOntoSegment({ x: p.x + 0.5, y: p.y + 0.5 }, a, b).distance <= WAY_SHAPES[way].halfWidth;
-      }),
-    );
-
   const tentsOf = (camp: Camp): PlacedProp[] => {
     const links = regionsAround(regionOf(camp), 1).flatMap(waysNear);
     return TENT_SPOTS.map((o) => ({ kind: Prop.Tent, at: { x: camp.x + o.x, y: camp.y + o.y } }))
@@ -161,7 +148,7 @@ export const createCamps = ({ seed, level, biomeAt, riversNear, waysNear }: Camp
     paint: ({ camp, level: campLevel, tents }, draft, x, y) => {
       const gap = distance({ x: x + 0.5, y: y + 0.5 }, { x: camp.x + 0.5, y: camp.y + 0.5 });
       if (gap > CAMP_RADIUS) return false;
-      draft.height = settle(draft.height, campLevel, gap);
+      draft.height = settle(draft.height, campLevel, gap - CAMP_YARD);
       draft.water = Water.None;
       if (gap <= CAMP_YARD) draft.ground = Ground.Dirt;
       const p = { x, y };

@@ -15,6 +15,7 @@ export const Ground = {
   Rock: 3,
   Snow: 4,
   Dressed: 5,
+  Spoil: 6,
 } as const;
 export type Ground = (typeof Ground)[keyof typeof Ground];
 
@@ -47,5 +48,8 @@ export const Prop = {
   Ramp: 16,
   CaveExit: 17,
   MineEntrance: 18,
+  Shed: 19,
+  Stockpile: 20,
+  Bunkhouse: 21,
 } as const;
 export type Prop = (typeof Prop)[keyof typeof Prop];

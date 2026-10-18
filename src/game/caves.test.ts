@@ -21,6 +21,7 @@ const caves = createCaves({
   fields: world.fields,
   peakOf: (r) => findPeak(world.fields, r),
   waynessAt: createWayness(world),
+  waysNear: world.waysNear,
 });
 const nearby = regionsAround({ rx: 0, ry: 0 }, 4).flatMap(caves.cavesIn);
 const { terrainOn, linkAcross } = generatedLayers(world);

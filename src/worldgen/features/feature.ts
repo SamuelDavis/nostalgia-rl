@@ -1,4 +1,5 @@
 import type { Point } from "../../lib";
+import { MAX_CLIMB } from "../constants";
 import type { Bounds } from "../region";
 import type { Biome, Cover, Ground, Prop, Water, Way } from "../terrain";
 
@@ -44,6 +45,11 @@ export const place = <A extends Anchor, L>(type: FeatureType<A, L>, anchor: A): 
     bounds: type.bounds(anchor),
     paint: (draft, x, y) => type.paint(layout, draft, x, y),
   };
+};
+
+export const settle = (level: number, target: number, gap: number): number => {
+  const slack = Math.ceil(Math.max(0, gap)) * MAX_CLIMB;
+  return Math.min(target + slack, Math.max(target - slack, level));
 };
 
 export const paintInOrder = (features: readonly PlacedFeature[], draft: TileDraft, x: number, y: number): boolean =>

@@ -9,6 +9,8 @@ import { type CaveFloor, type Layer, SURFACE } from "../layer";
 import { type Region, regionKey, regionOf, regionsAround } from "../region";
 import { createCaveFloors } from "./floor";
 import { createJunctions } from "./junctions";
+import { createMineYards } from "./yard";
+import type { WayLink } from "../ways";
 import { type Ramp, createCavePlans, isOnFloors } from "./plan";
 import { type Cave, TERRITORY_RADIUS, createCaveSiting } from "./siting";
 
@@ -17,17 +19,19 @@ export interface CavesInput {
   readonly fields: Fields;
   readonly peakOf: (region: Region) => Peak | undefined;
   readonly waynessAt: (p: Point) => number;
+  readonly waysNear: (region: Region) => readonly WayLink[];
 }
 
 const CACHE = 4096;
-const MOUTH_PRIORITY = 2;
+const MOUTH_PRIORITY = 3;
 
 const isAt = (a: Point, b: Point | undefined) => b !== undefined && a.x === b.x && a.y === b.y;
 
-export const createCaves = ({ seed, fields, peakOf, waynessAt }: CavesInput) => {
+export const createCaves = ({ seed, fields, peakOf, waynessAt, waysNear }: CavesInput) => {
   const siting = createCaveSiting({ seed, fields, peakOf });
   const plans = createCavePlans({ seed, fields, caveOwning: siting.caveOwning, waynessAt });
   const { junctionsOf } = createJunctions({ seed, fields, siting, plans });
+  const yards = createMineYards({ seed, planOf: plans.planOf, waynessAt, waysNear });
   const floors = createCaveFloors({ seed, fields, caveOwning: siting.caveOwning, plans, junctionsOf });
 
   const caveAt = (anchor: Point) => siting.cavesIn(regionOf(anchor)).find((cave) => isAt(cave, anchor));
@@ -41,6 +45,7 @@ export const createCaves = ({ seed, fields, peakOf, waynessAt }: CavesInput) => 
     regionKey,
     CACHE,
   );
+  const minesIn = (region: Region): Cave[] => siting.cavesIn(region).filter((cave) => plans.mouthOf(cave).isMine);
   const openingsIn = (region: Region): Opening[] =>
     mouthsIn(region).flatMap(({ opening, isMine }) => (isMine ? [] : [opening]));
   const entrancesIn = (region: Region): Opening[] =>
@@ -85,15 +90,16 @@ export const createCaves = ({ seed, fields, peakOf, waynessAt }: CavesInput) => 
     priority: MOUTH_PRIORITY,
     reach: TERRITORY_RADIUS,
     bounds: (cave) => {
-      const { portal, outside } = plans.mouthOf(cave).mouth;
-      return boundsOf([...portal, outside], 1);
+      const { inside, outside } = plans.mouthOf(cave).mouth;
+      return boundsOf([inside, outside], 1);
     },
     build: (cave) => plans.mouthOf(cave),
     paint: ({ mouth, isMine }, draft, x, y) => {
       const p = { x, y };
-      const isPortal = mouth.portal.some((t) => isAt(p, t));
+      const isPortal = isAt(p, mouth.inside);
       if (!isPortal && !isAt(p, mouth.outside)) return false;
       draft.prop = !isPortal ? Prop.None : isMine ? Prop.MineEntrance : Prop.CaveMouth;
+      draft.part = 0;
       if (isPortal) draft.way = Way.None;
       draft.water = Water.None;
       draft.cover = Cover.None;
@@ -103,7 +109,9 @@ export const createCaves = ({ seed, fields, peakOf, waynessAt }: CavesInput) => 
 
   return {
     type,
+    yardType: yards.type,
     cavesIn: siting.cavesIn,
+    minesIn,
     planOf: plans.planOf,
     rampBelow: plans.rampBelow,
     junctionsOf,

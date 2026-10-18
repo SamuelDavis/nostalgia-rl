@@ -14,6 +14,7 @@ import { findPeak } from "./landmarks";
 import { type WayLink, createWayness, createWays } from "./ways";
 import { createCaves } from "./caves/caves";
 import type { FloorLayout } from "./caves/floor";
+import type { MineYard } from "./caves/yard";
 import type { Opening } from "./features/deep-forest";
 import type { CaveFloor, Layer } from "./layer";
 
@@ -28,6 +29,7 @@ export interface Worldgen {
   readonly featuresNear: (region: Region) => readonly PlacedFeature[];
   readonly caveMouthsIn: (region: Region) => readonly Opening[];
   readonly mineEntrancesIn: (region: Region) => readonly Opening[];
+  readonly mineYardsIn: (region: Region) => readonly PlacedFeature<MineYard>[];
   readonly caveFloorOf: (layer: CaveFloor) => FloorLayout | undefined;
   readonly linkAcross: (layer: Layer, from: Point, to: Point) => Layer | undefined;
 }
@@ -67,7 +69,13 @@ export const createWorldgen = (seed: number): Worldgen => {
   };
 
   const peakOf = memoize((region: Region) => findPeak(fields, region), regionKey, REGION_CACHE);
-  const caves = createCaves({ seed, fields, peakOf, waynessAt: createWayness({ fields, campAt: campAtRegion }) });
+  const caves = createCaves({
+    seed,
+    fields,
+    peakOf,
+    waynessAt: createWayness({ fields, campAt: campAtRegion }),
+    waysNear: (region) => ways.near(region),
+  });
   const ways = createWays({
     seed,
     fields,
@@ -93,10 +101,11 @@ export const createWorldgen = (seed: number): Worldgen => {
   });
   const deepForestPlacer = placer(deepForests.type, deepForests.partsIn);
   const caveMouthPlacer = placer(caves.type, caves.cavesIn);
+  const mineYardPlacer = placer(caves.yardType, caves.minesIn);
   const placers: readonly {
     readonly reach: number;
     readonly placedIn: (region: Region, within: Bounds) => readonly PlacedFeature[];
-  }[] = [deepForestPlacer, campPlacer, caveMouthPlacer];
+  }[] = [deepForestPlacer, campPlacer, mineYardPlacer, caveMouthPlacer];
 
   const featuresNearRegion = memoize(
     (region: Region): PlacedFeature[] =>
@@ -122,6 +131,7 @@ export const createWorldgen = (seed: number): Worldgen => {
     featuresNear: featuresNearRegion,
     caveMouthsIn: caves.openingsIn,
     mineEntrancesIn: caves.entrancesIn,
+    mineYardsIn: (region) => mineYardPlacer.placedIn(region),
     caveFloorOf: caves.floorOf,
     linkAcross: caves.linkAcross,
   };

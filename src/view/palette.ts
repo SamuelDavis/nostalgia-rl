@@ -27,6 +27,7 @@ export const groundColor: Record<Ground, Rgb> = {
   [Ground.Rock]: [130, 120, 115],
   [Ground.Snow]: [235, 240, 245],
   [Ground.Dressed]: [165, 158, 148],
+  [Ground.Spoil]: [160, 140, 105],
 };
 
 export const wayColor: Record<Exclude<Way, typeof Way.None>, Rgb> = {
@@ -63,6 +64,9 @@ export const propColor: Record<Prop, Rgb> = {
   [Prop.Ramp]: [180, 165, 135],
   [Prop.CaveExit]: [255, 235, 180],
   [Prop.MineEntrance]: [190, 140, 80],
+  [Prop.Shed]: [85, 55, 30],
+  [Prop.Stockpile]: [95, 90, 88],
+  [Prop.Bunkhouse]: [70, 45, 25],
 };
 
 const HYPSOMETRIC_STOPS: readonly (readonly [elevation: number, color: Rgb])[] = [
