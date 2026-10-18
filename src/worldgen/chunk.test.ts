@@ -25,7 +25,7 @@ const tileAt = (world: ReturnType<typeof createWorldgen>, x: number, y: number) 
 
 const digest = (chunk: Chunk) =>
   [chunk.height, chunk.ground, chunk.water, chunk.prop, chunk.biome].reduce(
-    (h, layer) => layer.reduce((acc, v) => hash(acc, v), h),
+    (h, layer) => Array.from(layer).reduce((acc, v) => hash(acc, v), h),
     0,
   );
 

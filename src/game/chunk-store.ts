@@ -1,7 +1,8 @@
 import { type Point, createLru, distance, floorDiv } from "../lib";
-import { CHUNK_SIZE, type Chunk } from "../worldgen";
+import { CHUNK_SIZE, type Chunk, type Layer, layerKey } from "../worldgen";
 
 export type ChunkAt = (cx: number, cy: number) => Chunk;
+type LayerChunkAt = (layer: Layer, cx: number, cy: number) => Chunk;
 
 interface ChunkCoord {
   readonly cx: number;
@@ -10,7 +11,7 @@ interface ChunkCoord {
 
 const CHUNK_CACHE = 1024;
 
-const keyOf = (cx: number, cy: number) => `${cx},${cy}`;
+const keyOf = (layer: Layer, cx: number, cy: number) => `${layerKey(layer)} ${cx},${cy}`;
 const centreOf = ({ cx, cy }: ChunkCoord): Point => ({ x: (cx + 0.5) * CHUNK_SIZE, y: (cy + 0.5) * CHUNK_SIZE });
 
 export const chunksAround = (p: Point, reach: number): ChunkCoord[] => {
@@ -25,28 +26,28 @@ export const chunksAround = (p: Point, reach: number): ChunkCoord[] => {
     .map(({ c }) => c);
 };
 
-export const createChunkStore = (generate: ChunkAt, request: (cx: number, cy: number) => void) => {
+export const createChunkStore = (generate: LayerChunkAt, request: (layer: Layer, cx: number, cy: number) => void) => {
   const held = createLru<Chunk>(CHUNK_CACHE);
   const asked = new Set<string>();
   const receive = (chunk: Chunk) => {
-    asked.delete(keyOf(chunk.cx, chunk.cy));
-    held.set(keyOf(chunk.cx, chunk.cy), chunk);
+    asked.delete(keyOf(chunk.layer, chunk.cx, chunk.cy));
+    held.set(keyOf(chunk.layer, chunk.cx, chunk.cy), chunk);
   };
   return {
     receive,
-    chunkAt: (cx: number, cy: number): Chunk => {
-      const chunk = held.get(keyOf(cx, cy));
+    chunkAt: (layer: Layer, cx: number, cy: number): Chunk => {
+      const chunk = held.get(keyOf(layer, cx, cy));
       if (chunk) return chunk;
-      const generated = generate(cx, cy);
+      const generated = generate(layer, cx, cy);
       receive(generated);
       return generated;
     },
-    prefetch: (p: Point, reach: number) => {
+    prefetch: (layer: Layer, p: Point, reach: number) => {
       for (const { cx, cy } of chunksAround(p, reach)) {
-        const key = keyOf(cx, cy);
+        const key = keyOf(layer, cx, cy);
         if (held.has(key) || asked.has(key)) continue;
         asked.add(key);
-        request(cx, cy);
+        request(layer, cx, cy);
       }
     },
   };

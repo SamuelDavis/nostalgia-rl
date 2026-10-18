@@ -1,10 +1,10 @@
 import "./index.css";
-import type { Point } from "./lib";
+import { type Point, memoize } from "./lib";
 import { actionFor, createDirectionInput } from "./game/input";
 import { Direction, stepToward } from "./game/movement";
 import { playTurn, startSession } from "./game/session";
 import { createChunkStore } from "./game/chunk-store";
-import { createTerrain } from "./game/terrain";
+import { type Layers, createTerrain } from "./game/terrain";
 import type { ChunkRequest } from "./chunk-worker";
 import {
   approach,
@@ -25,7 +25,7 @@ import { directionAt } from "./view/tap";
 import { createMap } from "./view/map";
 import { HEIGHT_MODES, type HeightMode } from "./view/palette";
 import { createViewport } from "./view/viewport";
-import { type Chunk, CHUNK_SIZE, createWorldgen, generateChunk } from "./worldgen";
+import { type Chunk, CHUNK_SIZE, type Layer, chunkOn, createWorldgen, layerKey } from "./worldgen";
 
 const DEFAULT_TURN_MS = 100;
 const DEFAULT_REPEAT_DELAY_MS = 50;
@@ -34,6 +34,7 @@ const ZOOM_STEP = 4;
 const EYE_EASING_MS = 300;
 const TURN_EASING_MS = 60;
 const PREFETCH_SPANS = 2;
+const LAYER_CACHE = 16;
 
 const KEY_DIRECTIONS: Record<string, Direction> = {
   KeyW: Direction.North,
@@ -50,11 +51,14 @@ const repeatDelayMs = Number(params.get("repeat") ?? DEFAULT_REPEAT_DELAY_MS);
 const world = createWorldgen(seed);
 const worker = new Worker(new URL("./chunk-worker.ts", import.meta.url), { type: "module" });
 const chunks = createChunkStore(
-  (cx, cy) => generateChunk(world, cx, cy),
-  (cx, cy) => worker.postMessage({ seed, cx, cy } satisfies ChunkRequest),
+  (layer, cx, cy) => chunkOn(world, layer, cx, cy),
+  (layer, cx, cy) => worker.postMessage({ seed, layer, cx, cy } satisfies ChunkRequest),
 );
 worker.addEventListener("message", ({ data }: MessageEvent<Chunk>) => chunks.receive(data));
-const terrain = createTerrain(chunks.chunkAt);
+const layers: Layers = {
+  terrainOn: memoize((layer: Layer) => createTerrain((cx, cy) => chunks.chunkAt(layer, cx, cy)), layerKey, LAYER_CACHE),
+  linkAcross: () => undefined,
+};
 const input = createDirectionInput(repeatDelayMs);
 
 const canvas = document.createElement("canvas");
@@ -65,18 +69,19 @@ let session = startSession({
   x: Number(params.get("x") ?? world.spawn.x),
   y: Number(params.get("y") ?? world.spawn.y),
 });
+const here = () => layers.terrainOn(session.layer);
 let mode: HeightMode = HEIGHT_MODES[0];
 let zoomModifier = 0;
-const opennessAt = (p: Point) => openness((x, y) => terrain(x, y).height, p);
+const opennessAt = (p: Point) => openness((x, y) => here()(x, y).height, p);
 let open = opennessAt(session.position);
 let heading: Point = { x: 0, y: 0 };
 let natural = naturalSpan(open, heading);
 let practical = practicalSpan(open, heading);
-let sight = sightAhead(terrain, session.position, session.facing);
+let sight = sightAhead(here(), session.position, session.facing);
 let lastActionAt = performance.now();
 let tapTurnsFirst = false;
 let angle = facingAngle(session.facing);
-let eyeLevel = terrain(session.position.x, session.position.y).height;
+let eyeLevel = here()(session.position.x, session.position.y).height;
 const camera = createCamera();
 const glide = createGlide(turnMs, session.position);
 const drawViewport = createViewport(ctx);
@@ -98,7 +103,7 @@ let lastFrame = performance.now();
 const render = (now: number) => {
   const shown = glide.shownAt(now);
   angle = turnToward(angle, facingAngle(session.facing), now - lastFrame, TURN_EASING_MS);
-  eyeLevel = approach(eyeLevel, terrain(session.position.x, session.position.y).height, now - lastFrame, EYE_EASING_MS);
+  eyeLevel = approach(eyeLevel, here()(session.position.x, session.position.y).height, now - lastFrame, EYE_EASING_MS);
   const span = attentiveSpan({ natural, practical, sight }, now - lastActionAt);
   const view = camera(
     { position: shown, look: lookOffset(open, heading), span: spanOf(span, zoomModifier) },
@@ -112,11 +117,11 @@ const render = (now: number) => {
     .map(Math.round)
     .join();
   if (!dirty && placement === drawn) return;
-  drawViewport(terrain, view, { position: session.position, shown, eyeLevel, angle }, mode);
+  drawViewport(here(), view, { position: session.position, shown, eyeLevel, angle }, mode);
   hud.update({
     session,
     turnMs,
-    tile: terrain(session.position.x, session.position.y),
+    tile: here()(session.position.x, session.position.y),
     mode,
     zoom: { span, natural, modifier: zoomModifier },
     tapTurnsFirst,
@@ -171,17 +176,17 @@ const frame = (now: number) => {
     const press = input.take(now);
     const action = press && actionFor(press, session.facing, tapTurnsFirst);
     if (action !== undefined) lastActionAt = now;
-    session = playTurn(session, terrain, action);
+    session = playTurn(session, layers, action);
     if (session.position !== previous) {
       glide.moveTo(session.position, scheduled);
       open = opennessAt(session.position);
       syncUrl();
     }
     heading = steer(heading, stepToward({ x: 0, y: 0 }, session.facing));
-    chunks.prefetch(session.position, PREFETCH_SPANS * spanOf(natural, zoomModifier) + CHUNK_SIZE);
+    chunks.prefetch(session.layer, session.position, PREFETCH_SPANS * spanOf(natural, zoomModifier) + CHUNK_SIZE);
     natural = naturalSpan(open, heading);
     practical = practicalSpan(open, heading);
-    sight = sightAhead(terrain, session.position, session.facing);
+    sight = sightAhead(here(), session.position, session.facing);
     dirty = true;
     nextTurn = Math.max(nextTurn + turnMs, now);
   }

@@ -9,3 +9,4 @@ export * from "./landmarks";
 export * from "./landform";
 export * from "./region";
 export * from "./ways";
+export * from "./layer";

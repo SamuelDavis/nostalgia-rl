@@ -1,10 +1,12 @@
 import type { Point } from "../lib";
+import { type Layer, SURFACE } from "../worldgen";
 import { type Blocker, Direction, blockerBetween, stepToward } from "./movement";
-import type { Terrain } from "./terrain";
+import type { Layers } from "./terrain";
 
 export interface Session {
   readonly turn: number;
   readonly position: Point;
+  readonly layer: Layer;
   readonly facing: Direction;
   readonly blocked: Blocker | undefined;
 }
@@ -17,17 +19,21 @@ export interface Action {
 export const startSession = (position: Point): Session => ({
   turn: 0,
   position,
+  layer: SURFACE,
   facing: Direction.South,
   blocked: undefined,
 });
 
-export const playTurn = (session: Session, terrain: Terrain, action: Action | undefined): Session => {
+export const playTurn = (session: Session, { terrainOn, linkAcross }: Layers, action: Action | undefined): Session => {
   const turn = session.turn + 1;
   if (action === undefined) return { ...session, turn };
   const { kind, direction } = action;
   if (kind === "face") return { ...session, turn, facing: direction, blocked: undefined };
-  const { position } = session;
+  const { position, layer } = session;
   const target = stepToward(position, direction);
-  const blocked = blockerBetween(terrain(position.x, position.y), terrain(target.x, target.y));
-  return { turn, position: blocked ? position : target, facing: direction, blocked };
+  const beyond = linkAcross(layer, position, target) ?? layer;
+  const blocked = blockerBetween(terrainOn(layer)(position.x, position.y), terrainOn(beyond)(target.x, target.y));
+  return blocked
+    ? { ...session, turn, facing: direction, blocked }
+    : { turn, position: target, layer: beyond, facing: direction, blocked };
 };

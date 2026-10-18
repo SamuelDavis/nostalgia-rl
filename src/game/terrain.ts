@@ -1,10 +1,12 @@
-import { floorDiv } from "../lib";
+import { type Point, floorDiv } from "../lib";
 import {
   type Biome,
   CHUNK_SIZE,
   type Cover,
   type Prop,
   type Ground,
+  type Layer,
+  SURFACE,
   type Water,
   type Way,
   type Worldgen,
@@ -25,6 +27,16 @@ export interface Tile {
 
 export type Terrain = (x: number, y: number) => Tile;
 
+export interface Layers {
+  readonly terrainOn: (layer: Layer) => Terrain;
+  readonly linkAcross: (layer: Layer, from: Point, to: Point) => Layer | undefined;
+}
+
+export const onlySurface = (terrain: Terrain): Layers => ({
+  terrainOn: () => terrain,
+  linkAcross: () => undefined,
+});
+
 export const createTerrain =
   (chunkAt: ChunkAt): Terrain =>
   (x, y) => {
@@ -41,10 +53,10 @@ export const createTerrain =
     };
   };
 
-export const generatedTerrain = (world: Worldgen): Terrain =>
-  createTerrain(
-    createChunkStore(
-      (cx, cy) => generateChunk(world, cx, cy),
-      () => {},
-    ).chunkAt,
+export const generatedTerrain = (world: Worldgen): Terrain => {
+  const chunks = createChunkStore(
+    (_, cx, cy) => generateChunk(world, cx, cy),
+    () => {},
   );
+  return createTerrain((cx, cy) => chunks.chunkAt(SURFACE, cx, cy));
+};

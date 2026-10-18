@@ -7,11 +7,13 @@ import type { RiverNode } from "./rivers";
 import { overlaps, regionOf } from "./region";
 import type { LinkedWay } from "./ways";
 import type { Worldgen } from "./world";
+import { type Layer, SURFACE, layerKey } from "./layer";
 
 export interface Chunk {
+  readonly layer: Layer;
   readonly cx: number;
   readonly cy: number;
-  readonly height: Uint8Array;
+  readonly height: Int16Array;
   readonly ground: Uint8Array;
   readonly water: Uint8Array;
   readonly prop: Uint8Array;
@@ -55,6 +57,11 @@ interface Pool extends Point {
 
 const bankLevel = (bed: number, gap: number): number => Math.floor(bed + gap * BANK_SLOPE);
 
+export const chunkOn = (world: Worldgen, layer: Layer, cx: number, cy: number): Chunk => {
+  if (layer !== SURFACE) throw new Error(`no generator for ${layerKey(layer)}`);
+  return generateChunk(world, cx, cy);
+};
+
 export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk => {
   const { seed, fields } = world;
   const originX = cx * CHUNK_SIZE;
@@ -91,7 +98,7 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
       overlaps(bounds, { minX: originX, minY: originY, maxX: originX + CHUNK_SIZE, maxY: originY + CHUNK_SIZE }),
     );
 
-  const height = new Uint8Array(TILES);
+  const height = new Int16Array(TILES);
   const ground = new Uint8Array(TILES);
   const water = new Uint8Array(TILES);
   const prop = new Uint8Array(TILES);
@@ -173,5 +180,5 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
       covers[i] = draft.cover;
     }
 
-  return { cx, cy, height, ground, water, prop, biome, way: ways, cover: covers };
+  return { layer: SURFACE, cx, cy, height, ground, water, prop, biome, way: ways, cover: covers };
 };

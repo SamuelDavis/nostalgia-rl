@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { Cover, Prop, Ground, Water, Way } from "../worldgen";
+import { type CaveFloor, Cover, Prop, Ground, SURFACE, Water, Way } from "../worldgen";
 import { Direction } from "./movement";
 import { playTurn, startSession } from "./session";
-import type { Terrain } from "./terrain";
+import { type Terrain, onlySurface } from "./terrain";
 
 const flat: Terrain = () => ({
   height: 100,
@@ -14,26 +14,56 @@ const flat: Terrain = () => ({
   cover: Cover.None,
 });
 const walledEast: Terrain = (x, y) => (x > 0 ? { ...flat(x, y), prop: Prop.Boulder } : flat(x, y));
+const cave: CaveFloor = { cave: 7, floor: 0 };
+const mouthEast = {
+  terrainOn: (layer: typeof SURFACE | CaveFloor) => (layer === SURFACE ? walledEast : flat),
+  linkAcross: (_: unknown, from: { x: number }, to: { x: number }) => (from.x === 0 && to.x === 1 ? cave : undefined),
+};
 
 describe("playTurn", () => {
   it("advances the turn without moving when idle", () => {
-    const next = playTurn(startSession({ x: 0, y: 0 }), flat, undefined);
+    const next = playTurn(startSession({ x: 0, y: 0 }), onlySurface(flat), undefined);
     expect(next).toMatchObject({ turn: 1, position: { x: 0, y: 0 } });
   });
 
   it("moves and faces the chosen direction", () => {
-    const next = playTurn(startSession({ x: 0, y: 0 }), flat, { kind: "step", direction: Direction.West });
+    const next = playTurn(startSession({ x: 0, y: 0 }), onlySurface(flat), { kind: "step", direction: Direction.West });
     expect(next).toMatchObject({ position: { x: -1, y: 0 }, facing: Direction.West, blocked: undefined });
   });
 
   it("turns to face a blocker without moving, and clears it on the next move", () => {
-    const bumped = playTurn(startSession({ x: 0, y: 0 }), walledEast, { kind: "step", direction: Direction.East });
+    const bumped = playTurn(startSession({ x: 0, y: 0 }), onlySurface(walledEast), {
+      kind: "step",
+      direction: Direction.East,
+    });
     expect(bumped).toMatchObject({ position: { x: 0, y: 0 }, facing: Direction.East, blocked: "obstacle" });
-    expect(playTurn(bumped, walledEast, { kind: "step", direction: Direction.North }).blocked).toBeUndefined();
+    expect(
+      playTurn(bumped, onlySurface(walledEast), { kind: "step", direction: Direction.North }).blocked,
+    ).toBeUndefined();
   });
 
   it("turns to face without moving", () => {
-    const turned = playTurn(startSession({ x: 0, y: 0 }), walledEast, { kind: "face", direction: Direction.East });
+    const turned = playTurn(startSession({ x: 0, y: 0 }), onlySurface(walledEast), {
+      kind: "face",
+      direction: Direction.East,
+    });
     expect(turned).toMatchObject({ position: { x: 0, y: 0 }, facing: Direction.East, blocked: undefined });
+  });
+
+  it("starts on the surface", () => {
+    expect(startSession({ x: 0, y: 0 }).layer).toBe(SURFACE);
+  });
+
+  it("crosses a link onto the layer beyond it", () => {
+    const inside = playTurn(startSession({ x: 0, y: 0 }), mouthEast, { kind: "step", direction: Direction.East });
+    expect(inside).toMatchObject({ position: { x: 1, y: 0 }, layer: cave, blocked: undefined });
+  });
+
+  it("stays on its layer off a link", () => {
+    const inside = playTurn(startSession({ x: 0, y: 0 }), mouthEast, { kind: "step", direction: Direction.East });
+    expect(playTurn(inside, mouthEast, { kind: "step", direction: Direction.East })).toMatchObject({
+      position: { x: 2, y: 0 },
+      layer: cave,
+    });
   });
 });
