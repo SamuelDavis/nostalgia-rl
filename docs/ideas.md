@@ -28,4 +28,16 @@ Keep the turn clock short and give each action a cost in ticks, so speed varies 
 
 ## Feature interiors on the map
 
-The map is a surface overview: it marks where features are (a deep forest's extent and glade, a cave's mouth) but not their insides. It could also show the interior of the feature the player is in, such as a deep forest's paths or the current cave floor.
+The map is a surface overview: it marks where features are (a deep forest's extent and glade, a cave's mouth) but not their insides. The user doesn't want interiors on the surface map (forests don't show theirs), but would like the map to show the feature the player is in, on their current floor, since forests and mines can be confusing to navigate.
+
+## Mining camp on its own flat
+
+A wild mine's camp on a small flat of its own beside the yard, joined by a short path, instead of on the yard's terrace: miners sleep away from the spoil, and from afar a wild mine shows two flats. The user chose one terrace for now.
+
+## Mine planking and shoring
+
+Planking along the line the miners followed, from the portal through each corridor to every stair, so a mine has paths to orient by as forests do; each time the line met a cave chamber, the miners cleared a room. Shoring props lining the walls of worked passages and rooms.
+
+## Chasms
+
+Open drops through cave floors, for a sense of depth underground.

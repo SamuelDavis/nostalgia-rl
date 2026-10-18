@@ -3,6 +3,7 @@ import { distance, floorDiv, hash, memoize } from "../lib";
 import { describe, expect, it } from "vitest";
 import { type Chunk, FADE_LENGTH, generateChunk, tileIndex } from "./chunk";
 import { CHUNK_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
+import { partOf, tilesOf } from "./props";
 import { regionOf, regionsAround } from "./region";
 import { createWorldgen } from "./world";
 
@@ -70,7 +71,7 @@ describe("generateChunk", () => {
       ].map(([cx, cy]) => digest(generateChunk(world, cx!, cy!))),
     ).toMatchInlineSnapshot(`
       [
-        517722342,
+        2733807378,
         3467417234,
         2706048685,
         410932772,
@@ -127,6 +128,29 @@ describe("generateChunk", () => {
     const world = worldOf(1);
     const { chunk, i } = tileAt(world, world.spawn.x, world.spawn.y);
     expect(chunk.prop[i]).toBe(Prop.Campfire);
+  });
+
+  it("pitches three whole tents in every camp, off its ways", () => {
+    for (const seed of [1, 2, 3]) {
+      const world = worldOf(seed);
+      const camps = regionsAround(ORIGIN, 1).flatMap((region) => world.campAt(region) ?? []);
+      let tents = 0;
+      for (const camp of camps)
+        for (let y = camp.y - 13; y <= camp.y + 13; y++)
+          for (let x = camp.x - 13; x <= camp.x + 13; x++) {
+            const { chunk, i } = tileAt(world, x, y);
+            if (chunk.prop[i] !== Prop.Tent || chunk.part[i] !== 0) continue;
+            tents++;
+            const tent = { kind: Prop.Tent, at: { x, y } };
+            for (const p of tilesOf(tent)) {
+              const tile = tileAt(world, p.x, p.y);
+              expect(tile.chunk.prop[tile.i], `tent at ${x},${y}`).toBe(Prop.Tent);
+              expect(tile.chunk.part[tile.i]).toBe(partOf(tent, p));
+              expect(tile.chunk.way[tile.i]).toBe(Way.None);
+            }
+          }
+      expect(tents).toBe(3 * camps.length);
+    }
   });
 
   it("grows trees", () => {

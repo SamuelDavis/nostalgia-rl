@@ -11,6 +11,7 @@ export interface TileDraft {
   ground: Ground;
   water: Water;
   prop: Prop;
+  part: number;
   way: Way;
   cover: Cover;
   readonly biome: Biome;

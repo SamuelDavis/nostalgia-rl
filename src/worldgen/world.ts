@@ -41,7 +41,13 @@ export const createWorldgen = (seed: number): Worldgen => {
   const rivers = createRivers(seed, fields);
   const riversNearRegion = rivers.near;
 
-  const camps = createCamps({ seed, level, biomeAt, riversNear: rivers.bandsNear });
+  const camps = createCamps({
+    seed,
+    level,
+    biomeAt,
+    riversNear: rivers.bandsNear,
+    waysNear: (region) => ways.near(region),
+  });
   const { spawn } = camps;
   const campAtRegion = camps.at;
 

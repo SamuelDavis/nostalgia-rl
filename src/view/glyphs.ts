@@ -13,7 +13,7 @@ export const propGlyph: Record<Prop, string> = {
   [Prop.Boulder]: "●",
   [Prop.Flowers]: "*",
   [Prop.Tuft]: '"',
-  [Prop.Tent]: "▲",
+  [Prop.Tent]: "◢◣▌▐",
   [Prop.Campfire]: "☼",
   [Prop.Bridge]: "#",
   [Prop.Rock]: "",

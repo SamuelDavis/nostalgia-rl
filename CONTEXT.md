@@ -75,7 +75,10 @@ A place where a feature's enclosed parts meet the world, such as a cave mouth or
 ## Contents
 
 **Prop**:
-A static object occupying a tile, such as a tree, boulder, tent or campfire.
+A static object placed on the ground, such as a tree, boulder, tent or campfire, occupying one or more tiles to scale.
+
+**Part**:
+One tile of a prop.
 
 **Entity**:
 Something with state or behaviour, such as a player, monster or item.

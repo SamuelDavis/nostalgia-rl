@@ -9,6 +9,7 @@ const flat: Terrain = () => ({
   ground: Ground.Grass,
   water: Water.None,
   prop: Prop.None,
+  part: 0,
   biome: 2,
   way: Way.None,
   cover: Cover.None,

@@ -41,6 +41,11 @@ export interface WaynessInput {
   readonly campAt: (region: Region) => Point | undefined;
 }
 
+export const WAY_SHAPES: Record<LinkedWay, { readonly halfWidth: number; readonly clearance: number }> = {
+  [Way.Road]: { halfWidth: 1.1, clearance: 1.5 },
+  [Way.Path]: { halfWidth: 0.8, clearance: 0.6 },
+};
+
 const NodeKind = { Lattice: 0, Camp: 1, Peak: 2, Opening: 3, Stub: 4, Entrance: 5 } as const;
 type NodeKind = (typeof NodeKind)[keyof typeof NodeKind];
 

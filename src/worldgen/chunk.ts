@@ -5,7 +5,7 @@ import { type TileDraft, paintInOrder } from "./features/feature";
 import { CHUNK_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
 import type { RiverNode } from "./rivers";
 import { overlaps, regionOf } from "./region";
-import type { LinkedWay } from "./ways";
+import { WAY_SHAPES } from "./ways";
 import type { Worldgen } from "./world";
 import type { FloorMark } from "./caves/floor";
 import { type CaveFloor, type Layer, SURFACE } from "./layer";
@@ -18,6 +18,7 @@ export interface Chunk {
   readonly ground: Uint8Array;
   readonly water: Uint8Array;
   readonly prop: Uint8Array;
+  readonly part: Uint8Array;
   readonly biome: Uint8Array;
   readonly way: Uint8Array;
   readonly cover: Uint8Array;
@@ -28,10 +29,6 @@ export const tileIndex = (lx: number, ly: number): number => ly * CHUNK_SIZE + l
 const TILES = CHUNK_SIZE * CHUNK_SIZE;
 const BANK_WIDTH = 12;
 const BANK_SLOPE = MAX_CLIMB * 0.75;
-const WAY_SHAPES: Record<LinkedWay, { readonly halfWidth: number; readonly clearance: number }> = {
-  [Way.Road]: { halfWidth: 1.1, clearance: 1.5 },
-  [Way.Path]: { halfWidth: 0.8, clearance: 0.6 },
-};
 export const FADE_LENGTH = 24;
 const FADE_SALT = hashString("way fades");
 const VEGETATION_SALT = hashString("vegetation");
@@ -101,6 +98,7 @@ const generateFloorChunk = (world: Worldgen, layer: CaveFloor, cx: number, cy: n
     ground,
     water: new Uint8Array(TILES).fill(Water.None),
     prop,
+    part: new Uint8Array(TILES),
     biome: new Uint8Array(TILES).fill(Biome.Mountain),
     way: new Uint8Array(TILES).fill(Way.None),
     cover: new Uint8Array(TILES).fill(Cover.None),
@@ -147,6 +145,7 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
   const ground = new Uint8Array(TILES);
   const water = new Uint8Array(TILES);
   const prop = new Uint8Array(TILES);
+  const part = new Uint8Array(TILES);
   const biome = new Uint8Array(TILES);
   const ways = new Uint8Array(TILES);
   const covers = new Uint8Array(TILES);
@@ -204,6 +203,7 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
         ground: tileGround,
         water: tileWater,
         prop: way && tileWater !== Water.None ? Prop.Bridge : Prop.None,
+        part: 0,
         way: way?.kind ?? Way.None,
         cover: Cover.None,
         biome: tileBiome,
@@ -220,10 +220,11 @@ export const generateChunk = (world: Worldgen, cx: number, cy: number): Chunk =>
       ground[i] = draft.water === Water.None ? draft.ground : Ground.Sand;
       water[i] = draft.water;
       prop[i] = draft.prop;
+      part[i] = draft.part;
       biome[i] = tileBiome;
       ways[i] = draft.way;
       covers[i] = draft.cover;
     }
 
-  return { layer: SURFACE, cx, cy, height, ground, water, prop, biome, way: ways, cover: covers };
+  return { layer: SURFACE, cx, cy, height, ground, water, prop, part, biome, way: ways, cover: covers };
 };

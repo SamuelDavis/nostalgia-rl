@@ -1,8 +1,10 @@
-import { type Point, distance, hash, hashString, intBetween, memoize, unit } from "../../lib";
+import { type Point, distance, hash, hashString, intBetween, memoize, projectOntoSegment, unit } from "../../lib";
 import { MAX_CLIMB, REGION_SIZE, metresToLevels } from "../constants";
-import { type Region, boundsOf, regionKey, regionOf } from "../region";
+import { type PlacedProp, partOf, tilesOf } from "../props";
+import { type Region, boundsOf, regionKey, regionOf, regionsAround } from "../region";
 import { type River, distanceToRiver } from "../rivers";
-import { Biome, Ground, Prop, Water, Way } from "../terrain";
+import { Biome, Ground, Prop, Water } from "../terrain";
+import { WAY_SHAPES, type WayLink } from "../ways";
 import type { Anchor, FeatureType } from "./feature";
 
 export type Camp = Anchor;
@@ -10,6 +12,7 @@ export type Camp = Anchor;
 interface CampLayout {
   readonly camp: Camp;
   readonly level: number;
+  readonly tents: readonly PlacedProp[];
 }
 
 export interface CampSiting {
@@ -17,6 +20,7 @@ export interface CampSiting {
   readonly level: (p: Point) => number;
   readonly biomeAt: (p: Point) => Biome;
   readonly riversNear: (region: Region) => readonly River[];
+  readonly waysNear: (region: Region) => readonly WayLink[];
 }
 
 export const CAMP_RADIUS = 12;
@@ -33,11 +37,17 @@ const REGION_CACHE = 4096;
 const SALT = hashString("camps");
 const SEAM_REACH = (CAMP_RADIUS - CAMP_YARD) * MAX_CLIMB;
 
-const TENT_OFFSETS: readonly Point[] = [
-  { x: -4, y: -2 },
-  { x: 3, y: -3 },
-  { x: 2, y: 4 },
-];
+const TENTS = 3;
+const TENT_SPOTS: readonly Point[] = [
+  [3, -1],
+  [2, 2],
+  [-1, 3],
+  [-4, 2],
+  [-5, -1],
+  [-4, -4],
+  [-1, -5],
+  [2, -4],
+].map(([x, y]) => ({ x: x!, y: y! }));
 
 const FLATNESS_PROBES: readonly Point[] = [
   { x: 6, y: 0 },
@@ -67,7 +77,7 @@ const settle = (level: number, campLevel: number, gap: number): number => {
   return Math.min(campLevel + slack, Math.max(campLevel - slack, level));
 };
 
-export const createCamps = ({ seed, level, biomeAt, riversNear }: CampSiting) => {
+export const createCamps = ({ seed, level, biomeAt, riversNear, waysNear }: CampSiting) => {
   const levelsAround = (p: Point, probes: readonly Point[]) => probes.map((o) => level({ x: p.x + o.x, y: p.y + o.y }));
 
   const deviatesBy = (levels: readonly number[], from: number, tolerance: number) =>
@@ -126,20 +136,38 @@ export const createCamps = ({ seed, level, biomeAt, riversNear }: CampSiting) =>
     REGION_CACHE,
   );
 
+  const isOnWay = (links: readonly WayLink[], p: Point) =>
+    links.some(({ nodes, way }) =>
+      nodes.some((a, i) => {
+        const b = nodes[i + 1];
+        return b && projectOntoSegment({ x: p.x + 0.5, y: p.y + 0.5 }, a, b).distance <= WAY_SHAPES[way].halfWidth;
+      }),
+    );
+
+  const tentsOf = (camp: Camp): PlacedProp[] => {
+    const links = regionsAround(regionOf(camp), 1).flatMap(waysNear);
+    return TENT_SPOTS.map((o) => ({ kind: Prop.Tent, at: { x: camp.x + o.x, y: camp.y + o.y } }))
+      .filter((tent) => !tilesOf(tent).some((p) => isOnWay(links, p)))
+      .sort((a, b) => hash(seed, SALT, a.at.x, a.at.y) - hash(seed, SALT, b.at.x, b.at.y))
+      .slice(0, TENTS);
+  };
+
   const type: FeatureType<Camp, CampLayout> = {
     name: "camp",
     priority: 1,
     reach: CAMP_RADIUS,
     bounds: (camp) => boundsOf([camp], CAMP_RADIUS),
-    build: (camp) => ({ camp, level: campLevel(camp) }),
-    paint: ({ camp, level: campLevel }, draft, x, y) => {
+    build: (camp) => ({ camp, level: campLevel(camp), tents: tentsOf(camp) }),
+    paint: ({ camp, level: campLevel, tents }, draft, x, y) => {
       const gap = distance({ x: x + 0.5, y: y + 0.5 }, { x: camp.x + 0.5, y: camp.y + 0.5 });
       if (gap > CAMP_RADIUS) return false;
       draft.height = settle(draft.height, campLevel, gap);
       draft.water = Water.None;
       if (gap <= CAMP_YARD) draft.ground = Ground.Dirt;
-      const isTent = draft.way === Way.None && TENT_OFFSETS.some((o) => x === camp.x + o.x && y === camp.y + o.y);
-      draft.prop = x === camp.x && y === camp.y ? Prop.Campfire : isTent ? Prop.Tent : Prop.None;
+      const p = { x, y };
+      const tent = tents.find((t) => partOf(t, p) !== undefined);
+      draft.prop = x === camp.x && y === camp.y ? Prop.Campfire : tent ? Prop.Tent : Prop.None;
+      draft.part = tent ? partOf(tent, p)! : 0;
       return true;
     },
   };

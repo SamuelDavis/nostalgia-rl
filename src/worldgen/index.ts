@@ -10,3 +10,4 @@ export * from "./landform";
 export * from "./region";
 export * from "./ways";
 export * from "./layer";
+export * from "./props";

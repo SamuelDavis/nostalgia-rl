@@ -129,7 +129,7 @@ const lookOf = (tile: Tile, mode: HeightMode, light: number, heightShade: Height
   if (tile.prop === Prop.Rock) return { background: propColor[Prop.Rock], glyph: "", color: propColor[Prop.Rock] };
   if (tile.prop !== Prop.None) {
     const background = tile.water === Water.None ? surfaceBackground() : waterColor[tile.water];
-    return { background, glyph: propGlyph[tile.prop], color: propColor[tile.prop] };
+    return { background, glyph: [...propGlyph[tile.prop]][tile.part]!, color: propColor[tile.prop] };
   }
   if (tile.water !== Water.None) {
     const background = waterColor[tile.water];

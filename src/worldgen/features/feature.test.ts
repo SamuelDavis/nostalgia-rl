@@ -7,6 +7,7 @@ const draft = (): TileDraft => ({
   ground: Ground.Grass,
   water: Water.None,
   prop: Prop.None,
+  part: 0,
   way: Way.None,
   cover: Cover.None,
   biome: Biome.Grassland,

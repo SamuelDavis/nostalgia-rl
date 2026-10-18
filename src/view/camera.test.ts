@@ -105,6 +105,7 @@ const field =
     ground: Ground.Grass,
     water: Water.None,
     prop: prop(x, y),
+    part: 0,
     biome: Biome.Grassland,
     way: Way.None,
     cover: Cover.None,

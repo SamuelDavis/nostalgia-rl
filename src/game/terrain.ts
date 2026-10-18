@@ -21,6 +21,7 @@ export interface Tile {
   readonly ground: Ground;
   readonly water: Water;
   readonly prop: Prop;
+  readonly part: number;
   readonly biome: Biome;
   readonly way: Way;
   readonly cover: Cover;
@@ -50,6 +51,7 @@ export const createTerrain =
       ground: chunk.ground[i] as Ground,
       water: chunk.water[i] as Water,
       prop: chunk.prop[i] as Prop,
+      part: chunk.part[i]!,
       biome: chunk.biome[i] as Biome,
       way: chunk.way[i] as Way,
       cover: chunk.cover[i] as Cover,
