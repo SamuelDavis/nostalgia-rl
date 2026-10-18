@@ -7,6 +7,7 @@ import type { RiverNode } from "./rivers";
 import { overlaps, regionOf } from "./region";
 import type { LinkedWay } from "./ways";
 import type { Worldgen } from "./world";
+import type { RampTile } from "./caves/floor";
 import { type CaveFloor, type Layer, SURFACE } from "./layer";
 
 export interface Chunk {
@@ -37,6 +38,7 @@ const VEGETATION_SALT = hashString("vegetation");
 const DECORATION_SALT = hashString("decoration");
 const STALAGMITE_SALT = hashString("stalagmites");
 const STALAGMITE_SHARE = 0.04;
+const RAMP_PROPS: Record<RampTile, Prop> = { slope: Prop.Ramp, down: Prop.RampDown, up: Prop.RampUp };
 const AROUND: readonly Point[] = [
   { x: 1, y: 0 },
   { x: 1, y: 1 },
@@ -81,7 +83,8 @@ const generateFloorChunk = (world: Worldgen, layer: CaveFloor, cx: number, cy: n
     const isInterior = floor?.isChamber(p) && AROUND.every((o) => floor.isChamber({ x: p.x + o.x, y: p.y + o.y }));
     const isStalagmite = isInterior && unit(hash(world.seed, STALAGMITE_SALT, p.x, p.y)) < STALAGMITE_SHARE;
     height[i] = floor?.levelAt(p) ?? 0;
-    prop[i] = !floor?.isOpen(p) ? Prop.Rock : isStalagmite ? Prop.Stalagmite : Prop.None;
+    const ramp = floor?.rampAt(p);
+    prop[i] = !floor?.isOpen(p) ? Prop.Rock : ramp ? RAMP_PROPS[ramp] : isStalagmite ? Prop.Stalagmite : Prop.None;
   }
   return {
     layer,

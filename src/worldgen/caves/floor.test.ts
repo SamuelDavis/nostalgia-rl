@@ -104,6 +104,8 @@ describe("cave floors", () => {
       expect(upper.isOpen(tile)).toBe(i < RAMP_LINK);
       expect(lower.isOpen(tile)).toBe(i >= RAMP_LINK);
       expect((i < RAMP_LINK ? upper : lower).levelAt(tile)).toBe(tile.level);
+      expect(upper.rampAt(tile)).toBe(i === RAMP_LINK - 1 ? "down" : i < RAMP_LINK ? "slope" : undefined);
+      expect(lower.rampAt(tile)).toBe(i === RAMP_LINK ? "up" : i > RAMP_LINK ? "slope" : undefined);
     });
   });
 });

@@ -34,6 +34,12 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 
 _Record user feedback verbatim, newest first, with the commit it refers to._
 
+### 03be79c: caves
+
+> I think that ramps should have a special symbol
+
+Ramps are drawn as stairs (`≡`), with Rogue's `>` on the tile that steps down to the next floor and `<` on the tile that steps back up. A whole ramp of `>` or `<` read as arrows pointing along the ramp, often the wrong way.
+
 ### 1ea8663: chunks in a worker
 
 > It feels very good.

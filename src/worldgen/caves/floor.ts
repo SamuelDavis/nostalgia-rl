@@ -17,10 +17,13 @@ import { CEILING, RAMP_LINK, type createCavePlans } from "./plan";
 import type { Junction } from "./junctions";
 import { type Cave, TERRITORY_RADIUS } from "./siting";
 
+export type RampTile = "slope" | "down" | "up";
+
 export interface FloorLayout {
   readonly isOpen: (p: Point) => boolean;
   readonly isChamber: (p: Point) => boolean;
   readonly levelAt: (p: Point) => number;
+  readonly rampAt: (p: Point) => RampTile | undefined;
   readonly openTiles: () => Point[];
 }
 
@@ -219,7 +222,14 @@ export const createCaveFloors = ({ seed, fields, caveOwning, plans, junctionsOf 
       for (let i = meeting; i !== undefined && i !== end; i = toward.get(i)) carve(pointOf(i), TUNNEL);
       reached = spread([indexOf(ends[0]!)], isWalkable);
     }
+    const ramps = new Map<number, RampTile>([
+      ...(below?.tiles.slice(0, RAMP_LINK) ?? []).map(
+        (t, i) => [indexOf(t), i === RAMP_LINK - 1 ? "down" : "slope"] as const,
+      ),
+      ...(above?.tiles.slice(RAMP_LINK) ?? []).map((t, i) => [indexOf(t), i === 0 ? "up" : "slope"] as const),
+    ]);
     return {
+      rampAt: (p) => ramps.get(indexOf(p)),
       isOpen: (p) => kindAt(p) !== ROCK,
       isChamber: (p) => kindAt(p) === CHAMBER,
       levelAt: (p) => {
