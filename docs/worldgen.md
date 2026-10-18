@@ -1,13 +1,14 @@
 # World generation
 
-`createWorldgen(seed)` (`src/worldgen/world.ts`) builds a world description. `generateChunk(world, cx, cy)` (`src/worldgen/chunk.ts`) turns it into tiles. The same seed and coordinates always give the same output, regardless of which chunks were generated before.
+`createWorldgen(seed)` (`src/worldgen/world.ts`) builds a world description. `chunkOn(world, layer, cx, cy)` (`src/worldgen/chunk.ts`) turns it into tiles: `generateChunk` for the surface, cave floors otherwise. The same seed and coordinates always give the same output, regardless of which chunks were generated before.
 
 ## Units
 
 The constants live in `src/worldgen/constants.ts`.
 
 - **Tile:** one grid cell, with integer coordinates. The world is unbounded in every direction.
-- **Chunk:** `CHUNK_SIZE`² tiles; the unit of generation and caching. A chunk is a set of flat typed arrays indexed by `tileIndex(lx, ly)`: `height`, `ground`, `water`, `prop`, `biome`, and `way` (road or path over the natural ground). The value sets are in `src/worldgen/terrain.ts`.
+- **Layer:** the surface, or one floor of a cave (`layer.ts`, [ADR 0005](adr/0005-cave-floors-are-layers-linked-at-tile-edges.md)). Every position, chunk and terrain lookup is on one layer; `linkAcross` names the layer a step lands on when it crosses a mouth, ramp or junction.
+- **Chunk:** `CHUNK_SIZE`² tiles of one layer; the unit of generation and caching. A chunk is a set of flat typed arrays indexed by `tileIndex(lx, ly)`: `height`, `ground`, `water`, `prop`, `biome`, and `way` (road or path over the natural ground). The value sets are in `src/worldgen/terrain.ts`.
 - **Region:** `REGION_SIZE`² tiles (`region.ts`); feature types site their anchors per region (camps at most one, deep forests one per forested blob).
 - **Height:** integer levels from 0 to `HEIGHT_LEVELS - 1`, fine enough that natural slope can exceed `MAX_CLIMB`, the most a walker can climb or descend per step; steeper steps are cliffs. Tiles below `SEA_LEVEL` are ocean, and the ocean surface sits at `SEA_LEVEL - 1`. Express thresholds as elevations (0–1) converted with `heightLevel`, so they survive changes to `HEIGHT_LEVELS`.
 
@@ -37,6 +38,16 @@ Each stage depends only on coarser stages within a bounded neighbourhood. That i
    - add decorations.
      Snow appears in cold areas, with a noise-dithered edge.
 
+## Caves
+
+`caves/`, [ADR 0005](adr/0005-cave-floors-are-layers-linked-at-tile-edges.md). Each stage reads only the ones before it, and a floor reads only its cave's plan.
+
+1. **Siting** (`siting.ts`): a region's peak is a candidate if its mountain is massive (most of a ring of probes is mountain), and a cave if no higher candidate is within `CAVE_SPACING`. A cave's territory is the tiles within `TERRITORY_RADIUS` that are nearer its anchor than any other's.
+2. **Plan** (`plan.ts`): one mouth, found by walking out from the anchor until the ground falls to a hashed height; floor 0 is level with the ground outside it. Floors are `FLOOR_SPACING` apart: above, as many as fit under the peak; below, a hashed depth. A ramp joins each floor to the next, placed where both halves have `CEILING` of rock overhead; a floor that can't be reached by ramps is dropped.
+3. **Junctions** (`junctions.ts`): neighbouring caves meet, by chance, at adjacent tiles on their shared border, each sloping from its nearest floor to a common height.
+4. **Floors** (`floor.ts`): chambers (rough blobs) and the floor's ends (mouth passage, ramp halves, junctions) joined by tunnels routed along their relative neighbourhood graph, under rock where possible. A repair pass then joins any end the tunnels left cut off. Each floor keeps out of the column of the other floors' ramp halves and junction slopes.
+5. **Surface:** the mouth is a feature painted on the surface (`∩`, solid) and an opening in the way network.
+
 Results for a region (rivers, anchors, placed features, ways) are memoized in an LRU cache inside the world object. The first chunk in a new region pays for the links and features near it. On the author's machine an isolated cold region takes about 220 ms, and a warm chunk about 4 ms (`npm run bench`).
 
 In the browser a Web Worker (`src/chunk-worker.ts`) generates chunks with its own world object. The main thread prefetches chunks nearest first within two view spans of the player (`src/game/chunk-store.ts`), and generates a chunk itself only when it is needed before the worker delivers it, as at startup. Output is identical either way, so this only moves cost.
@@ -54,7 +65,7 @@ Peers will generate terrain independently, so results must be bit-identical acro
 - `*.test.ts` files sit next to their sources. They check:
   - **determinism:** generation order and world instance don't affect results;
   - **golden digests** of four chunks, one crossed by a river (`chunk.test.ts`): update them deliberately, with `-u`, whenever generation is meant to change;
-  - **invariants across seeds:** rivers never flow uphill, never narrow downstream, and flow on into another river, the sea or a lake; ways cross land, neighbouring regions agree on the links they share, few ways fade and almost every camp has a road, the spawn is dry and near the origin, and carving (rivers, camps) never makes a step steeper than `max(MAX_CLIMB, natural step)`; ways are walkable up to their far end, or to where they fade, under the game's movement rules (`src/game/ways.test.ts`).
+  - **invariants across seeds:** rivers never flow uphill, never narrow downstream, and flow on into another river, the sea or a lake; ways cross land, neighbouring regions agree on the links they share, few ways fade and almost every camp has a road, the spawn is dry and near the origin, and carving (rivers, camps) never makes a step steeper than `max(MAX_CLIMB, natural step)`; ways are walkable up to their far end, or to where they fade, under the game's movement rules (`src/game/ways.test.ts`); caves keep rock overhead, every floor joins its ends, and a walker entering at a mouth reaches every floor and, through junctions, neighbouring caves (`src/game/caves.test.ts`).
 - Tests tagged `slow` sweep many seeds or regions; `npm test` skips them; `npm run test:all` and `npm run verify` run them. Tests share one world per seed within a file, since a cold region costs far more than a warm one.
 - `chunk.bench.ts` asserts a time budget for a warm chunk.
 
