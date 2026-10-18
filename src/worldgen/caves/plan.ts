@@ -44,7 +44,7 @@ const MOUTH_REACH = TERRITORY_RADIUS - PASSAGE_LENGTH;
 const MAX_FLOORS_BELOW = 8;
 const RAMP_TRIES = 32;
 const RAMP_REACH = Math.round(TERRITORY_RADIUS * 0.7);
-const RAMP_GAP = 4;
+export const RAMP_GAP = 4;
 const CACHE = 1024;
 
 const CARDINALS: readonly Point[] = [
@@ -65,10 +65,10 @@ const DIRECTIONS: readonly Point[] = [
   { x: Math.SQRT1_2, y: -Math.SQRT1_2 },
 ];
 
-const cardinalOf = (d: Point): Point =>
+export const cardinalOf = (d: Point): Point =>
   Math.abs(d.x) >= Math.abs(d.y) ? { x: Math.sign(d.x), y: 0 } : { x: 0, y: Math.sign(d.y) };
 
-const stepsFrom = (from: Point, step: Point, count: number): Point[] =>
+export const stepsFrom = (from: Point, step: Point, count: number): Point[] =>
   Array.from({ length: count }, (_, i) => ({ x: from.x + step.x * i, y: from.y + step.y * i }));
 
 export const createCavePlans = ({ seed, fields, caveOwning }: CavePlanInput) => {

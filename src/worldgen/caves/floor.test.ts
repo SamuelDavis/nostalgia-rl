@@ -5,6 +5,7 @@ import { findPeak } from "../landmarks";
 import { regionsAround } from "../region";
 import { createWorldgen } from "../world";
 import { createCaveFloors } from "./floor";
+import { createJunctions } from "./junctions";
 import { CEILING, RAMP_LINK, createCavePlans } from "./plan";
 import { createCaveSiting } from "./siting";
 
@@ -13,8 +14,16 @@ const caveWorldOf = memoize(
     const { fields } = createWorldgen(seed);
     const siting = createCaveSiting({ seed, fields, peakOf: (r) => findPeak(fields, r) });
     const plans = createCavePlans({ seed, fields, caveOwning: siting.caveOwning });
-    const floors = createCaveFloors({ seed, fields, caveOwning: siting.caveOwning, plans });
-    return { fields, siting, plans, floors, caves: regionsAround({ rx: 0, ry: 0 }, 3).flatMap(siting.cavesIn) };
+    const { junctionsOf } = createJunctions({ seed, fields, siting, plans });
+    const floors = createCaveFloors({ seed, fields, caveOwning: siting.caveOwning, plans, junctionsOf });
+    return {
+      fields,
+      siting,
+      plans,
+      floors,
+      junctionsOf,
+      caves: regionsAround({ rx: 0, ry: 0 }, 3).flatMap(siting.cavesIn),
+    };
   },
   String,
   4,
@@ -46,7 +55,7 @@ const reachableFrom = (start: Point, isOpen: (p: Point) => boolean, levelAt: (p:
 describe("cave floors", () => {
   it("connect the mouth and every ramp end on a floor", { tags: "slow" }, () => {
     for (const seed of [1, 2]) {
-      const { plans, floors, caves } = caveWorldOf(seed);
+      const { plans, floors, junctionsOf, caves } = caveWorldOf(seed);
       for (const cave of caves) {
         const plan = plans.planOf(cave);
         for (let floor = plan.top; floor >= plan.bottom; floor--) {
@@ -55,6 +64,9 @@ describe("cave floors", () => {
             ...(floor === 0 ? [plan.mouth.inside] : []),
             ...(floor > plan.bottom ? [plans.rampBelow(cave, floor)!.tiles[0]!] : []),
             ...(floor < plan.top ? [plans.rampBelow(cave, floor + 1)!.tiles.at(-1)!] : []),
+            ...junctionsOf(cave)
+              .filter((j) => j.floor === floor)
+              .map((j) => j.tiles[0]!),
           ];
           const reached = reachableFrom(ends[0]!, layout.isOpen, layout.levelAt);
           for (const end of ends) expect(reached.has(`${end.x},${end.y}`), `cave ${cave.id} floor ${floor}`).toBe(true);

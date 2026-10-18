@@ -14,6 +14,7 @@ import { MAX_CLIMB, heightLevel } from "../constants";
 import type { Fields } from "../fields";
 import { route } from "../routing";
 import { CEILING, RAMP_LINK, type createCavePlans } from "./plan";
+import type { Junction } from "./junctions";
 import { type Cave, TERRITORY_RADIUS } from "./siting";
 
 export interface FloorLayout {
@@ -28,6 +29,7 @@ export interface CaveFloorInput {
   readonly fields: Fields;
   readonly caveOwning: (p: Point) => Cave | undefined;
   readonly plans: ReturnType<typeof createCavePlans>;
+  readonly junctionsOf: (cave: Cave) => readonly Junction[];
 }
 
 const SALT = hashString("cave floors");
@@ -60,7 +62,7 @@ const NEIGHBOURS: readonly Point[] = [
 
 const tileCentre = (p: Point): Point => ({ x: p.x + 0.5, y: p.y + 0.5 });
 
-export const createCaveFloors = ({ seed, fields, caveOwning, plans }: CaveFloorInput) => {
+export const createCaveFloors = ({ seed, fields, caveOwning, plans, junctionsOf }: CaveFloorInput) => {
   const roughness = createNoise(seed, SALT);
   const wobble = createNoise(seed, hash(SALT, 1));
 
@@ -78,17 +80,28 @@ export const createCaveFloors = ({ seed, fields, caveOwning, plans }: CaveFloorI
 
     const below = floor > plan.bottom ? plans.rampBelow(cave, floor) : undefined;
     const above = floor < plan.top ? plans.rampBelow(cave, floor + 1) : undefined;
-    const ownRamp = [...(below?.tiles.slice(0, RAMP_LINK) ?? []), ...(above?.tiles.slice(RAMP_LINK) ?? [])];
-    const foreignRamp = [...(below?.tiles.slice(RAMP_LINK) ?? []), ...(above?.tiles.slice(0, RAMP_LINK) ?? [])];
+    const junctions = junctionsOf(cave).filter((j) => j.floor === floor);
+    const junctionsBesides = junctionsOf(cave).filter((j) => Math.abs(j.floor - floor) === 1);
+    const ownSlopes = [
+      ...(below?.tiles.slice(0, RAMP_LINK) ?? []),
+      ...(above?.tiles.slice(RAMP_LINK) ?? []),
+      ...junctions.flatMap((j) => j.tiles),
+    ];
+    const foreignSlopes = [
+      ...(below?.tiles.slice(RAMP_LINK) ?? []),
+      ...(above?.tiles.slice(0, RAMP_LINK) ?? []),
+      ...junctionsBesides.flatMap((j) => j.tiles),
+    ];
     const passage = floor === 0 ? plan.mouth.passage : [];
     const ends = [
       ...(passage[0] ? [passage[0]] : []),
       ...(below ? [below.tiles[0]!] : []),
       ...(above ? [above.tiles.at(-1)!] : []),
+      ...junctions.map((j) => j.tiles.at(-1)!),
     ];
-    const rampInterior = new Set(ownRamp.filter((t) => !ends.includes(t)).map(indexOf));
+    const rampInterior = new Set(ownSlopes.filter((t) => !ends.includes(t)).map(indexOf));
     const excluded = new Set(
-      foreignRamp.flatMap((t) =>
+      foreignSlopes.flatMap((t) =>
         [-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dx) => indexOf({ x: t.x + dx, y: t.y + dy }))),
       ),
     );
@@ -174,7 +187,7 @@ export const createCaveFloors = ({ seed, fields, caveOwning, plans }: CaveFloorI
 
     for (const p of [...passage, ...ends]) carve(p, TUNNEL);
     for (const i of excluded) if (i >= 0) kinds[i] = ROCK;
-    for (const t of ownRamp) {
+    for (const t of ownSlopes) {
       carve(t, TUNNEL);
       levels[indexOf(t)] = t.level;
     }

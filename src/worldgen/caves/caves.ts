@@ -8,6 +8,7 @@ import type { Peak } from "../landmarks";
 import { type CaveFloor, type Layer, SURFACE } from "../layer";
 import { type Region, regionKey, regionOf, regionsAround } from "../region";
 import { createCaveFloors } from "./floor";
+import { createJunctions } from "./junctions";
 import { RAMP_LINK, createCavePlans } from "./plan";
 import { type Cave, TERRITORY_RADIUS, createCaveSiting } from "./siting";
 
@@ -25,7 +26,8 @@ const isAt = (a: Point, b: Point | undefined) => b !== undefined && a.x === b.x 
 export const createCaves = ({ seed, fields, peakOf }: CavesInput) => {
   const siting = createCaveSiting({ seed, fields, peakOf });
   const plans = createCavePlans({ seed, fields, caveOwning: siting.caveOwning });
-  const floors = createCaveFloors({ seed, fields, caveOwning: siting.caveOwning, plans });
+  const { junctionsOf } = createJunctions({ seed, fields, siting, plans });
+  const floors = createCaveFloors({ seed, fields, caveOwning: siting.caveOwning, plans, junctionsOf });
 
   const caveAt = (anchor: Point) => siting.cavesIn(regionOf(anchor)).find((cave) => isAt(cave, anchor));
 
@@ -67,7 +69,7 @@ export const createCaves = ({ seed, fields, peakOf }: CavesInput) => {
     const above = floor < top ? plans.rampBelow(cave, floor + 1) : undefined;
     if (above && isAt(from, above.tiles[RAMP_LINK]) && isAt(to, above.tiles[RAMP_LINK - 1]))
       return { cave, floor: floor + 1 };
-    return undefined;
+    return junctionsOf(cave).find((j) => j.floor === floor && isAt(from, j.tiles[0]) && isAt(to, j.across))?.other;
   };
 
   const type: FeatureType<Cave, Opening> = {
@@ -95,6 +97,7 @@ export const createCaves = ({ seed, fields, peakOf }: CavesInput) => {
     cavesIn: siting.cavesIn,
     planOf: plans.planOf,
     rampBelow: plans.rampBelow,
+    junctionsOf,
     openingsIn,
     floorOf,
     linkAcross,
