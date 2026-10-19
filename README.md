@@ -39,7 +39,7 @@ These are requirements, not designs. How to meet them is decided in the multipla
 
 ## Layout
 
-The game depends on [worldgen](../worldgen), a portable world generation library in its own repo, through the filesystem ([ADR 0007](docs/adr/0007-worldgen-library-in-a-sibling-repo.md)). Clone it beside this repo before `npm install`.
+The game depends on [procgen](../procgen), a portable procedural generation library in its own repo, through the filesystem ([ADR 0007](docs/adr/0007-procgen-library-in-a-sibling-repo.md)). Clone it beside this repo before `npm install`.
 
 | Path           | Contents                                                                                 |
 | -------------- | ---------------------------------------------------------------------------------------- |

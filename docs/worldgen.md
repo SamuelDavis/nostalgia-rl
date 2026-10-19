@@ -59,7 +59,7 @@ In the browser a Web Worker (`src/chunk-worker.ts`) generates chunks with its ow
 Peers will generate terrain independently, so results must be bit-identical across JavaScript engines.
 
 - All randomness is counter-based hashing (`src/lib/hash.ts`): `hash(seed, salt, x, y, …)`. There is no stateful random number generator and no `Math.random`.
-- Use only operations with exactly specified results: `+ - * /`, `Math.sqrt`, `Math.floor`, `ceil`, `round`, `abs`, `min`, `max`, and integer operations. `Math.sin`, `cos`, `exp`, `pow`, `atan2`, `hypot`, and `**` are implementation-approximated, so keep them out of anything peers must reproduce. `npm run lint` enforces this in `src/lib`, `src/worldgen` and `src/game`, with the preset from `worldgen/eslint-determinism`.
+- Use only operations with exactly specified results: `+ - * /`, `Math.sqrt`, `Math.floor`, `ceil`, `round`, `abs`, `min`, `max`, and integer operations. `Math.sin`, `cos`, `exp`, `pow`, `atan2`, `hypot`, and `**` are implementation-approximated, so keep them out of anything peers must reproduce. `npm run lint` enforces this in `src/lib`, `src/worldgen` and `src/game`, with the preset from `procgen/eslint-determinism`.
 - `simplex-noise` uses only exact operations, and it is seeded through the hash.
 
 ## Tests

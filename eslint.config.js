@@ -1,5 +1,5 @@
 import tseslint from "typescript-eslint";
-import { determinismRules } from "worldgen/eslint-determinism";
+import { determinismRules } from "procgen/eslint-determinism";
 
 export default tseslint.config({
   files: ["src/lib/**/*.ts", "src/worldgen/**/*.ts", "src/game/**/*.ts"],
