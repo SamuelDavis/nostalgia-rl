@@ -1,8 +1,8 @@
 import tseslint from "typescript-eslint";
-import { determinismRules } from "./packages/procgen/eslint-determinism.js";
+import { determinismRules } from "worldgen/eslint-determinism";
 
 export default tseslint.config({
-  files: ["src/lib/**/*.ts", "src/worldgen/**/*.ts", "src/game/**/*.ts", "packages/procgen/{src,examples}/**/*.ts"],
+  files: ["src/lib/**/*.ts", "src/worldgen/**/*.ts", "src/game/**/*.ts"],
   ignores: ["**/*.test.ts", "**/*.bench.ts"],
   languageOptions: { parser: tseslint.parser },
   rules: determinismRules,

@@ -39,15 +39,16 @@ These are requirements, not designs. How to meet them is decided in the multipla
 
 ## Layout
 
-| Path               | Contents                                                                                                                                         |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/lib`          | Game-agnostic utilities: hashing, seeded noise, math, A\*, LRU memoize                                                                           |
-| `packages/procgen` | Portable procgen library, isolated from the game ([README](packages/procgen/README.md), [ADR 0007](docs/adr/0007-a-portable-procgen-library.md)) |
-| `src/worldgen`     | World generation ([docs/worldgen.md](docs/worldgen.md)); `features/` holds feature types                                                         |
-| `src/game`         | Game state and rules, independent of presentation                                                                                                |
-| `src/view`         | Canvas viewport, HTML HUD and map, palette shared with `tooling`                                                                                 |
-| `tooling`          | Node scripts for development, e.g. the offline map renderer                                                                                      |
-| `docs/phases`      | One doc per phase: goal, decisions, playtest log                                                                                                 |
+The game depends on [worldgen](../worldgen), a portable world generation library in its own repo, through the filesystem ([ADR 0007](docs/adr/0007-worldgen-library-in-a-sibling-repo.md)). Clone it beside this repo before `npm install`.
+
+| Path           | Contents                                                                                 |
+| -------------- | ---------------------------------------------------------------------------------------- |
+| `src/lib`      | Game-agnostic utilities: hashing, seeded noise, math, A\*, LRU memoize                   |
+| `src/worldgen` | World generation ([docs/worldgen.md](docs/worldgen.md)); `features/` holds feature types |
+| `src/game`     | Game state and rules, independent of presentation                                        |
+| `src/view`     | Canvas viewport, HTML HUD and map, palette shared with `tooling`                         |
+| `tooling`      | Node scripts for development, e.g. the offline map renderer                              |
+| `docs/phases`  | One doc per phase: goal, decisions, playtest log                                         |
 
 ## Commands
 

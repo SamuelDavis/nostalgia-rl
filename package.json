@@ -10,9 +10,9 @@
     "test": "vitest run --tagsFilter=!slow",
     "test:all": "vitest run",
     "bench": "vitest bench --run",
-    "typecheck": "tsc && tsc -p packages/procgen",
+    "typecheck": "tsc",
     "lint": "eslint .",
-    "verify": "tsc && tsc -p packages/procgen && eslint . && vitest run",
+    "verify": "tsc && eslint . && vitest run",
     "map": "tsx tooling/worldmap.ts",
     "format": "prettier --write ."
   },
@@ -29,6 +29,7 @@
     "vitest": "^5.0.5"
   },
   "dependencies": {
-    "simplex-noise": "^4.0.3"
+    "simplex-noise": "^4.0.3",
+    "worldgen": "file:../worldgen"
   }
 }
