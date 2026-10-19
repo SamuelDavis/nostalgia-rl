@@ -2,7 +2,7 @@ import { type Point, distance, hash, hashString, memoize } from "../../lib";
 import { type FeatureType, settle } from "../features/feature";
 import { type PlacedProp, footprintOf, partOf, tilesOf } from "../props";
 import { type Region, boundsOf, regionOf, regionsAround } from "../region";
-import { Cover, Ground, Prop, Water } from "../terrain";
+import { Cover, Ground, Prop, Water, Way } from "../terrain";
 import { type WayLink, isOnWay } from "../ways";
 import type { CavePlan, Mouth } from "./plan";
 import { type Cave, TERRITORY_RADIUS } from "./siting";
@@ -10,7 +10,6 @@ import { type Cave, TERRITORY_RADIUS } from "./siting";
 export interface MineYard {
   readonly mouth: Mouth;
   readonly floors: number;
-  readonly isWild: boolean;
   readonly half: number;
   readonly depth: number;
   readonly props: readonly PlacedProp[];
@@ -19,18 +18,17 @@ export interface MineYard {
 export interface MineYardInput {
   readonly seed: number;
   readonly planOf: (cave: Cave) => CavePlan;
-  readonly waynessAt: (p: Point) => number;
   readonly waysNear: (region: Region) => readonly WayLink[];
 }
 
+export const MEDIUM_MINE_FLOORS = 8;
 export const BIG_MINE_FLOORS = 12;
-export const WILD_WAYNESS = 0.4;
 const SALT = hashString("mine yards");
 const PRIORITY = 2;
 const ROAD_HALF = 1;
 const FIRST_COLUMN = ROAD_HALF + 2;
-const MIN_HALF = 4;
-const MIN_DEPTH = 6;
+const MIN_HALF = 3;
+const MIN_DEPTH = 3;
 const SEAM = 8;
 const YARD_REACH = 32;
 const CACHE = 1024;
@@ -70,18 +68,21 @@ const columnOf = (kinds: readonly Prop[], side: number, mouth: Mouth) => {
   });
 };
 
-export const createMineYards = ({ seed, planOf, waynessAt, waysNear }: MineYardInput) => {
+const columnsFor = (floors: number, hasTent: boolean): readonly (readonly Prop[])[] => {
+  if (floors >= BIG_MINE_FLOORS) return [[Prop.Stockpile, Prop.Shed, Prop.Shed], [Prop.Bunkhouse, Prop.Campfire]];
+  if (floors >= MEDIUM_MINE_FLOORS) return [[Prop.Stockpile], [Prop.Tent, Prop.Campfire]];
+  return [[Prop.Campfire], hasTent ? [Prop.Tent] : []];
+};
+
+export const createMineYards = ({ seed, planOf, waysNear }: MineYardInput) => {
   const yardOf = memoize(
     (cave: Cave): MineYard => {
       const { mouth, mine } = planOf(cave);
       const floors = mine ? mine.top - mine.bottom + 1 : 0;
-      const isWild = waynessAt(mouth.outside) < WILD_WAYNESS;
+      const [near, far] = columnsFor(floors, hash(seed, SALT, cave.id, 1) % 2 === 0);
       const links = regionsAround(regionOf(mouth.outside), 1).flatMap(waysNear);
       const layOut = (side: number) => {
-        const columns = [
-          columnOf(floors >= BIG_MINE_FLOORS ? [Prop.Stockpile, Prop.Shed] : [], side, mouth),
-          columnOf(isWild ? [Prop.Bunkhouse, Prop.Campfire] : [], -side, mouth),
-        ].flat();
+        const columns = [columnOf(near!, side, mouth), columnOf(far!, -side, mouth)].flat();
         const props = columns.map(({ prop }) => prop).filter((prop) => !tilesOf(prop).some((p) => isOnWay(links, p)));
         return { columns, props };
       };
@@ -94,7 +95,6 @@ export const createMineYards = ({ seed, planOf, waynessAt, waysNear }: MineYardI
       return {
         mouth,
         floors,
-        isWild,
         half,
         depth,
         props,
@@ -127,6 +127,7 @@ export const createMineYards = ({ seed, planOf, waynessAt, waysNear }: MineYardI
       draft.ground = Ground.Dirt;
       draft.prop = prop?.kind ?? Prop.None;
       draft.part = prop ? partOf(prop, p)! : 0;
+      if (prop) draft.way = Way.None;
       return true;
     },
   };

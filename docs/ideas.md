@@ -32,7 +32,7 @@ The map is a surface overview: it marks where features are (a deep forest's exte
 
 ## Mining camp on its own flat
 
-A wild mine's camp on a small flat of its own beside the yard, joined by a short path, instead of on the yard's terrace: miners sleep away from the spoil, and from afar a wild mine shows two flats. The user chose one terrace for now.
+A big mine's bunkhouse and campfire on a small flat of their own beside the yard, joined by a short path, instead of on the yard's terrace: miners sleep away from the work, and from afar a big mine shows two flats. The user chose one terrace for now.
 
 ## Mine planking and shoring
 

@@ -31,7 +31,7 @@ export const createCaves = ({ seed, fields, peakOf, waynessAt, waysNear }: Caves
   const siting = createCaveSiting({ seed, fields, peakOf });
   const plans = createCavePlans({ seed, fields, caveOwning: siting.caveOwning, waynessAt });
   const { junctionsOf } = createJunctions({ seed, fields, siting, plans });
-  const yards = createMineYards({ seed, planOf: plans.planOf, waynessAt, waysNear });
+  const yards = createMineYards({ seed, planOf: plans.planOf, waysNear });
   const floors = createCaveFloors({ seed, fields, caveOwning: siting.caveOwning, plans, junctionsOf });
 
   const caveAt = (anchor: Point) => siting.cavesIn(regionOf(anchor)).find((cave) => isAt(cave, anchor));

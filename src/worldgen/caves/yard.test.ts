@@ -6,7 +6,7 @@ import { partOf, tilesOf } from "../props";
 import { regionsAround } from "../region";
 import { Prop, Way } from "../terrain";
 import { createWorldgen } from "../world";
-import { BIG_MINE_FLOORS } from "./yard";
+import { BIG_MINE_FLOORS, MEDIUM_MINE_FLOORS } from "./yard";
 
 const worldOf = memoize(createWorldgen, String, 4);
 const chunkOf = memoize(
@@ -45,18 +45,19 @@ describe("mine yards", () => {
       }
   });
 
-  it("stocks big mines with sheds and stockpiles, and houses wild ones' miners", () => {
+  it("scales each yard to its mine: a fire and maybe a tent at small ones, stores and lodging at big ones", () => {
     const yards = SEEDS.flatMap(yardsOf);
     const kindsOf = (yard: (typeof yards)[number]) => yard.props.map(({ kind }) => kind);
-    for (const yard of yards) {
-      const expected: Prop[] = [
-        ...(yard.floors >= BIG_MINE_FLOORS ? [Prop.Stockpile, Prop.Shed] : []),
-        ...(yard.isWild ? [Prop.Bunkhouse, Prop.Campfire] : []),
-      ];
-      expect(kindsOf(yard).every((kind) => expected.includes(kind))).toBe(true);
-    }
-    expect(yards.some((yard) => kindsOf(yard).includes(Prop.Shed))).toBe(true);
-    expect(yards.some((yard) => kindsOf(yard).includes(Prop.Bunkhouse))).toBe(true);
+    const areaOf = ({ half, depth }: (typeof yards)[number]) => (2 * half + 1) * depth;
+    const small = yards.filter(({ floors }) => floors < MEDIUM_MINE_FLOORS);
+    const big = yards.filter(({ floors }) => floors >= BIG_MINE_FLOORS);
+    for (const yard of small) expect(kindsOf(yard).every((kind) => kind === Prop.Campfire || kind === Prop.Tent)).toBe(true);
+    expect(small.some((yard) => kindsOf(yard).includes(Prop.Tent))).toBe(true);
+    expect(small.some((yard) => !kindsOf(yard).includes(Prop.Tent))).toBe(true);
+    for (const kind of [Prop.Stockpile, Prop.Shed, Prop.Bunkhouse])
+      expect(big.some((yard) => kindsOf(yard).includes(kind))).toBe(true);
+    expect(yards.filter((yard) => kindsOf(yard).includes(Prop.Campfire)).length / yards.length).toBeGreaterThan(0.9);
+    expect(Math.max(...small.map(areaOf))).toBeLessThan(Math.min(...big.map(areaOf)));
   });
 
   it("builds every prop whole and off the ways", { tags: "slow" }, () => {
