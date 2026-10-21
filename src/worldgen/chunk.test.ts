@@ -1,13 +1,13 @@
 import { Prop, Water, Way } from "./terrain";
-import { distance, floorDiv, hash, memoize } from "../lib";
+import { distance, floorDiv, hash, memoize } from "procgen";
 import { describe, expect, it } from "vitest";
-import { type Chunk, FADE_LENGTH, generateChunk, tileIndex } from "./chunk";
+import { type Chunk, FADE_LENGTH, tileIndex } from "./chunk";
 import { CHUNK_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
 import { partOf, tilesOf } from "./props";
-import { regionOf, regionsAround } from "./region";
-import { createWorldgen } from "./world";
+import { regions } from "./region";
+import { createWorldgen, generateChunk } from "./world";
 
-const ORIGIN = { rx: 0, ry: 0 };
+const ORIGIN = { col: 0, row: 0 };
 
 const worldOf = memoize(createWorldgen, String, 8);
 
@@ -71,10 +71,10 @@ describe("generateChunk", () => {
       ].map(([cx, cy]) => digest(generateChunk(world, cx!, cy!))),
     ).toMatchInlineSnapshot(`
       [
-        2733807378,
-        3467417234,
-        2706048685,
-        410932772,
+        2915349697,
+        2802449863,
+        3675663224,
+        3629781279,
       ]
     `);
   });
@@ -98,7 +98,8 @@ describe("generateChunk", () => {
   it("carves rivers as water", () => {
     const world = worldOf(1);
     const rivers =
-      regionsAround(ORIGIN, 3)
+      regions
+        .cellsAround(ORIGIN, 3)
         .map(world.riversNear)
         .find((found) => found.length > 0) ?? [];
     expect(rivers.length).toBeGreaterThan(0);
@@ -111,7 +112,7 @@ describe("generateChunk", () => {
 
   it("paves roads and bridges rivers", () => {
     const world = worldOf(1);
-    const roads = world.waysNear(regionOf(world.spawn)).filter((link) => link.way === Way.Road);
+    const roads = world.waysNear(regions.cellOf(world.spawn)).filter((link) => link.way === Way.Road);
     expect(roads.length).toBeGreaterThan(0);
     for (const road of roads)
       for (const node of road.nodes) {
@@ -133,7 +134,7 @@ describe("generateChunk", () => {
   it("pitches three whole tents in every camp, off its ways", () => {
     for (const seed of [1, 2, 3]) {
       const world = worldOf(seed);
-      const camps = regionsAround(ORIGIN, 1).flatMap((region) => world.campAt(region) ?? []);
+      const camps = regions.cellsAround(ORIGIN, 1).flatMap((region) => world.campAt(region) ?? []);
       let tents = 0;
       for (const camp of camps)
         for (let y = camp.y - 13; y <= camp.y + 13; y++)
@@ -161,7 +162,7 @@ describe("generateChunk", () => {
 
   it("settles camps without carving cliffs", () => {
     const world = worldOf(1);
-    const camps = regionsAround(ORIGIN, 2).map(world.campAt);
+    const camps = regions.cellsAround(ORIGIN, 2).map(world.campAt);
     for (const camp of camps.filter((c) => c !== undefined))
       for (let y = camp.y - 14; y <= camp.y + 14; y++)
         for (let x = camp.x - 14; x <= camp.x + 14; x++)
@@ -171,7 +172,7 @@ describe("generateChunk", () => {
   it("settles each camp at the median level of the ground around it", () => {
     const world = worldOf(1);
     const natural = (x: number, y: number) => heightLevel(world.fields.elevation(x + 0.5, y + 0.5));
-    for (const region of regionsAround(ORIGIN, 3)) {
+    for (const region of regions.cellsAround(ORIGIN, 3)) {
       const camp = world.campAt(region);
       if (!camp) continue;
       const ring = Array.from({ length: 16 }, (_, i) => {
@@ -189,7 +190,7 @@ describe("generateChunk", () => {
   it("carves rivers without cliffs", { tags: "slow" }, () => {
     for (const seed of [1, 2, 3]) {
       const world = worldOf(seed);
-      for (const river of world.riversNear(regionOf(world.spawn)))
+      for (const river of world.riversNear(regions.cellOf(world.spawn)))
         for (const node of river.nodes.slice(1, -1)) {
           const x = Math.floor(node.x);
           for (let y = Math.floor(node.y) - 6; y <= Math.floor(node.y) + 6; y++) expectNoCarvedCliff(world, x, y);

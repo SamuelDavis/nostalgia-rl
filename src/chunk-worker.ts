@@ -1,4 +1,4 @@
-import { memoize } from "./lib";
+import { memoize } from "procgen";
 import { type Layer, chunkOn, createWorldgen } from "./worldgen";
 
 export interface ChunkRequest {

@@ -1,4 +1,4 @@
-import { type Point, floorDiv, memoize } from "../lib";
+import { type Vec2, floorDiv, memoize } from "procgen";
 import {
   type Biome,
   CHUNK_SIZE,
@@ -33,7 +33,7 @@ export type Terrain = (x: number, y: number) => Tile;
 
 export interface Layers {
   readonly terrainOn: (layer: Layer) => Terrain;
-  readonly linkAcross: (layer: Layer, from: Point, to: Point) => Layer | undefined;
+  readonly linkAcross: (layer: Layer, from: Vec2, to: Vec2) => Layer | undefined;
 }
 
 export const onlySurface = (terrain: Terrain): Layers => ({

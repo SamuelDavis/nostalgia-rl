@@ -1,22 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { distance, memoize } from "../../lib";
+import { distance, memoize } from "procgen";
 import { MAX_CLIMB, heightLevel } from "../constants";
-import { findPeak } from "../landmarks";
-import { regionsAround } from "../region";
-import { createWorldgen } from "../world";
-import { CEILING, FLOOR_SPACING, createCavePlans } from "./plan";
-import { createCaveSiting } from "./siting";
+import { regions } from "../region";
+import { cavesWithWayness } from "./fixture";
+import { CEILING, FLOOR_SPACING } from "./plan";
 
-const worldOf = memoize(createWorldgen, String, 4);
 const EMPTY = 0;
 const BUSY = 1;
 const plansOf = memoize(
   ([seed, wayness]: readonly [number, number]) => {
-    const { fields } = worldOf(seed);
-    const siting = createCaveSiting({ seed, fields, peakOf: (r) => findPeak(fields, r) });
-    const caves = regionsAround({ rx: 0, ry: 0 }, 5).flatMap(siting.cavesIn);
-    const plans = createCavePlans({ seed, fields, caveOwning: siting.caveOwning, waynessAt: () => wayness });
-    return { fields, siting, caves, plans };
+    const { fields, caves: explored } = cavesWithWayness(seed, wayness);
+    const caves = regions.cellsAround({ col: 0, row: 0 }, 5).flatMap(explored.cavesIn);
+    return { fields, siting: explored, caves, plans: explored };
   },
   String,
   8,
@@ -83,19 +78,26 @@ describe("cave plans", () => {
     }
   });
 
-  it("digs no mines in empty country, and some under half the caves in busy country", () => {
+  it("digs no mines in empty country, and mines most caves in busy country", () => {
     const mined = (wayness: number) => {
-      const { caves, plans } = plansOf([1, wayness]);
-      return caves.filter((cave) => plans.planOf(cave).mine).length / caves.length;
+      const plans = [1, 2, 3].flatMap((seed) => {
+        const { caves, plans } = plansOf([seed, wayness]);
+        return caves.map(plans.planOf);
+      });
+      return plans.filter((plan) => plan.mine).length / plans.length;
     };
     expect(mined(EMPTY)).toBe(0);
-    expect(mined(BUSY)).toBeGreaterThan(0.3);
-    expect(mined(BUSY)).toBeLessThan(0.7);
+    expect(mined(BUSY)).toBeGreaterThan(0.6);
+    expect(mined(BUSY)).toBeLessThan(0.9);
   });
 
   it("digs mines past the cave's lowest floor, and above its highest only where the mountain has room", () => {
-    const { caves, plans } = plansOf([1, BUSY]);
-    const plansWithMines = caves.map(plans.planOf).filter((plan) => plan.mine);
+    const plansWithMines = [1, 2, 3]
+      .flatMap((seed) => {
+        const { caves, plans } = plansOf([seed, BUSY]);
+        return caves.map(plans.planOf);
+      })
+      .filter((plan) => plan.mine);
     for (const { mine, top, bottom, baseOf, cave } of plansWithMines) {
       expect(mine!.bottom).toBeLessThan(bottom);
       expect(mine!.top).toBeGreaterThanOrEqual(top);

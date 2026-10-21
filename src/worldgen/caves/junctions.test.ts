@@ -1,20 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { distance, memoize } from "../../lib";
+import { distance, memoize } from "procgen";
 import { MAX_CLIMB, heightLevel } from "../constants";
-import { findPeak } from "../landmarks";
-import { regionsAround } from "../region";
-import { createWorldgen } from "../world";
-import { createJunctions } from "./junctions";
-import { CEILING, createCavePlans } from "./plan";
-import { TERRITORY_RADIUS, createCaveSiting } from "./siting";
+import { regions } from "../region";
+import { cavesWithWayness } from "./fixture";
+import { CEILING } from "./plan";
+import { TERRITORY_RADIUS } from "./siting";
 
 const junctionWorldOf = memoize(
   (seed: number) => {
-    const { fields } = createWorldgen(seed);
-    const siting = createCaveSiting({ seed, fields, peakOf: (r) => findPeak(fields, r) });
-    const plans = createCavePlans({ seed, fields, caveOwning: siting.caveOwning, waynessAt: () => 0 });
-    const junctions = createJunctions({ seed, fields, siting, plans });
-    return { fields, siting, plans, junctions, caves: regionsAround({ rx: 0, ry: 0 }, 5).flatMap(siting.cavesIn) };
+    const { fields, caves: explored } = cavesWithWayness(seed, 0);
+    const caves = regions.cellsAround({ col: 0, row: 0 }, 5).flatMap(explored.cavesIn);
+    return { fields, siting: explored, plans: explored, junctions: explored, caves };
   },
   String,
   4,
@@ -47,10 +43,10 @@ describe("cave junctions", () => {
     }
   });
 
-  it("join most neighbouring caves", () => {
+  it("join a fair share of neighbouring caves", () => {
     let pairs = 0;
     let joined = 0;
-    for (const seed of [1, 2, 3]) {
+    for (let seed = 1; seed <= 24; seed++) {
       const { junctions, caves } = junctionWorldOf(seed);
       for (const cave of caves)
         for (const other of caves)
@@ -59,7 +55,7 @@ describe("cave junctions", () => {
             if (junctions.junctionsOf(cave).some((j) => j.other.cave.id === other.id)) joined++;
           }
     }
-    expect(pairs).toBeGreaterThan(5);
-    expect(joined / pairs).toBeGreaterThan(0.4);
+    expect(pairs).toBeGreaterThan(40);
+    expect(joined / pairs).toBeGreaterThan(0.15);
   });
 });

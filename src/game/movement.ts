@@ -1,17 +1,17 @@
-import type { Point } from "../lib";
+import type { Vec2 } from "procgen";
 import { Prop, MAX_CLIMB, Water, Way } from "../worldgen";
 
 export const Direction = { North: 0, East: 1, South: 2, West: 3 } as const;
 export type Direction = (typeof Direction)[keyof typeof Direction];
 
-const OFFSETS: Record<Direction, Point> = {
+const OFFSETS: Record<Direction, Vec2> = {
   [Direction.North]: { x: 0, y: -1 },
   [Direction.East]: { x: 1, y: 0 },
   [Direction.South]: { x: 0, y: 1 },
   [Direction.West]: { x: -1, y: 0 },
 };
 
-export const stepToward = (p: Point, direction: Direction): Point => ({
+export const stepToward = (p: Vec2, direction: Direction): Vec2 => ({
   x: p.x + OFFSETS[direction].x,
   y: p.y + OFFSETS[direction].y,
 });

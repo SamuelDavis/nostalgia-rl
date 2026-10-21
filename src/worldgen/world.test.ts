@@ -1,15 +1,15 @@
-import { distance, memoize } from "../lib";
+import { distance, memoize } from "procgen";
 import { describe, expect, it } from "vitest";
 import { SEA_LEVEL, heightLevel } from "./constants";
-import { regionOf, regionsAround } from "./region";
+import { regions } from "./region";
 import { Way } from "./terrain";
 import { createWorldgen } from "./world";
 
 const worldOf = memoize(createWorldgen, String, 8);
 
 const seeds = [1, 2, 3, 4, 5];
-const ORIGIN = { rx: 0, ry: 0 };
-const regions = regionsAround(ORIGIN, 2);
+const ORIGIN = { col: 0, row: 0 };
+const nearby = regions.cellsAround(ORIGIN, 2);
 
 describe("createWorldgen", () => {
   it("places a flat, dry world spawn near the origin", () => {
@@ -24,7 +24,7 @@ describe("createWorldgen", () => {
   it("puts the world spawn camp in its macro region", () => {
     for (const seed of seeds) {
       const world = worldOf(seed);
-      expect(world.campAt(regionOf(world.spawn))).toMatchObject(world.spawn);
+      expect(world.campAt(regions.cellOf(world.spawn))).toMatchObject(world.spawn);
     }
   });
 
@@ -32,7 +32,7 @@ describe("createWorldgen", () => {
     for (const seed of seeds) {
       const world = worldOf(seed);
       const roads = world
-        .waysNear(regionOf(world.spawn))
+        .waysNear(regions.cellOf(world.spawn))
         .filter(
           (link) =>
             link.way === Way.Road &&
@@ -45,7 +45,7 @@ describe("createWorldgen", () => {
   it("lays ways over land", { tags: "slow" }, () => {
     for (const seed of seeds) {
       const world = worldOf(seed);
-      const links = regions.flatMap(world.waysNear);
+      const links = nearby.flatMap(world.waysNear);
       expect(links.length).toBeGreaterThan(0);
       for (const link of links)
         for (const node of link.nodes)
@@ -57,7 +57,7 @@ describe("createWorldgen", () => {
     const a = createWorldgen(9);
     const b = createWorldgen(9);
     expect(a.spawn).toEqual(b.spawn);
-    expect(a.campAt({ rx: 1, ry: 1 })).toEqual(b.campAt({ rx: 1, ry: 1 }));
+    expect(a.campAt({ col: 1, row: 1 })).toEqual(b.campAt({ col: 1, row: 1 }));
     expect(a.waysNear(ORIGIN)).toEqual(b.waysNear(ORIGIN));
   });
 });

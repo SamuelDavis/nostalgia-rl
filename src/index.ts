@@ -1,5 +1,5 @@
 import "./index.css";
-import type { Point } from "./lib";
+import type { Vec2 } from "procgen";
 import { actionFor, createDirectionInput } from "./game/input";
 import { Direction, stepToward } from "./game/movement";
 import { playTurn, startSession } from "./game/session";
@@ -68,9 +68,9 @@ let session = startSession({
 const here = () => layers.terrainOn(session.layer);
 let mode: HeightMode = HEIGHT_MODES[0];
 let zoomModifier = 0;
-const opennessAt = (p: Point) => openness((x, y) => here()(x, y).height, p);
+const opennessAt = (p: Vec2) => openness((x, y) => here()(x, y).height, p);
 let open = opennessAt(session.position);
-let heading: Point = { x: 0, y: 0 };
+let heading: Vec2 = { x: 0, y: 0 };
 let natural = naturalSpan(open, heading);
 let practical = practicalSpan(open, heading);
 let sight = sightAhead(here(), session.position, session.facing);

@@ -1,4 +1,4 @@
-import type { Point } from "../lib";
+import { type Vec2, contains } from "procgen";
 import {
   Biome,
   type Conditions,
@@ -6,11 +6,9 @@ import {
   Water,
   Way,
   type Worldgen,
-  type Bounds,
   biomeOf,
   heightLevel,
-  regionOf,
-  regionsAround,
+  regions,
 } from "../worldgen";
 import {
   type HeightMode,
@@ -25,7 +23,7 @@ import {
 } from "./palette";
 
 export interface Mark {
-  readonly point: Point;
+  readonly point: Vec2;
   readonly color: Rgb;
   readonly radius: number;
 }
@@ -63,26 +61,26 @@ export const fieldColor = (
   return onIndex ? shade(color, INDEX_CONTOUR_SHADE) : color;
 };
 
-const featureMarks = (point: Point, color: Rgb): Mark[] => [
+const featureMarks = (point: Vec2, color: Rgb): Mark[] => [
   { point, color: FEATURE_OUTLINE, radius: FEATURE_RADIUS + 1 },
   { point, color, radius: FEATURE_RADIUS },
 ];
 
-const squareAround = (radius: number): Point[] =>
+const squareAround = (radius: number): Vec2[] =>
   Array.from({ length: (2 * radius + 1) ** 2 }, (_, i) => ({
     x: (i % (2 * radius + 1)) - radius,
     y: Math.floor(i / (2 * radius + 1)) - radius,
   }));
 
-export const markPixels = ({ radius }: Mark): Point[] => squareAround(radius);
+export const markPixels = ({ radius }: Mark): Vec2[] => squareAround(radius);
 
-const regionsWithin = (center: Point, radius: number) =>
-  regionsAround(regionOf(center), Math.ceil(radius / REGION_SIZE));
+const regionsWithin = (center: Vec2, radius: number) =>
+  regions.cellsAround(regions.cellOf(center), Math.ceil(radius / REGION_SIZE));
 
-const lineMarks = (lines: readonly { readonly nodes: readonly Point[] }[], color: Rgb): Mark[] =>
+const lineMarks = (lines: readonly { readonly nodes: readonly Vec2[] }[], color: Rgb): Mark[] =>
   lines.flatMap(({ nodes }) => nodes.map((point) => ({ point, color, radius: 0 })));
 
-export const overviewFeatureMarks = (world: Worldgen, center: Point, radius: number): Mark[] =>
+export const overviewFeatureMarks = (world: Worldgen, center: Vec2, radius: number): Mark[] =>
   regionsWithin(center, radius).flatMap((region) => {
     const camp = world.campAt(region);
     return [
@@ -93,7 +91,7 @@ export const overviewFeatureMarks = (world: Worldgen, center: Point, radius: num
     ];
   });
 
-export const overviewMarks = (world: Worldgen, center: Point, radius: number): Mark[] => [
+export const overviewMarks = (world: Worldgen, center: Vec2, radius: number): Mark[] => [
   ...regionsWithin(center, radius).flatMap((region) => [
     ...lineMarks(world.riversNear(region), RIVER_MARK),
     ...world.waysNear(region).flatMap((link) => lineMarks([link], link.way === Way.Road ? ROAD_MARK : TRAIL_MARK)),
@@ -101,13 +99,10 @@ export const overviewMarks = (world: Worldgen, center: Point, radius: number): M
   ...overviewFeatureMarks(world, center, radius),
 ];
 
-const isWithin = (p: Point, { minX, minY, maxX, maxY }: Bounds) =>
-  p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY;
-
-export const createOverviewTint = (world: Worldgen, center: Point, radius: number) => {
+export const createOverviewTint = (world: Worldgen, center: Vec2, radius: number) => {
   const forests = regionsWithin(center, radius).flatMap(world.deepForestsIn);
-  return (color: Rgb, p: Point): Rgb =>
-    forests.some(({ bounds, layout }) => isWithin(p, bounds) && layout.contains(p))
+  return (color: Rgb, p: Vec2): Rgb =>
+    forests.some(({ bounds, layout }) => contains(bounds, p) && layout.contains(p))
       ? mix(color, DEEP_FOREST_AREA, DEEP_FOREST_TINT)
       : color;
 };

@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { memoize } from "../lib";
+import { memoize } from "procgen";
 import { SEA_LEVEL, heightLevel } from "./constants";
-import { createFields } from "./fields";
-import { regionsAround } from "./region";
-import { type River, createRivers } from "./rivers";
+import { regions } from "./region";
+import type { River } from "./rivers";
+import { createWorldgen } from "./world";
 
 const seeds = [1, 2, 3];
-const ORIGIN = { rx: 0, ry: 0 };
-const regions = regionsAround(ORIGIN, 3);
+const ORIGIN = { col: 0, row: 0 };
+const nearby = regions.cellsAround(ORIGIN, 3);
 
-const networkOf = memoize((seed: number) => createRivers(seed, createFields(seed)), String, 4);
-const riversOf = (seed: number, within = regions) => [...new Set(within.flatMap(networkOf(seed).near))];
-const inner = regionsAround(ORIGIN, 1);
+const worldOf = memoize(createWorldgen, String, 4);
+const riversOf = (seed: number, within = nearby) => [...new Set(within.flatMap(worldOf(seed).riversNear))];
+const inner = regions.cellsAround(ORIGIN, 1);
 
 const key = (p: { x: number; y: number }) => `${p.x},${p.y}`;
 
@@ -21,10 +21,10 @@ describe("rivers", () => {
   });
 
   it("are deterministic", () => {
-    const a = createRivers(1, createFields(1));
-    const b = createRivers(1, createFields(1));
-    b.near({ rx: 5, ry: 5 });
-    expect(b.near(ORIGIN)).toEqual(a.near(ORIGIN));
+    const a = createWorldgen(1);
+    const b = createWorldgen(1);
+    b.riversNear({ col: 5, row: 5 });
+    expect(b.riversNear(ORIGIN)).toEqual(a.riversNear(ORIGIN));
   });
 
   it("never flow uphill", () => {
@@ -37,7 +37,7 @@ describe("rivers", () => {
 
   it("flow on into another river, the sea or a lake", () => {
     for (const seed of seeds) {
-      const fields = createFields(seed);
+      const { fields } = worldOf(seed);
       const rivers = riversOf(seed);
       const starts = new Map<string, River>(rivers.flatMap((r) => (r.nodes[0] ? [[key(r.nodes[0]), r]] : [])));
       const lakes = new Set(rivers.flatMap((r) => (r.lake ? [key(r.lake)] : [])));

@@ -29,7 +29,6 @@
     "vitest": "^5.0.5"
   },
   "dependencies": {
-    "procgen": "file:../procgen",
-    "simplex-noise": "^4.0.3"
+    "procgen": "file:../procgen"
   }
 }

@@ -1,4 +1,4 @@
-import { type Point, hash, hashString, unit } from "../lib";
+import { type Vec2, hash, hashString, unit } from "procgen";
 import type { View } from "./camera";
 import { isCliff, isStairs, isTrail } from "../game/movement";
 import type { Terrain, Tile } from "../game/terrain";
@@ -54,7 +54,7 @@ interface Look {
   readonly color: Rgb;
 }
 
-const NEIGHBOURS: readonly Point[] = [
+const NEIGHBOURS: readonly Vec2[] = [
   { x: 1, y: 0 },
   { x: -1, y: 0 },
   { x: 0, y: 1 },
@@ -184,8 +184,8 @@ const drawSprite = (
 
 export interface Player {
   readonly layer: Layer;
-  readonly position: Point;
-  readonly shown: Point;
+  readonly position: Vec2;
+  readonly shown: Vec2;
   readonly eyeLevel: number;
   readonly angle: number;
 }

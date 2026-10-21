@@ -1,4 +1,4 @@
-import type { Point } from "../lib";
+import type { Vec2 } from "procgen";
 import { type Worldgen, heightLevel } from "../worldgen";
 import { createOverviewTint, fieldColor, overviewMarks } from "./overview";
 import { type HeightMode, css } from "./palette";
@@ -18,12 +18,12 @@ export const createMap = (parent: HTMLElement, world: Worldgen) => {
   const ctx = canvas.getContext("2d")!;
   let render = 0;
 
-  const toPixel = (center: Point, p: Point) => ({
+  const toPixel = (center: Vec2, p: Vec2) => ({
     px: Math.round((p.x - center.x) / TILES_PER_PX + MAP_PX / 2),
     py: Math.round((p.y - center.y) / TILES_PER_PX + MAP_PX / 2),
   });
 
-  const drawMarks = (center: Point) => {
+  const drawMarks = (center: Vec2) => {
     for (const { point, color, radius } of overviewMarks(world, center, MAP_RADIUS)) {
       const { px, py } = toPixel(center, point);
       ctx.fillStyle = css(color);
@@ -34,7 +34,7 @@ export const createMap = (parent: HTMLElement, world: Worldgen) => {
     ctx.fillRect(MAP_PX / 2 - 1, MAP_PX / 2 - 3, 3, 7);
   };
 
-  const draw = (center: Point, mode: HeightMode) => {
+  const draw = (center: Vec2, mode: HeightMode) => {
     const id = ++render;
     const tint = createOverviewTint(world, center, MAP_RADIUS);
     const image = ctx.createImageData(MAP_PX, MAP_PX);
@@ -71,7 +71,7 @@ export const createMap = (parent: HTMLElement, world: Worldgen) => {
     step();
   };
 
-  const toggle = (center: Point, mode: HeightMode) => {
+  const toggle = (center: Vec2, mode: HeightMode) => {
     canvas.hidden = !canvas.hidden;
     if (canvas.hidden) render++;
     else draw(center, mode);

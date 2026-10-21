@@ -1,4 +1,4 @@
-import { clamp, smoothstep } from "../lib";
+import { clamp, smoothstep } from "procgen";
 import { Biome, Ground, Prop } from "./terrain";
 import type { Conditions } from "./fields";
 import { SEA_ELEVATION, SEA_LEVEL, heightLevel } from "./constants";

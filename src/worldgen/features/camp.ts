@@ -1,11 +1,12 @@
-import { type Point, distance, hash, hashString, intBetween, memoize, unit } from "../../lib";
+import { type FeatureType, type Reader, type Stage, type Vec2, boundsOf, distance, rngOf, stage } from "procgen";
+import { spawnNear } from "procgen/recipes";
 import { MAX_CLIMB, REGION_SIZE, metresToLevels } from "../constants";
 import { type PlacedProp, partOf, tilesOf } from "../props";
-import { type Region, boundsOf, regionKey, regionOf, regionsAround } from "../region";
+import { regions } from "../region";
 import { type River, distanceToRiver } from "../rivers";
 import { Biome, Ground, Prop, Water } from "../terrain";
 import { type WayLink, isOnWay } from "../ways";
-import { type Anchor, type FeatureType, settle } from "./feature";
+import { type Anchor, type TileDraft, settle } from "./feature";
 
 export type Camp = Anchor;
 
@@ -15,14 +16,6 @@ interface CampLayout {
   readonly tents: readonly PlacedProp[];
 }
 
-export interface CampSiting {
-  readonly seed: number;
-  readonly level: (p: Point) => number;
-  readonly biomeAt: (p: Point) => Biome;
-  readonly riversNear: (region: Region) => readonly River[];
-  readonly waysNear: (region: Region) => readonly WayLink[];
-}
-
 export const CAMP_RADIUS = 12;
 const CAMP_YARD = 5;
 const CAMP_SPACING = 120;
@@ -30,15 +23,13 @@ const CAMP_CHANCE = 0.55;
 const CAMP_ATTEMPTS = 4;
 const CAMP_MARGIN = 32;
 const CAMP_FLATNESS = metresToLevels(4);
-const RIVER_CLEARANCE = 10;
+export const RIVER_CLEARANCE = 10;
 const SPAWN_SEARCH_STEP = 16;
-const SPAWN_SEARCH_RINGS = 60;
-const REGION_CACHE = 4096;
-const SALT = hashString("camps");
+const SPAWN_SEARCH_RADIUS = 60 * SPAWN_SEARCH_STEP;
 const SEAM_REACH = (CAMP_RADIUS - CAMP_YARD) * MAX_CLIMB;
 
 const TENTS = 3;
-const TENT_SPOTS: readonly Point[] = [
+const TENT_SPOTS: readonly Vec2[] = [
   [3, -1],
   [2, 2],
   [-1, 3],
@@ -49,7 +40,7 @@ const TENT_SPOTS: readonly Point[] = [
   [2, -4],
 ].map(([x, y]) => ({ x: x!, y: y! }));
 
-const FLATNESS_PROBES: readonly Point[] = [
+const FLATNESS_PROBES: readonly Vec2[] = [
   { x: 6, y: 0 },
   { x: -6, y: 0 },
   { x: 0, y: 6 },
@@ -60,7 +51,7 @@ const FLATNESS_PROBES: readonly Point[] = [
   { x: -4, y: -4 },
 ];
 
-const SEAM_PROBES: readonly Point[] = [
+const SEAM_PROBES: readonly Vec2[] = [
   [13, 0],
   [12, 5],
   [9, 9],
@@ -72,79 +63,95 @@ const SEAM_PROBES: readonly Point[] = [
   { x: b!, y: -a! },
 ]);
 
-export const createCamps = ({ seed, level, biomeAt, riversNear, waysNear }: CampSiting) => {
-  const levelsAround = (p: Point, probes: readonly Point[]) => probes.map((o) => level({ x: p.x + o.x, y: p.y + o.y }));
+export interface CampSiting {
+  readonly level: (p: Vec2) => number;
+  readonly biomeAt: (p: Vec2) => Biome;
+  readonly riverBands: Stage<readonly River[]>;
+}
+
+export const campSiting = ({ level, biomeAt, riverBands }: CampSiting) => {
+  const levelsAround = (p: Vec2, probes: readonly Vec2[]) => probes.map((o) => level({ x: p.x + o.x, y: p.y + o.y }));
 
   const deviatesBy = (levels: readonly number[], from: number, tolerance: number) =>
     levels.some((l) => Math.abs(l - from) > tolerance);
 
-  const campLevel = (p: Point) => {
+  const campLevel = (p: Vec2) => {
     const ring = levelsAround(p, SEAM_PROBES).sort((a, b) => a - b);
     return ring[ring.length >> 1]!;
   };
 
-  const isSite = (p: Point): boolean => {
+  const isSite = (reader: Reader, p: Vec2): boolean => {
     const biome = biomeAt(p);
     if (biome === Biome.Ocean || biome === Biome.Beach || biome === Biome.Mountain) return false;
     if (deviatesBy(levelsAround(p, FLATNESS_PROBES), level(p), CAMP_FLATNESS)) return false;
     if (deviatesBy(levelsAround(p, SEAM_PROBES), campLevel(p), SEAM_REACH)) return false;
-    return riversNear(regionOf(p)).every((river) => distanceToRiver(river, p) > RIVER_CLEARANCE);
+    return reader.readAt(riverBands, p).every((river) => distanceToRiver(river, p) > RIVER_CLEARANCE);
   };
 
-  const findSpawn = (): Camp => {
-    for (let ring = 0; ring <= SPAWN_SEARCH_RINGS; ring++)
-      for (let i = 0; i < Math.max(1, ring * 8); i++) {
-        const side = Math.floor(i / Math.max(1, ring * 2));
-        const along = (i % Math.max(1, ring * 2)) - ring;
-        const [gx, gy] = [
-          [along, -ring],
-          [ring, along],
-          [-along, ring],
-          [-ring, -along],
-        ][side]!;
-        const p = { x: gx! * SPAWN_SEARCH_STEP, y: gy! * SPAWN_SEARCH_STEP };
-        if (isSite(p)) return { ...p, id: hash(seed, SALT, p.x, p.y) };
-      }
-    return { x: 0, y: 0, id: hash(seed, SALT) };
-  };
+  return { campLevel, isSite, riverBands };
+};
 
-  const spawn = findSpawn();
-  const spawnRegion = regionOf(spawn);
+export type Siting = ReturnType<typeof campSiting>;
 
-  const at = memoize(
-    ({ rx, ry }: Region): Camp | undefined => {
-      if (rx === spawnRegion.rx && ry === spawnRegion.ry) return spawn;
-      const nearSpawn = Math.abs(rx - spawnRegion.rx) <= 1 && Math.abs(ry - spawnRegion.ry) <= 1;
-      if (!nearSpawn && unit(hash(seed, SALT, rx, ry)) > CAMP_CHANCE) return undefined;
+export const findSpawn = (seed: number, reader: Reader, { isSite }: Siting): Camp => {
+  const rng = rngOf(seed, "spawn");
+  const spawn = spawnNear({
+    step: SPAWN_SEARCH_STEP,
+    maxRadius: SPAWN_SEARCH_RADIUS,
+    isSite: (p) => isSite(reader, p),
+  });
+  return spawn ? { ...spawn, id: rng.u32(spawn.x, spawn.y) } : { x: 0, y: 0, id: rng.u32(0, 0) };
+};
+
+export const createCampSites = (siting: Siting, spawn: Camp) => {
+  const spawnRegion = regions.cellOf(spawn);
+  return stage({
+    name: "camps",
+    grid: regions,
+    reads: [{ stage: siting.riverBands, radius: 0 }],
+    compute: ({ col, row }, context): readonly Camp[] => {
+      if (col === spawnRegion.col && row === spawnRegion.row) return [spawn];
+      const nearSpawn = Math.abs(col - spawnRegion.col) <= 1 && Math.abs(row - spawnRegion.row) <= 1;
+      const { rng } = context;
+      if (!nearSpawn && !rng.chance(CAMP_CHANCE, 0)) return [];
       for (let attempt = 0; attempt < CAMP_ATTEMPTS; attempt++) {
         const p = {
-          x:
-            rx * REGION_SIZE + intBetween(CAMP_MARGIN, REGION_SIZE - CAMP_MARGIN, hash(seed, SALT, rx, ry, attempt, 1)),
-          y:
-            ry * REGION_SIZE + intBetween(CAMP_MARGIN, REGION_SIZE - CAMP_MARGIN, hash(seed, SALT, rx, ry, attempt, 2)),
+          x: col * REGION_SIZE + rng.int(CAMP_MARGIN, REGION_SIZE - CAMP_MARGIN, attempt, 1),
+          y: row * REGION_SIZE + rng.int(CAMP_MARGIN, REGION_SIZE - CAMP_MARGIN, attempt, 2),
         };
-        if (distance(p, spawn) > CAMP_SPACING && isSite(p)) return { ...p, id: hash(seed, SALT, rx, ry) };
+        if (distance(p, spawn) > CAMP_SPACING && siting.isSite(context, p)) return [{ ...p, id: rng.u32(attempt, 3) }];
       }
-      return undefined;
+      return [];
     },
-    regionKey,
-    REGION_CACHE,
-  );
+  });
+};
 
-  const tentsOf = (camp: Camp): PlacedProp[] => {
-    const links = regionsAround(regionOf(camp), 1).flatMap(waysNear);
-    return TENT_SPOTS.map((o) => ({ kind: Prop.Tent, at: { x: camp.x + o.x, y: camp.y + o.y } }))
+export const campFeature = (
+  seed: number,
+  siting: Siting,
+  sites: Stage<readonly Camp[]>,
+  waysNear: Stage<readonly WayLink[]>,
+): FeatureType<Camp, CampLayout, TileDraft> => {
+  const rng = rngOf(seed, "tents");
+  const tentsOf = (camp: Camp, links: readonly WayLink[]): PlacedProp[] =>
+    TENT_SPOTS.map((o) => ({ kind: Prop.Tent, at: { x: camp.x + o.x, y: camp.y + o.y } }))
       .filter((tent) => !tilesOf(tent).some((p) => isOnWay(links, p)))
-      .sort((a, b) => hash(seed, SALT, a.at.x, a.at.y) - hash(seed, SALT, b.at.x, b.at.y))
+      .sort((a, b) => rng.u32(a.at.x, a.at.y) - rng.u32(b.at.x, b.at.y))
       .slice(0, TENTS);
-  };
 
-  const type: FeatureType<Camp, CampLayout> = {
+  return {
     name: "camp",
     priority: 1,
+    sites,
     reach: CAMP_RADIUS,
-    bounds: (camp) => boundsOf([camp], CAMP_RADIUS),
-    build: (camp) => ({ camp, level: campLevel(camp), tents: tentsOf(camp) }),
+    extent: (camp) => boundsOf([camp], CAMP_RADIUS),
+    reads: [{ stage: waysNear, radius: CAMP_RADIUS }],
+    build: (camp, { gather }) => ({
+      camp,
+      level: siting.campLevel(camp),
+      tents: tentsOf(camp, [...new Set(gather(waysNear, boundsOf([camp], CAMP_RADIUS)))]),
+    }),
+    bounds: ({ camp }) => boundsOf([camp], CAMP_RADIUS),
     paint: ({ camp, level: campLevel, tents }, draft, x, y) => {
       const gap = distance({ x: x + 0.5, y: y + 0.5 }, { x: camp.x + 0.5, y: camp.y + 0.5 });
       if (gap > CAMP_RADIUS) return false;
@@ -158,6 +165,4 @@ export const createCamps = ({ seed, level, biomeAt, riversNear, waysNear }: Camp
       return true;
     },
   };
-
-  return { spawn, at, type };
 };

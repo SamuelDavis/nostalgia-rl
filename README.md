@@ -43,7 +43,6 @@ The game depends on [procgen](../procgen), a portable procedural generation libr
 
 | Path           | Contents                                                                                 |
 | -------------- | ---------------------------------------------------------------------------------------- |
-| `src/lib`      | Game-agnostic utilities: hashing, seeded noise, math, A\*, LRU memoize                   |
 | `src/worldgen` | World generation ([docs/worldgen.md](docs/worldgen.md)); `features/` holds feature types |
 | `src/game`     | Game state and rules, independent of presentation                                        |
 | `src/view`     | Canvas viewport, HTML HUD and map, palette shared with `tooling`                         |

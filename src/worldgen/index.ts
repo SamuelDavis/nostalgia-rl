@@ -6,7 +6,7 @@ export * from "./rivers";
 export * from "./terrain";
 export * from "./world";
 export * from "./landmarks";
-export * from "./landform";
+
 export * from "./region";
 export * from "./ways";
 export * from "./layer";

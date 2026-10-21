@@ -1,4 +1,4 @@
-import { type Point, createLru, distance, floorDiv } from "../lib";
+import { type Vec2, createLru, distance, floorDiv } from "procgen";
 import { CHUNK_SIZE, type Chunk, type Layer, layerKey } from "../worldgen";
 
 export type ChunkAt = (cx: number, cy: number) => Chunk;
@@ -12,9 +12,9 @@ interface ChunkCoord {
 const CHUNK_CACHE = 1024;
 
 const keyOf = (layer: Layer, cx: number, cy: number) => `${layerKey(layer)} ${cx},${cy}`;
-const centreOf = ({ cx, cy }: ChunkCoord): Point => ({ x: (cx + 0.5) * CHUNK_SIZE, y: (cy + 0.5) * CHUNK_SIZE });
+const centreOf = ({ cx, cy }: ChunkCoord): Vec2 => ({ x: (cx + 0.5) * CHUNK_SIZE, y: (cy + 0.5) * CHUNK_SIZE });
 
-export const chunksAround = (p: Point, reach: number): ChunkCoord[] => {
+export const chunksAround = (p: Vec2, reach: number): ChunkCoord[] => {
   const ring = Math.ceil(reach / CHUNK_SIZE);
   const side = 2 * ring + 1;
   const [ox, oy] = [floorDiv(p.x, CHUNK_SIZE) - ring, floorDiv(p.y, CHUNK_SIZE) - ring];
@@ -42,7 +42,7 @@ export const createChunkStore = (generate: LayerChunkAt, request: (layer: Layer,
       receive(generated);
       return generated;
     },
-    prefetch: (layer: Layer, p: Point, reach: number) => {
+    prefetch: (layer: Layer, p: Vec2, reach: number) => {
       for (const { cx, cy } of chunksAround(p, reach)) {
         const key = keyOf(layer, cx, cy);
         if (held.has(key) || asked.has(key)) continue;

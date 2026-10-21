@@ -1,28 +1,19 @@
-import {
-  type Point,
-  clamp,
-  countBiasedLow,
-  distance,
-  hash,
-  hashString,
-  intBetween,
-  inverseLerp,
-  memoize,
-  unit,
-} from "../../lib";
+import { type Dependency, type Reader, type Vec2, clamp, distance, inverseLerp, rngOf, stage } from "procgen";
+import { fewerMoreLikely } from "../counts";
 import { MOUNTAIN_LEVEL } from "../biome";
 import { heightLevel, metresToLevels } from "../constants";
 import type { Fields } from "../fields";
-import { type Cave, TERRITORY_RADIUS } from "./siting";
+import { regions } from "../region";
+import { type Cave, type CaveSiting, TERRITORY_RADIUS } from "./siting";
 
-export interface LevelledTile extends Point {
+export interface LevelledTile extends Vec2 {
   readonly level: number;
 }
 
 export interface Mouth {
-  readonly outside: Point;
-  readonly inside: Point;
-  readonly passage: readonly Point[];
+  readonly outside: Vec2;
+  readonly inside: Vec2;
+  readonly passage: readonly Vec2[];
   readonly level: number;
 }
 
@@ -39,22 +30,23 @@ export interface FloorRange {
 export interface CavePlan extends FloorRange {
   readonly cave: Cave;
   readonly mouth: Mouth;
-  readonly mine?: FloorRange;
+  readonly mine: FloorRange | undefined;
   readonly baseOf: (floor: number) => number;
+  readonly rampBelow: (floor: number) => Ramp | undefined;
 }
 
 export interface CavePlanInput {
   readonly seed: number;
   readonly fields: Fields;
-  readonly caveOwning: (p: Point) => Cave | undefined;
-  readonly waynessAt: (p: Point) => number;
+  readonly siting: CaveSiting;
+  readonly waynessAt: (reader: Reader, p: Vec2) => number;
+  readonly waynessReads: readonly Dependency[];
 }
 
 export const FLOOR_SPACING = metresToLevels(8);
 export const CEILING = metresToLevels(5);
 export const RAMP_LENGTH = 24;
 
-const SALT = hashString("cave plans");
 const PASSAGE_LENGTH = 8;
 const MOUTH_REACH = TERRITORY_RADIUS - PASSAGE_LENGTH;
 const MAX_FLOORS_BELOW = 8;
@@ -66,16 +58,16 @@ const EMPTY_WAYNESS = 0.2;
 const BUSY_WAYNESS = 0.5;
 const MAX_MINE_FLOORS_BELOW = 6;
 const MAX_MINE_FLOORS_ABOVE = 3;
-const CACHE = 1024;
+const OWNER_REACH = 2 * TERRITORY_RADIUS + 32;
 
-const CARDINALS: readonly Point[] = [
+const CARDINALS: readonly Vec2[] = [
   { x: 1, y: 0 },
   { x: 0, y: 1 },
   { x: -1, y: 0 },
   { x: 0, y: -1 },
 ];
 
-const DIRECTIONS: readonly Point[] = [
+const DIRECTIONS: readonly Vec2[] = [
   { x: 1, y: 0 },
   { x: Math.SQRT1_2, y: Math.SQRT1_2 },
   { x: 0, y: 1 },
@@ -86,15 +78,15 @@ const DIRECTIONS: readonly Point[] = [
   { x: Math.SQRT1_2, y: -Math.SQRT1_2 },
 ];
 
-export const cardinalOf = (d: Point): Point =>
+export const cardinalOf = (d: Vec2): Vec2 =>
   Math.abs(d.x) >= Math.abs(d.y) ? { x: Math.sign(d.x), y: 0 } : { x: 0, y: Math.sign(d.y) };
 
-export const stepsFrom = (from: Point, step: Point, count: number): Point[] =>
+export const stepsFrom = (from: Vec2, step: Vec2, count: number): Vec2[] =>
   Array.from({ length: count }, (_, i) => ({ x: from.x + step.x * i, y: from.y + step.y * i }));
 
 export const isOnFloors = ({ top, bottom }: FloorRange, floor: number) => floor <= top && floor >= bottom;
 
-export const rampFrom = (start: Point, outward: Point, upper: number, lower: number, length: number): Ramp => ({
+export const rampFrom = (start: Vec2, outward: Vec2, upper: number, lower: number, length: number): Ramp => ({
   tiles: stepsFrom(start, outward, length).map((p, i) => ({
     ...p,
     level: upper - Math.round(((upper - lower) * i) / (length - 1)),
@@ -102,17 +94,13 @@ export const rampFrom = (start: Point, outward: Point, upper: number, lower: num
   link: Math.floor(length / 2),
 });
 
-export const createCavePlans = ({ seed, fields, caveOwning, waynessAt }: CavePlanInput) => {
-  const level = (p: Point) => heightLevel(fields.elevation(p.x + 0.5, p.y + 0.5));
-  const isOwnedBy = (cave: Cave, p: Point) => caveOwning(p)?.id === cave.id;
+export const createCavePlans = ({ seed, fields, siting, waynessAt, waynessReads }: CavePlanInput) => {
+  const rng = rngOf(seed, "cave plans");
+  const level = (p: Vec2) => heightLevel(fields.elevation(p.x + 0.5, p.y + 0.5));
 
-  const mouthOf = (cave: Cave): Mouth => {
-    const target = intBetween(
-      MOUNTAIN_LEVEL,
-      Math.max(MOUNTAIN_LEVEL, cave.level - 2 * FLOOR_SPACING),
-      hash(cave.id, 1),
-    );
-    const start = hash(cave.id, 2) % DIRECTIONS.length;
+  const mouthOf = (cave: Cave, isOwned: (p: Vec2) => boolean): Mouth => {
+    const target = rng.int(MOUNTAIN_LEVEL, Math.max(MOUNTAIN_LEVEL, cave.level - 2 * FLOOR_SPACING), cave.id, 1);
+    const start = rng.u32(cave.id, 2) % DIRECTIONS.length;
     const attempts = DIRECTIONS.map((_, i) => {
       const direction = DIRECTIONS[(start + i) % DIRECTIONS.length]!;
       const outward = cardinalOf(direction);
@@ -131,81 +119,65 @@ export const createCavePlans = ({ seed, fields, caveOwning, waynessAt }: CavePla
       );
       return { inside, outside, passage, level: level(outside) };
     });
-    const valid = attempts.filter((m) => m.passage.every((p) => isOwnedBy(cave, p)) && m.level < level(m.inside));
+    const valid = attempts.filter((m) => m.passage.every(isOwned) && m.level < level(m.inside));
     return valid.find((m) => m.level <= target) ?? valid[0] ?? attempts.reduce((a, b) => (b.level < a.level ? b : a));
   };
 
-  const isMined = (cave: Cave, { outside }: Mouth) =>
-    unit(hash(seed, SALT, cave.id, 4)) <
-    MINE_CHANCE * clamp(inverseLerp(EMPTY_WAYNESS, BUSY_WAYNESS, waynessAt(outside)), 0, 1);
+  const planOf = (cave: Cave, reader: Reader): CavePlan => {
+    const isOwned = (p: Vec2) => siting.caveOwning(reader, p)?.id === cave.id;
+    const mouth = mouthOf(cave, isOwned);
+    const busyness = clamp(inverseLerp(EMPTY_WAYNESS, BUSY_WAYNESS, waynessAt(reader, mouth.outside)), 0, 1);
+    const isMine = rng.chance(MINE_CHANCE * busyness, cave.id, 4);
+    const baseOf = (floor: number) => mouth.level + floor * FLOOR_SPACING;
+    const naturalTop = Math.max(0, Math.floor((cave.level - CEILING - mouth.level) / FLOOR_SPACING) - 1);
+    const naturalBottom = -rng.weighted(fewerMoreLikely(MAX_FLOORS_BELOW), cave.id, 3);
 
-  let planOf: (cave: Cave) => CavePlan;
-
-  const rampBelow = memoize(
-    ({ cave, floor }: { cave: Cave; floor: number }): Ramp | undefined => {
-      const { baseOf } = planOf(cave);
+    const ramps = new Map<number, Ramp | undefined>();
+    const isNearRampOrMouth = (floor: number, ramp: Ramp): boolean => {
+      const others = [
+        ...(floor + 1 <= naturalTop ? (rampBelow(floor + 1)?.tiles ?? []) : []),
+        ...(floor === 0 || floor - 1 === 0 ? mouth.passage : []),
+      ];
+      return ramp.tiles.some((t) => others.some((o) => distance(t, o) <= RAMP_GAP));
+    };
+    const findRamp = (floor: number): Ramp | undefined => {
       for (let i = 0; i < RAMP_TRIES; i++) {
-        const h = hash(seed, SALT, cave.id, floor, i);
+        const attempt = rng.child(cave.id, floor, i);
         const start = {
-          x: cave.x + intBetween(-RAMP_REACH, RAMP_REACH, hash(h, 1)),
-          y: cave.y + intBetween(-RAMP_REACH, RAMP_REACH, hash(h, 2)),
+          x: cave.x + attempt.int(-RAMP_REACH, RAMP_REACH, 1),
+          y: cave.y + attempt.int(-RAMP_REACH, RAMP_REACH, 2),
         };
-        const outward = CARDINALS[hash(h, 3) % CARDINALS.length]!;
+        const outward = attempt.pick(CARDINALS, 3);
         const ramp = rampFrom(start, outward, baseOf(floor), baseOf(floor - 1), RAMP_LENGTH);
-        const fits = ramp.tiles.every((t) => isOwnedBy(cave, t) && level(t) >= t.level + CEILING);
-        if (fits && !isNearRampOrMouth(cave, floor, ramp)) return ramp;
+        const fits = ramp.tiles.every((t) => isOwned(t) && level(t) >= t.level + CEILING);
+        if (fits && !isNearRampOrMouth(floor, ramp)) return ramp;
       }
       return undefined;
-    },
-    ({ cave, floor }) => `${cave.id}:${floor}`,
-    CACHE,
-  );
+    };
+    const rampBelow = (floor: number): Ramp | undefined => {
+      if (!ramps.has(floor)) ramps.set(floor, findRamp(floor));
+      return ramps.get(floor);
+    };
 
-  const isNearRampOrMouth = (cave: Cave, floor: number, ramp: Ramp): boolean => {
-    const plan = planOf(cave);
-    const others = [
-      ...(floor + 1 <= plan.top ? (rampBelow({ cave, floor: floor + 1 })?.tiles ?? []) : []),
-      ...(floor === 0 || floor - 1 === 0 ? plan.mouth.passage : []),
-    ];
-    return ramp.tiles.some((t) => others.some((o) => distance(t, o) <= RAMP_GAP));
+    let top = 0;
+    while (top < naturalTop && rampBelow(top + 1)) top++;
+    let bottom = 0;
+    while (bottom > naturalBottom && rampBelow(bottom)) bottom--;
+    const mine = isMine
+      ? {
+          top: Math.min(naturalTop, top + rng.weighted(fewerMoreLikely(MAX_MINE_FLOORS_ABOVE), cave.id, 5)),
+          bottom: bottom - rng.weighted(fewerMoreLikely(MAX_MINE_FLOORS_BELOW), cave.id, 6),
+        }
+      : undefined;
+    const reachable = new Map([...ramps].filter(([floor]) => floor > bottom && floor <= top));
+    return { cave, mouth, top, bottom, mine, baseOf, rampBelow: (floor) => reachable.get(floor) };
   };
 
-  planOf = memoize(
-    (cave: Cave): CavePlan => {
-      const mouth = mouthOf(cave);
-      const isMine = isMined(cave, mouth);
-      const baseOf = (floor: number) => mouth.level + floor * FLOOR_SPACING;
-      const top = Math.max(0, Math.floor((cave.level - CEILING - mouth.level) / FLOOR_SPACING) - 1);
-      const bottom = -countBiasedLow(MAX_FLOORS_BELOW, hash(cave.id, 3));
-      return { cave, mouth, top, bottom, mine: isMine ? { top, bottom } : undefined, baseOf };
-    },
-    (cave) => String(cave.id),
-    CACHE,
-  );
-
-  const reachablePlanOf = memoize(
-    (cave: Cave): CavePlan => {
-      const plan = planOf(cave);
-      let top = 0;
-      while (top < plan.top && rampBelow({ cave, floor: top + 1 })) top++;
-      let bottom = 0;
-      while (bottom > plan.bottom && rampBelow({ cave, floor: bottom })) bottom--;
-      const mine = plan.mine && {
-        top: Math.min(plan.top, top + countBiasedLow(MAX_MINE_FLOORS_ABOVE, hash(cave.id, 5))),
-        bottom: bottom - countBiasedLow(MAX_MINE_FLOORS_BELOW, hash(cave.id, 6)),
-      };
-      return { ...plan, top, bottom, mine };
-    },
-    (cave) => String(cave.id),
-    CACHE,
-  );
-
-  return {
-    planOf: reachablePlanOf,
-    mouthOf: (cave: Cave) => {
-      const { mouth, mine } = planOf(cave);
-      return { mouth, isMine: mine !== undefined };
-    },
-    rampBelow: (cave: Cave, floor: number) => rampBelow({ cave, floor }),
-  };
+  return stage({
+    name: "cave plans",
+    grid: regions,
+    reads: [{ stage: siting.caves, radius: OWNER_REACH }, ...waynessReads],
+    compute: (region, context): readonly CavePlan[] =>
+      context.read(siting.caves, region).map((cave) => planOf(cave, context)),
+  });
 };

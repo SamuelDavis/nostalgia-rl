@@ -1,19 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { type Point, distance } from "../lib";
-import {
-  Cover,
-  type DeepForestLayout,
-  SURFACE,
-  Water,
-  Way,
-  createWorldgen,
-  regionOf,
-  regionsAround,
-} from "../worldgen";
+import { type Vec2, distance } from "procgen";
+import { Cover, type DeepForestLayout, SURFACE, Water, Way, createWorldgen, regions } from "../worldgen";
 import { blockerBetween } from "./movement";
 import { generatedLayers } from "./terrain";
 
-const NEIGHBOURS: readonly Point[] = [
+const NEIGHBOURS: readonly Vec2[] = [
   { x: 1, y: 0 },
   { x: -1, y: 0 },
   { x: 0, y: 1 },
@@ -22,18 +13,18 @@ const NEIGHBOURS: readonly Point[] = [
 
 const world = createWorldgen(1);
 const terrain = generatedLayers(world).terrainOn(SURFACE);
-const forests = regionsAround({ rx: 0, ry: 0 }, 6).flatMap(world.deepForestsIn);
+const forests = regions.cellsAround({ col: 0, row: 0 }, 6).flatMap(world.deepForestsIn);
 
-const key = (p: Point) => `${p.x},${p.y}`;
-const centre = (p: Point) => ({ x: p.x + 0.5, y: p.y + 0.5 });
-const tileOf = (p: Point): Point => ({ x: Math.floor(p.x), y: Math.floor(p.y) });
+const key = (p: Vec2) => `${p.x},${p.y}`;
+const centre = (p: Vec2) => ({ x: p.x + 0.5, y: p.y + 0.5 });
+const tileOf = (p: Vec2): Vec2 => ({ x: Math.floor(p.x), y: Math.floor(p.y) });
 
-const regionDistance = (a: { anchor: Point }, b: { anchor: Point }) => {
-  const [ra, rb] = [regionOf(a.anchor), regionOf(b.anchor)];
-  return Math.abs(ra.rx - rb.rx) + Math.abs(ra.ry - rb.ry);
+const regionDistance = (a: { anchor: Vec2 }, b: { anchor: Vec2 }) => {
+  const [ra, rb] = [regions.cellOf(a.anchor), regions.cellOf(b.anchor)];
+  return Math.abs(ra.col - rb.col) + Math.abs(ra.row - rb.row);
 };
 
-const reachable = (start: Point, layouts: readonly DeepForestLayout[]): Set<string> => {
+const reachable = (start: Vec2, layouts: readonly DeepForestLayout[]): Set<string> => {
   const reached = new Set([key(start)]);
   const frontier = [start];
   while (frontier.length > 0) {

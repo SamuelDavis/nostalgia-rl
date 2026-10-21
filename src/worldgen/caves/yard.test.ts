@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { floorDiv, memoize } from "../../lib";
-import { generateChunk, tileIndex } from "../chunk";
+import { floorDiv, memoize } from "procgen";
+import { tileIndex } from "../chunk";
+import { generateChunk } from "../world";
 import { CHUNK_SIZE } from "../constants";
 import { partOf, tilesOf } from "../props";
-import { regionsAround } from "../region";
+import { regions } from "../region";
 import { Prop, Way } from "../terrain";
 import { createWorldgen } from "../world";
 import { BIG_MINE_FLOORS, MEDIUM_MINE_FLOORS } from "./yard";
@@ -28,7 +29,9 @@ const tileAt = (seed: number, x: number, y: number) => {
 
 const SEEDS = [1, 2, 3];
 const yardsOf = (seed: number) =>
-  [...new Set(regionsAround({ rx: 0, ry: 0 }, 4).flatMap(worldOf(seed).mineYardsIn))].map(({ layout }) => layout);
+  [...new Set(regions.cellsAround({ col: 0, row: 0 }, 4).flatMap(worldOf(seed).mineYardsIn))].map(
+    ({ layout }) => layout,
+  );
 
 describe("mine yards", () => {
   it("levels a terrace at the portal's level in front of every mine", { tags: "slow" }, () => {
@@ -46,12 +49,13 @@ describe("mine yards", () => {
   });
 
   it("scales each yard to its mine: a fire and maybe a tent at small ones, stores and lodging at big ones", () => {
-    const yards = SEEDS.flatMap(yardsOf);
+    const yards = [1, 2, 3, 4, 5, 6].flatMap(yardsOf);
     const kindsOf = (yard: (typeof yards)[number]) => yard.props.map(({ kind }) => kind);
     const areaOf = ({ half, depth }: (typeof yards)[number]) => (2 * half + 1) * depth;
     const small = yards.filter(({ floors }) => floors < MEDIUM_MINE_FLOORS);
     const big = yards.filter(({ floors }) => floors >= BIG_MINE_FLOORS);
-    for (const yard of small) expect(kindsOf(yard).every((kind) => kind === Prop.Campfire || kind === Prop.Tent)).toBe(true);
+    for (const yard of small)
+      expect(kindsOf(yard).every((kind) => kind === Prop.Campfire || kind === Prop.Tent)).toBe(true);
     expect(small.some((yard) => kindsOf(yard).includes(Prop.Tent))).toBe(true);
     expect(small.some((yard) => !kindsOf(yard).includes(Prop.Tent))).toBe(true);
     for (const kind of [Prop.Stockpile, Prop.Shed, Prop.Bunkhouse])

@@ -9,4 +9,4 @@ The library compiles with `rootDir` set to itself and with only the ES library, 
 - Cloning this game means cloning `procgen` beside it, then `npm install`.
 - Its tests, lint and typecheck run in its own repo (`npm run verify` there); this repo's gate covers only the game.
 - The determinism lint preset comes from `procgen/eslint-determinism`.
-- `src/lib` and parts of `src/worldgen` duplicate the library until the game migrates onto it. The library's noise hashes gradients per lattice corner, so migrating will change the terrain.
+- World generation runs on the library's stages, features, networks and recipes; `src/lib` is gone. Moving onto it changed the terrain, since the library's noise hashes gradients per lattice corner.

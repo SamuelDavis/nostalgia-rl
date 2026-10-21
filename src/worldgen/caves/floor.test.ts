@@ -1,29 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { type Point, memoize } from "../../lib";
+import { type Vec2, memoize } from "procgen";
 import { MAX_CLIMB, heightLevel } from "../constants";
-import { findPeak } from "../landmarks";
-import { regionsAround } from "../region";
-import { createWorldgen } from "../world";
-import { createCaveFloors } from "./floor";
-import { createJunctions } from "./junctions";
-import { CEILING, createCavePlans } from "./plan";
-import { createCaveSiting } from "./siting";
+import { regions } from "../region";
+import { cavesWithWayness } from "./fixture";
+import { CEILING } from "./plan";
 
 const caveWorldWith = (wayness: number) =>
   memoize(
     (seed: number) => {
-      const { fields } = createWorldgen(seed);
-      const siting = createCaveSiting({ seed, fields, peakOf: (r) => findPeak(fields, r) });
-      const plans = createCavePlans({ seed, fields, caveOwning: siting.caveOwning, waynessAt: () => wayness });
-      const { junctionsOf } = createJunctions({ seed, fields, siting, plans });
-      const floors = createCaveFloors({ seed, fields, caveOwning: siting.caveOwning, plans, junctionsOf });
+      const { fields, caves: explored } = cavesWithWayness(seed, wayness);
       return {
         fields,
-        siting,
-        plans,
-        floors,
-        junctionsOf,
-        caves: regionsAround({ rx: 0, ry: 0 }, 3).flatMap(siting.cavesIn),
+        siting: explored,
+        plans: explored,
+        floors: explored,
+        junctionsOf: explored.junctionsOf,
+        caves: regions.cellsAround({ col: 0, row: 0 }, 3).flatMap(explored.cavesIn),
       };
     },
     String,
@@ -32,15 +24,15 @@ const caveWorldWith = (wayness: number) =>
 const caveWorldOf = caveWorldWith(0);
 const mineWorldOf = caveWorldWith(1);
 
-const NEIGHBOURS: readonly Point[] = [
+const NEIGHBOURS: readonly Vec2[] = [
   { x: 1, y: 0 },
   { x: -1, y: 0 },
   { x: 0, y: 1 },
   { x: 0, y: -1 },
 ];
 
-const reachableFrom = (start: Point, isOpen: (p: Point) => boolean, levelAt: (p: Point) => number) => {
-  const key = (p: Point) => `${p.x},${p.y}`;
+const reachableFrom = (start: Vec2, isOpen: (p: Vec2) => boolean, levelAt: (p: Vec2) => number) => {
+  const key = (p: Vec2) => `${p.x},${p.y}`;
   const seen = new Set([key(start)]);
   const frontier = [start];
   while (frontier.length > 0) {

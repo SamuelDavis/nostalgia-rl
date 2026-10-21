@@ -1,9 +1,9 @@
-import type { Point } from "../lib";
+import type { Vec2 } from "procgen";
 
 export const SURFACE = "surface";
 
 export interface CaveFloor {
-  readonly cave: Point;
+  readonly cave: Vec2;
   readonly floor: number;
 }
 

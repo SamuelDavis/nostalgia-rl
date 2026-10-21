@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Direction } from "../game/movement";
 import type { Terrain } from "../game/terrain";
-import { type Point } from "../lib";
+import { type Vec2 } from "procgen";
 import { Biome, Cover, Ground, Prop, Water, Way } from "../worldgen";
 import {
   SETTLE_MS,
@@ -21,13 +21,13 @@ const cone = (x: number, y: number) => 200 - Math.abs(x) - Math.abs(y);
 const plain = () => 100;
 const risingEast = (x: number) => 100 + x;
 
-const EAST: Point = { x: 1, y: 0 };
-const WEST: Point = { x: -1, y: 0 };
-const SOUTH: Point = { x: 0, y: 1 };
-const STILL: Point = { x: 0, y: 0 };
-const ORIGIN: Point = { x: 0, y: 0 };
+const EAST: Vec2 = { x: 1, y: 0 };
+const WEST: Vec2 = { x: -1, y: 0 };
+const SOUTH: Vec2 = { x: 0, y: 1 };
+const STILL: Vec2 = { x: 0, y: 0 };
+const ORIGIN: Vec2 = { x: 0, y: 0 };
 
-const walk = (steps: readonly Point[], from: Point = STILL) => steps.reduce(steer, from);
+const walk = (steps: readonly Vec2[], from: Vec2 = STILL) => steps.reduce(steer, from);
 
 describe("openness", () => {
   it("is closed in every direction on level ground", () => {

@@ -1,48 +1,37 @@
 import {
-  type Point,
-  clamp,
-  createNoise,
-  distance,
-  hash,
-  hashString,
-  intBetween,
-  lerp,
-  memoize,
-  projectOntoSegment,
-  unit,
-} from "../../lib";
-import { REGION_SIZE } from "../constants";
-import {
   type Bounds,
-  type Region,
-  boundsOf,
-  overlaps,
-  regionBounds,
-  regionKey,
-  regionOf,
-  regionsAround,
-} from "../region";
-import { climbCost, route } from "../routing";
-import { Biome, Cover, Ground, Prop, Water, Way } from "../terrain";
+  type Cell,
+  type FeatureType,
+  type Stage,
+  type Vec2,
+  clamp,
+  distance,
+  expand,
+  lerp,
+  projectOntoSegment,
+  rngOf,
+  simplex2,
+  stage,
+} from "procgen";
+import { REGION_SIZE } from "../constants";
 import type { Glade } from "../landmarks";
-import { CAMP_RADIUS } from "./camp";
-import type { Anchor, FeatureType } from "./feature";
+import { regions } from "../region";
+import { climbCost, pathOf, route } from "../routing";
+import { Biome, Cover, Ground, Prop, Water, Way } from "../terrain";
+import type { WayLink } from "../ways";
+import { CAMP_RADIUS, type Camp } from "./camp";
+import type { Anchor, Opening, TileDraft } from "./feature";
 
 export interface DeepForest extends Anchor {
-  readonly region: Region;
+  readonly region: Cell;
   readonly cells: ReadonlySet<number>;
   readonly footprintCells: ReadonlySet<number>;
-  readonly camps: readonly Point[];
-}
-
-export interface Opening {
-  readonly outside: Point;
-  readonly inside: Point;
+  readonly camps: readonly Vec2[];
 }
 
 export interface Link {
-  readonly here: Point;
-  readonly there: Point;
+  readonly here: Vec2;
+  readonly there: Vec2;
 }
 
 export interface DeepForestLayout {
@@ -50,21 +39,20 @@ export interface DeepForestLayout {
   readonly glade: Glade;
   readonly openings: readonly Opening[];
   readonly links: readonly Link[];
-  readonly stops: readonly Point[];
-  readonly contains: (p: Point) => boolean;
+  readonly stops: readonly Vec2[];
+  readonly contains: (p: Vec2) => boolean;
   readonly paths: ReadonlySet<string>;
   readonly mouths: ReadonlySet<string>;
+  readonly nearby: readonly DeepForest[];
 }
 
 export interface DeepForestSiting {
   readonly seed: number;
-  readonly level: (p: Point) => number;
-  readonly forestness: (p: Point) => number;
-  readonly campAt: (region: Region) => Point | undefined;
-  readonly waysNear: (region: Region) => readonly { readonly nodes: readonly Point[] }[];
+  readonly level: (p: Vec2) => number;
+  readonly forestness: (p: Vec2) => number;
+  readonly camps: Stage<readonly Camp[]>;
 }
 
-const SALT = hashString("deep forests");
 const DEEP_FORESTNESS = 0.7;
 const SEAM_FORESTNESS = 0.08;
 const CELL = 8;
@@ -72,6 +60,7 @@ const CELLS_PER_SIDE = REGION_SIZE / CELL;
 const MIN_CELLS = 10;
 const MARGIN = 2 * CELL;
 const DEEP_FOREST_REACH = REGION_SIZE + MARGIN;
+export const OPENING_REACH = MARGIN + 2;
 const GUARANTEED_OPENINGS = 2;
 const OPENING_STEP = 2;
 const GLADE_RADII = [5, 8] as const;
@@ -84,25 +73,24 @@ const PATH_WOBBLE = 1.5;
 const PATH_WOBBLE_SCALE = 12;
 const PATH_REUSE = 0.35;
 const PATH_TYPICAL_COST = 2;
-const REGION_CACHE = 4096;
 const DEEP_TILE_CACHE = 1 << 18;
 const TILE_KEY_STRIDE = 1 << 26;
 
-const NEIGHBOURS: readonly Point[] = [
+const NEIGHBOURS: readonly Vec2[] = [
   { x: 1, y: 0 },
   { x: -1, y: 0 },
   { x: 0, y: 1 },
   { x: 0, y: -1 },
 ];
 
-const AROUND: readonly Point[] = [...NEIGHBOURS, { x: 1, y: 1 }, { x: 1, y: -1 }, { x: -1, y: 1 }, { x: -1, y: -1 }];
+const AROUND: readonly Vec2[] = [...NEIGHBOURS, { x: 1, y: 1 }, { x: 1, y: -1 }, { x: -1, y: 1 }, { x: -1, y: -1 }];
 
-const HEART_REACH: readonly Point[] = Array.from({ length: 25 }, (_, i) => ({
+const HEART_REACH: readonly Vec2[] = Array.from({ length: 25 }, (_, i) => ({
   x: (i % 5) - 2,
   y: Math.floor(i / 5) - 2,
 }));
 
-const DIRECTIONS: readonly Point[] = [
+const DIRECTIONS: readonly Vec2[] = [
   { x: 1, y: 0 },
   { x: Math.SQRT1_2, y: Math.SQRT1_2 },
   { x: 0, y: 1 },
@@ -113,7 +101,7 @@ const DIRECTIONS: readonly Point[] = [
   { x: Math.SQRT1_2, y: -Math.SQRT1_2 },
 ];
 
-const along = (from: Point, direction: Point, length: number): Point => ({
+const along = (from: Vec2, direction: Vec2, length: number): Vec2 => ({
   x: from.x + direction.x * length,
   y: from.y + direction.y * length,
 });
@@ -122,14 +110,14 @@ const cellIndex = (col: number, row: number) => row * CELLS_PER_SIDE + col;
 
 const isCellOnGrid = (col: number, row: number) => col >= 0 && col < CELLS_PER_SIDE && row >= 0 && row < CELLS_PER_SIDE;
 
-const cellTile = ({ rx, ry }: Region, index: number): Point => ({
-  x: rx * REGION_SIZE + (index % CELLS_PER_SIDE) * CELL + CELL / 2,
-  y: ry * REGION_SIZE + Math.floor(index / CELLS_PER_SIDE) * CELL + CELL / 2,
+const cellTile = ({ col, row }: Cell, index: number): Vec2 => ({
+  x: col * REGION_SIZE + (index % CELLS_PER_SIDE) * CELL + CELL / 2,
+  y: row * REGION_SIZE + Math.floor(index / CELLS_PER_SIDE) * CELL + CELL / 2,
 });
 
-const tileCentre = (p: Point): Point => ({ x: Math.floor(p.x) + 0.5, y: Math.floor(p.y) + 0.5 });
+const tileCentre = (p: Vec2): Vec2 => ({ x: Math.floor(p.x) + 0.5, y: Math.floor(p.y) + 0.5 });
 
-const isInCamp = (forest: DeepForest, p: Point) =>
+const isInCamp = (forest: DeepForest, p: Vec2) =>
   forest.camps.some((camp) => distance(tileCentre(p), { x: camp.x + 0.5, y: camp.y + 0.5 }) <= CAMP_RADIUS);
 
 const colRow = (index: number) => [index % CELLS_PER_SIDE, Math.floor(index / CELLS_PER_SIDE)] as const;
@@ -137,7 +125,7 @@ const colRow = (index: number) => [index % CELLS_PER_SIDE, Math.floor(index / CE
 export const gladeOf = (forest: DeepForest): Glade => ({
   x: forest.x,
   y: forest.y,
-  radius: intBetween(...GLADE_RADII, hash(forest.id, 1)),
+  radius: rngOf(forest.id).int(...GLADE_RADII, 1),
 });
 
 const boundsOfForest = (forest: DeepForest): Bounds => {
@@ -152,7 +140,7 @@ const boundsOfForest = (forest: DeepForest): Bounds => {
 
 const tileKey = (x: number, y: number) => `${x},${y}`;
 
-const rasterize = (nodes: readonly Point[], tiles: Set<string>) =>
+const rasterize = (nodes: readonly Vec2[], tiles: Set<string>) =>
   nodes.forEach((a, i) => {
     const b = nodes[i + 1] ?? a;
     for (let y = Math.floor(Math.min(a.y, b.y)) - 1; y <= Math.floor(Math.max(a.y, b.y)) + 1; y++)
@@ -161,12 +149,12 @@ const rasterize = (nodes: readonly Point[], tiles: Set<string>) =>
   });
 
 interface Run {
-  readonly before?: Point;
-  readonly inside: readonly Point[];
-  readonly after?: Point;
+  readonly before?: Vec2;
+  readonly inside: readonly Vec2[];
+  readonly after?: Vec2;
 }
 
-const densely = (nodes: readonly Point[]): Point[] =>
+const densely = (nodes: readonly Vec2[]): Vec2[] =>
   nodes.flatMap((a, i) => {
     const b = nodes[i + 1];
     if (!b) return [a];
@@ -177,10 +165,10 @@ const densely = (nodes: readonly Point[]): Point[] =>
     }));
   });
 
-const runsWithin = (nodes: readonly Point[], contains: (p: Point) => boolean): Run[] => {
+const runsWithin = (nodes: readonly Vec2[], contains: (p: Vec2) => boolean): Run[] => {
   const runs: Run[] = [];
-  let run: { before?: Point; inside: Point[] } | undefined;
-  let previous: Point | undefined;
+  let run: { before?: Vec2; inside: Vec2[] } | undefined;
+  let previous: Vec2 | undefined;
   for (const p of densely(nodes)) {
     if (contains(p)) {
       run ??= { before: previous, inside: [] };
@@ -195,11 +183,12 @@ const runsWithin = (nodes: readonly Point[], contains: (p: Point) => boolean): R
   return runs;
 };
 
-export const createDeepForests = ({ seed, level, forestness, campAt, waysNear }: DeepForestSiting) => {
-  const wobble = createNoise(seed, hash(SALT, 1));
+export const createDeepForests = ({ seed, level, forestness, camps }: DeepForestSiting) => {
+  const rng = rngOf(seed, "deep forests");
+  const wobble = simplex2(rng.child("wobble").key);
 
   const deepTiles = new Map<number, boolean>();
-  const isDeep = (p: Point) => {
+  const isDeep = (p: Vec2) => {
     const key = Math.floor(p.x) * TILE_KEY_STRIDE + Math.floor(p.y);
     let deep = deepTiles.get(key);
     if (deep === undefined) {
@@ -210,8 +199,11 @@ export const createDeepForests = ({ seed, level, forestness, campAt, waysNear }:
     return deep;
   };
 
-  const partsIn = memoize(
-    (region: Region): DeepForest[] => {
+  const parts = stage({
+    name: "deep forest parts",
+    grid: regions,
+    reads: [{ stage: camps, radius: CAMP_RADIUS }],
+    compute: (region, context): readonly DeepForest[] => {
       const deep = Array.from({ length: CELLS_PER_SIDE * CELLS_PER_SIDE }, (_, i) => isDeep(cellTile(region, i)));
       const isDeepCell = (col: number, row: number) => isCellOnGrid(col, row) && deep[cellIndex(col, row)]!;
       const componentOf = (start: number) => {
@@ -245,10 +237,7 @@ export const createDeepForests = ({ seed, level, forestness, campAt, waysNear }:
       });
       components.sort((a, b) => b.size - a.size);
       const owned = new Set(components.flatMap((cells) => [...cells]));
-      const camps = regionsAround(region, 1).flatMap((other) => {
-        const camp = campAt(other);
-        return camp && overlaps(boundsOf([camp], CAMP_RADIUS), regionBounds(region)) ? [camp] : [];
-      });
+      const campsNear = context.gather(camps, expand(regions.boundsOf(region), CAMP_RADIUS));
       return components.map((cells) => {
         const ring = [...cells].flatMap((index) => {
           const [col, row] = colRow(index);
@@ -260,32 +249,30 @@ export const createDeepForests = ({ seed, level, forestness, campAt, waysNear }:
         const heart = heartOf(cells);
         return {
           ...cellTile(region, heart),
-          id: hash(seed, SALT, region.rx, region.ry, heart),
+          id: context.rng.u32(heart),
           region,
           cells,
           footprintCells: new Set([...cells, ...ring]),
-          camps,
+          camps: campsNear,
         };
       });
     },
-    regionKey,
-    REGION_CACHE,
-  );
+  });
 
-  const isInFootprint = (forest: DeepForest, p: Point) => {
-    const col = Math.floor((p.x - forest.region.rx * REGION_SIZE) / CELL);
-    const row = Math.floor((p.y - forest.region.ry * REGION_SIZE) / CELL);
+  const isInFootprint = (forest: DeepForest, p: Vec2) => {
+    const col = Math.floor((p.x - forest.region.col * REGION_SIZE) / CELL);
+    const row = Math.floor((p.y - forest.region.row * REGION_SIZE) / CELL);
     return isCellOnGrid(col, row) && forest.footprintCells.has(cellIndex(col, row)) && !isInCamp(forest, p);
   };
 
-  const isUnder = (forest: DeepForest, p: Point) => isInFootprint(forest, p) && isDeep(p);
+  const isUnder = (forest: DeepForest, p: Vec2) => isInFootprint(forest, p) && isDeep(p);
 
-  const isCovered = (p: Point, near: DeepForest) =>
-    isInFootprint(near, p) ? isDeep(p) : partsIn(regionOf(p)).some((forest) => isUnder(forest, p));
+  const isCovered = (partsAt: (p: Vec2) => readonly DeepForest[], p: Vec2, near: DeepForest) =>
+    isInFootprint(near, p) ? isDeep(p) : partsAt(p).some((forest) => isUnder(forest, p));
 
-  const linksOf = (forest: DeepForest): Link[] =>
+  const linksOf = (forest: DeepForest, partsIn: (region: Cell) => readonly DeepForest[]): Link[] =>
     NEIGHBOURS.flatMap((o) =>
-      partsIn({ rx: forest.region.rx + o.x, ry: forest.region.ry + o.y }).flatMap((other) => {
+      partsIn({ col: forest.region.col + o.x, row: forest.region.row + o.y }).flatMap((other) => {
         const step = o.x + o.y;
         const edge = (part: DeepForest, k: number, side: number) => {
           const last = CELLS_PER_SIDE - 1;
@@ -297,51 +284,72 @@ export const createDeepForests = ({ seed, level, forestness, campAt, waysNear }:
           there: edge(other, k, -step),
         })).filter((pair): pair is Link => pair.here !== undefined && pair.there !== undefined);
         if (pairs.length === 0) return [];
-        const pick = hash(seed, SALT, Math.min(forest.id, other.id), Math.max(forest.id, other.id)) % pairs.length;
+        const pick = rng.int(0, pairs.length - 1, Math.min(forest.id, other.id), Math.max(forest.id, other.id));
         return [pairs[pick]!];
       }),
     );
 
-  const guaranteedOpeningsOf = memoize(
-    (forest: DeepForest): Opening[] => {
-      const contains = (p: Point) => isUnder(forest, tileCentre(p));
-      const glade = gladeOf(forest);
-      return Array.from({ length: DIRECTIONS.length }, (_, i) => {
-        const direction = DIRECTIONS[(hash(forest.id, 2) + i * 3) % DIRECTIONS.length]!;
-        let length = glade.radius;
-        while (contains(along(forest, direction, length + OPENING_STEP))) length += OPENING_STEP;
-        const outside = along(forest, direction, length + OPENING_STEP);
-        return isCovered(tileCentre(outside), forest)
-          ? undefined
-          : { inside: along(forest, direction, length), outside };
-      })
-        .filter((opening) => opening !== undefined)
-        .slice(0, GUARANTEED_OPENINGS);
-    },
-    (forest) => String(forest.id),
-    REGION_CACHE,
-  );
+  const guaranteedOpeningsOf = (forest: DeepForest, partsAt: (p: Vec2) => readonly DeepForest[]): Opening[] => {
+    const contains = (p: Vec2) => isUnder(forest, tileCentre(p));
+    const glade = gladeOf(forest);
+    return Array.from({ length: DIRECTIONS.length }, (_, i) => {
+      const direction = DIRECTIONS[(rngOf(forest.id).u32(2) + i * 3) % DIRECTIONS.length]!;
+      let length = glade.radius;
+      while (contains(along(forest, direction, length + OPENING_STEP))) length += OPENING_STEP;
+      const outside = along(forest, direction, length + OPENING_STEP);
+      return isCovered(partsAt, tileCentre(outside), forest)
+        ? undefined
+        : { inside: along(forest, direction, length), outside };
+    })
+      .filter((opening) => opening !== undefined)
+      .slice(0, GUARANTEED_OPENINGS);
+  };
 
-  const build = (forest: DeepForest): DeepForestLayout => {
-    const contains = (p: Point) => isUnder(forest, tileCentre(p));
+  const guaranteed = stage({
+    name: "deep forest openings",
+    grid: regions,
+    reads: [{ stage: parts, radius: OPENING_REACH }],
+    compute: (region, { read }): readonly (readonly Opening[])[] => {
+      const partsAt = (p: Vec2) => read(parts, regions.cellOf(p));
+      return read(parts, region).map((forest) => guaranteedOpeningsOf(forest, partsAt));
+    },
+  });
+
+  const openings = stage({
+    name: "deep forest opening list",
+    grid: regions,
+    reads: [{ stage: guaranteed, radius: 0 }],
+    compute: (region, { read }): readonly Opening[] => read(guaranteed, region).flat(),
+  });
+
+  const build = (
+    forest: DeepForest,
+    ways: readonly WayLink[],
+    nearby: readonly DeepForest[],
+    guaranteedOpenings: readonly Opening[],
+    links: readonly Link[],
+  ): DeepForestLayout => {
+    const contains = (p: Vec2) => isUnder(forest, tileCentre(p));
     const glade = gladeOf(forest);
 
     const paths = new Set<string>();
     const mouths = new Set<string>();
     const walked = new Set<string>();
-    const routeToGlade = (from: Point) => {
-      const nodes = route(from, glade, {
-        gradeLevel: level,
-        isOpen: contains,
-        unitCost: (grade, at) =>
-          (1 + PATH_WOBBLE * (1 + wobble(at.x / PATH_WOBBLE_SCALE, at.y / PATH_WOBBLE_SCALE)) + climbCost(grade)) *
-          (walked.has(tileKey(at.x, at.y)) ? PATH_REUSE : 1),
-        typicalUnitCost: PATH_TYPICAL_COST,
-      });
+    const routeToGlade = (from: Vec2) => {
+      const nodes = pathOf(
+        route(from, glade, {
+          gradeLevel: level,
+          isOpen: contains,
+          unitCost: (grade, at) =>
+            (1 + PATH_WOBBLE * (1 + wobble(at.x / PATH_WOBBLE_SCALE, at.y / PATH_WOBBLE_SCALE)) + climbCost(grade)) *
+            (walked.has(tileKey(at.x, at.y)) ? PATH_REUSE : 1),
+          typicalUnitCost: PATH_TYPICAL_COST,
+        }),
+      );
       nodes?.forEach((node) => walked.add(tileKey(node.x, node.y)));
-      return nodes && [...nodes, glade];
+      return nodes;
     };
-    const notch = (opening: Opening, nodes: readonly Point[]) =>
+    const notch = (opening: Opening, nodes: readonly Vec2[]) =>
       rasterize(
         [
           opening.outside,
@@ -354,10 +362,9 @@ export const createDeepForests = ({ seed, level, forestness, campAt, waysNear }:
       );
 
     const openings: Opening[] = [];
-    const stops: Point[] = [];
-    const links: Link[] = [];
-    const ways = new Set(regionsAround(forest.region, 1).flatMap(waysNear));
-    for (const run of [...ways].flatMap(({ nodes }) => runsWithin(nodes, contains))) {
+    const stops: Vec2[] = [];
+    const joined: Link[] = [];
+    for (const run of ways.flatMap(({ nodes }) => runsWithin(nodes, contains))) {
       const ends = [
         run.before ? { outside: run.before, inside: run.inside[0]! } : run.inside[0]!,
         run.after ? { outside: run.after, inside: run.inside.at(-1)! } : run.inside.at(-1)!,
@@ -368,8 +375,8 @@ export const createDeepForests = ({ seed, level, forestness, campAt, waysNear }:
           if (!("outside" in end)) {
             stops.push(end);
             rasterize([end, ...nodes!], paths);
-          } else if (isCovered(tileCentre(end.outside), forest)) {
-            links.push({ here: end.inside, there: end.outside });
+          } else if (isCovered(() => nearby, tileCentre(end.outside), forest)) {
+            joined.push({ here: end.inside, there: end.outside });
             rasterize([end.outside, end.inside, ...nodes!], paths);
           } else {
             openings.push(end);
@@ -383,40 +390,57 @@ export const createDeepForests = ({ seed, level, forestness, campAt, waysNear }:
         rasterize(through, mouths);
       }
     }
-    for (const opening of guaranteedOpeningsOf(forest)) {
+    for (const opening of guaranteedOpenings) {
       const nodes = routeToGlade(opening.inside);
       if (!nodes) continue;
       openings.push(opening);
       rasterize([opening.outside, opening.inside, ...nodes], paths);
       notch(opening, nodes);
     }
-    for (const link of linksOf(forest)) {
+    for (const link of links) {
       const nodes = routeToGlade(link.here);
       if (!nodes) continue;
-      links.push(link);
+      joined.push(link);
       rasterize([link.there, link.here, ...nodes], paths);
     }
-    return { forest, glade, openings, links, stops, contains, paths, mouths };
+    return { forest, glade, openings, links: joined, stops, contains, paths, mouths, nearby };
   };
 
-  const type: FeatureType<DeepForest, DeepForestLayout> = {
+  const feature = (waysNear: Stage<readonly WayLink[]>): FeatureType<DeepForest, DeepForestLayout, TileDraft> => ({
     name: "deep forest",
     priority: 0,
+    sites: parts,
     reach: DEEP_FOREST_REACH,
-    bounds: boundsOfForest,
-    build,
-    paint: ({ forest, glade, paths, mouths }, draft, x, y) => {
+    extent: boundsOfForest,
+    reads: [
+      { stage: waysNear, radius: MARGIN },
+      { stage: parts, radius: REGION_SIZE },
+      { stage: guaranteed, radius: 0 },
+    ],
+    build: (forest, { read, gather }) => {
+      const bounds = boundsOfForest(forest);
+      const index = read(parts, forest.region).findIndex(({ id }) => id === forest.id);
+      return build(
+        forest,
+        [...new Set(gather(waysNear, bounds))],
+        gather(parts, expand(bounds, 1)),
+        read(guaranteed, forest.region)[index]!,
+        linksOf(forest, (region) => read(parts, region)),
+      );
+    },
+    bounds: ({ forest }) => boundsOfForest(forest),
+    paint: ({ forest, glade, paths, mouths, nearby }, draft, x, y) => {
       const centre = { x: x + 0.5, y: y + 0.5 };
       const key = tileKey(x, y);
       const isWall = () =>
         NEIGHBOURS.some((o) => {
           const next = { x: centre.x + o.x, y: centre.y + o.y };
-          return mouths.has(tileKey(x + o.x, y + o.y)) || !isCovered(next, forest);
+          return mouths.has(tileKey(x + o.x, y + o.y)) || !isCovered(() => nearby, next, forest);
         });
       if (paths.has(key)) {
         draft.way = Way.Path;
         draft.prop = draft.water === Water.None ? Prop.None : Prop.Bridge;
-        draft.cover = isCovered(centre, forest) && !mouths.has(key) ? Cover.Canopy : Cover.None;
+        draft.cover = isCovered(() => nearby, centre, forest) && !mouths.has(key) ? Cover.Canopy : Cover.None;
         return true;
       }
       if (draft.biome === Biome.Ocean || !isInFootprint(forest, centre)) return false;
@@ -424,7 +448,7 @@ export const createDeepForests = ({ seed, level, forestness, campAt, waysNear }:
       draft.cover = Cover.Canopy;
       if (draft.ground === Ground.Sand) draft.ground = Ground.Grass;
       draft.way = Way.None;
-      const roll = unit(hash(seed, SALT, x, y));
+      const roll = rng.unit(x, y);
       if (draft.water !== Water.None) draft.prop = Prop.None;
       else if (isWall()) draft.prop = draft.ground === Ground.Snow || roll < 1 / 3 ? Prop.Pine : Prop.Oak;
       else if (distance(centre, glade) <= glade.radius) draft.prop = roll < 0.2 ? Prop.Flowers : Prop.Tuft;
@@ -436,7 +460,7 @@ export const createDeepForests = ({ seed, level, forestness, campAt, waysNear }:
       }
       return true;
     },
-  };
+  });
 
-  return { partsIn, guaranteedOpeningsOf, type };
+  return { parts, openings, feature };
 };

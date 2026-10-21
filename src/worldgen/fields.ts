@@ -1,7 +1,7 @@
-import { type Field2, clamp, createNoise, fbm, hashString, lerp, smoothstep } from "../lib";
+import { type Field2, clamp, fbm, lerp, rngOf, simplex2, smoothstep } from "procgen";
+import { type Landform, jaggedness, landformNoise, ruggedness, terrainOffset } from "procgen/recipes";
 import { forestness, mountainness } from "./biome";
 import { HEIGHT_LEVELS, SEA_ELEVATION, heightLevel, metresToLevels } from "./constants";
-import { type Landform, jaggedness, peaksAndValleys, ruggedness, terrainOffset } from "./landform";
 
 export interface Conditions {
   readonly elevation: number;
@@ -24,12 +24,13 @@ export interface Fields {
   readonly landform: (x: number, y: number) => Landform;
 }
 
+const noise = (seed: number, name: string): Field2 => simplex2(rngOf(seed, name).key);
+
 const layer = (seed: number, name: string, octaves: number, frequency: number): Field2 =>
-  fbm(createNoise(seed, hashString(name)), { octaves, frequency });
+  fbm(noise(seed, name), { octaves, frequency });
 
 const TERRACE_STEP = metresToLevels(8) / HEIGHT_LEVELS;
 const ELEVATION_PER_OFFSET = 128 / HEIGHT_LEVELS;
-const NOISE_STRETCH = 1.7;
 const JAGGED_AMPLITUDE = 0.15;
 const HILLS_AMPLITUDE = 0.02;
 const ORIGIN_LAND_BIAS = 0.5;
@@ -39,17 +40,10 @@ const FOREST_EDGE_JITTER = 0.1;
 
 const distanceFromOrigin = (x: number, y: number) => Math.sqrt(x * x + y * y);
 
-const stretched =
-  (field: Field2): Field2 =>
-  (x, y) =>
-    clamp(field(x, y) * NOISE_STRETCH, -1, 1);
-
 const halfNegative = (v: number) => (v < 0 ? v / 2 : v);
 
 export const createFields = (seed: number): Fields => {
-  const continents = stretched(layer(seed, "continentalness", 6, 1 / 3000));
-  const erosionNoise = stretched(layer(seed, "erosion", 5, 1 / 2000));
-  const ridges = stretched(layer(seed, "ridges", 3, 1 / 600));
+  const naturalLandform = landformNoise({ seed });
   const jagged = layer(seed, "jagged", 3, 1 / 80);
   const hills = layer(seed, "hills", 3, 1 / 110);
   const ledges = layer(seed, "ledges", 2, 1 / 150);
@@ -57,17 +51,14 @@ export const createFields = (seed: number): Fields => {
   const wetness = layer(seed, "moisture", 4, 1 / 1500);
   const mountainEdge = layer(seed, "mountain edge", 2, 1 / 24);
   const forestEdge = layer(seed, "forest edge", 2, 1 / 24);
-  const groveNoise = createNoise(seed, hashString("groves"));
-  const frostNoise = createNoise(seed, hashString("ground"));
+  const groveNoise = noise(seed, "groves");
+  const frostNoise = noise(seed, "ground");
 
-  const landform = (x: number, y: number): Landform => ({
-    continentalness: Math.min(
-      1,
-      continents(x, y) + ORIGIN_LAND_BIAS * (1 - smoothstep(0, ORIGIN_LAND_RADIUS, distanceFromOrigin(x, y))),
-    ),
-    erosion: erosionNoise(x, y),
-    peaksAndValleys: peaksAndValleys(ridges(x, y)),
-  });
+  const landform = (x: number, y: number): Landform => {
+    const natural = naturalLandform(x, y);
+    const bias = ORIGIN_LAND_BIAS * (1 - smoothstep(0, ORIGIN_LAND_RADIUS, distanceFromOrigin(x, y)));
+    return { ...natural, continentalness: Math.min(1, natural.continentalness + bias) };
+  };
 
   const relief = (x: number, y: number) => {
     const form = landform(x, y);

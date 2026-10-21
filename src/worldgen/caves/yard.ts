@@ -1,7 +1,6 @@
-import { type Point, distance, hash, hashString, memoize } from "../../lib";
-import { type FeatureType, settle } from "../features/feature";
+import { type FeatureType, type Stage, type Vec2, boundsOf, distance, rngOf } from "procgen";
+import { type TileDraft, settle } from "../features/feature";
 import { type PlacedProp, footprintOf, partOf, tilesOf } from "../props";
-import { type Region, boundsOf, regionOf, regionsAround } from "../region";
 import { Cover, Ground, Prop, Water, Way } from "../terrain";
 import { type WayLink, isOnWay } from "../ways";
 import type { CavePlan, Mouth } from "./plan";
@@ -17,13 +16,13 @@ export interface MineYard {
 
 export interface MineYardInput {
   readonly seed: number;
-  readonly planOf: (cave: Cave) => CavePlan;
-  readonly waysNear: (region: Region) => readonly WayLink[];
+  readonly mines: Stage<readonly Cave[]>;
+  readonly plans: Stage<readonly CavePlan[]>;
+  readonly waysNear: Stage<readonly WayLink[]>;
 }
 
 export const MEDIUM_MINE_FLOORS = 8;
 export const BIG_MINE_FLOORS = 12;
-const SALT = hashString("mine yards");
 const PRIORITY = 2;
 const ROAD_HALF = 1;
 const FIRST_COLUMN = ROAD_HALF + 2;
@@ -31,17 +30,16 @@ const MIN_HALF = 3;
 const MIN_DEPTH = 3;
 const SEAM = 8;
 const YARD_REACH = 32;
-const CACHE = 1024;
 
-const outwardOf = ({ inside, outside }: Mouth): Point => ({ x: outside.x - inside.x, y: outside.y - inside.y });
-const lateralOf = (outward: Point): Point => ({ x: -outward.y, y: outward.x });
+const outwardOf = ({ inside, outside }: Mouth): Vec2 => ({ x: outside.x - inside.x, y: outside.y - inside.y });
+const lateralOf = (outward: Vec2): Vec2 => ({ x: -outward.y, y: outward.x });
 
-const worldAt = (mouth: Mouth, u: number, v: number): Point => {
+const worldAt = (mouth: Mouth, u: number, v: number): Vec2 => {
   const [outward, lateral] = [outwardOf(mouth), lateralOf(outwardOf(mouth))];
   return { x: mouth.inside.x + lateral.x * u + outward.x * v, y: mouth.inside.y + lateral.y * u + outward.y * v };
 };
 
-const localOf = (mouth: Mouth, p: Point) => {
+const localOf = (mouth: Mouth, p: Vec2) => {
   const [outward, lateral] = [outwardOf(mouth), lateralOf(outwardOf(mouth))];
   const d = { x: p.x - mouth.inside.x, y: p.y - mouth.inside.y };
   return { u: d.x * lateral.x + d.y * lateral.y, v: d.x * outward.x + d.y * outward.y };
@@ -69,50 +67,53 @@ const columnOf = (kinds: readonly Prop[], side: number, mouth: Mouth) => {
 };
 
 const columnsFor = (floors: number, hasTent: boolean): readonly (readonly Prop[])[] => {
-  if (floors >= BIG_MINE_FLOORS) return [[Prop.Stockpile, Prop.Shed, Prop.Shed], [Prop.Bunkhouse, Prop.Campfire]];
+  if (floors >= BIG_MINE_FLOORS)
+    return [
+      [Prop.Stockpile, Prop.Shed, Prop.Shed],
+      [Prop.Bunkhouse, Prop.Campfire],
+    ];
   if (floors >= MEDIUM_MINE_FLOORS) return [[Prop.Stockpile], [Prop.Tent, Prop.Campfire]];
   return [[Prop.Campfire], hasTent ? [Prop.Tent] : []];
 };
 
-export const createMineYards = ({ seed, planOf, waysNear }: MineYardInput) => {
-  const yardOf = memoize(
-    (cave: Cave): MineYard => {
-      const { mouth, mine } = planOf(cave);
-      const floors = mine ? mine.top - mine.bottom + 1 : 0;
-      const [near, far] = columnsFor(floors, hash(seed, SALT, cave.id, 1) % 2 === 0);
-      const links = regionsAround(regionOf(mouth.outside), 1).flatMap(waysNear);
-      const layOut = (side: number) => {
-        const columns = [columnOf(near!, side, mouth), columnOf(far!, -side, mouth)].flat();
-        const props = columns.map(({ prop }) => prop).filter((prop) => !tilesOf(prop).some((p) => isOnWay(links, p)));
-        return { columns, props };
-      };
-      const preferred = hash(seed, SALT, cave.id) % 2 === 0 ? 1 : -1;
-      const { columns, props } = [layOut(preferred), layOut(-preferred)].reduce((a, b) =>
-        b.props.length > a.props.length ? b : a,
-      );
-      const half = Math.max(MIN_HALF, ...columns.map(({ extent }) => FIRST_COLUMN + extent.u));
-      const depth = Math.max(MIN_DEPTH, ...columns.map(({ end }) => end + 1));
-      return {
-        mouth,
-        floors,
-        half,
-        depth,
-        props,
-      };
-    },
-    (cave) => String(cave.id),
-    CACHE,
-  );
+export const createMineYards = ({
+  seed,
+  mines,
+  plans,
+  waysNear,
+}: MineYardInput): FeatureType<Cave, MineYard, TileDraft> => {
+  const rng = rngOf(seed, "mine yards");
+  const yardOf = ({ mouth, mine, cave }: CavePlan, links: readonly WayLink[]): MineYard => {
+    const floors = mine ? mine.top - mine.bottom + 1 : 0;
+    const [near, far] = columnsFor(floors, rng.chance(0.5, cave.id, 1));
+    const layOut = (side: number) => {
+      const columns = [columnOf(near!, side, mouth), columnOf(far!, -side, mouth)].flat();
+      const props = columns.map(({ prop }) => prop).filter((prop) => !tilesOf(prop).some((p) => isOnWay(links, p)));
+      return { columns, props };
+    };
+    const preferred = rng.chance(0.5, cave.id, 0) ? 1 : -1;
+    const { columns, props } = [layOut(preferred), layOut(-preferred)].reduce((a, b) =>
+      b.props.length > a.props.length ? b : a,
+    );
+    const half = Math.max(MIN_HALF, ...columns.map(({ extent }) => FIRST_COLUMN + extent.u));
+    const depth = Math.max(MIN_DEPTH, ...columns.map(({ end }) => end + 1));
+    return { mouth, floors, half, depth, props };
+  };
 
-  const type: FeatureType<Cave, MineYard> = {
+  return {
     name: "mine yard",
     priority: PRIORITY,
+    sites: mines,
     reach: TERRITORY_RADIUS + YARD_REACH,
-    bounds: (cave) => {
-      const { mouth, half, depth } = yardOf(cave);
-      return boundsOf([worldAt(mouth, -half, 1), worldAt(mouth, half, depth)], SEAM);
+    reads: [
+      { stage: plans, radius: 0 },
+      { stage: waysNear, radius: TERRITORY_RADIUS + YARD_REACH },
+    ],
+    build: (cave, { read, gather }) => {
+      const plan = read(plans, cave.region).find((p) => p.cave.id === cave.id)!;
+      return yardOf(plan, [...new Set(gather(waysNear, boundsOf([plan.mouth.outside], YARD_REACH)))]);
     },
-    build: yardOf,
+    bounds: ({ mouth, half, depth }) => boundsOf([worldAt(mouth, -half, 1), worldAt(mouth, half, depth)], SEAM),
     paint: ({ mouth, half, depth, props }, draft, x, y) => {
       const p = { x, y };
       const { u, v } = localOf(mouth, p);
@@ -131,6 +132,4 @@ export const createMineYards = ({ seed, planOf, waysNear }: MineYardInput) => {
       return true;
     },
   };
-
-  return { type, yardOf };
 };

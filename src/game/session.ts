@@ -1,11 +1,11 @@
-import type { Point } from "../lib";
+import type { Vec2 } from "procgen";
 import { type Layer, SURFACE } from "../worldgen";
 import { type Blocker, Direction, blockerBetween, stepToward } from "./movement";
 import type { Layers } from "./terrain";
 
 export interface Session {
   readonly turn: number;
-  readonly position: Point;
+  readonly position: Vec2;
   readonly layer: Layer;
   readonly facing: Direction;
   readonly blocked: Blocker | undefined;
@@ -16,7 +16,7 @@ export interface Action {
   readonly direction: Direction;
 }
 
-export const startSession = (position: Point): Session => ({
+export const startSession = (position: Vec2): Session => ({
   turn: 0,
   position,
   layer: SURFACE,

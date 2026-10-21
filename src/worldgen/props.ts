@@ -1,31 +1,15 @@
-import type { Point } from "../lib";
+import { type PlacedProp as Placed, footprints } from "procgen";
 import { Prop } from "./terrain";
 
-export interface PlacedProp {
-  readonly kind: Prop;
-  readonly at: Point;
-}
+export type PlacedProp = Placed<Prop>;
 
-const TILE: Point = { x: 1, y: 1 };
-const FOOTPRINTS: Partial<Record<Prop, Point>> = {
+export const {
+  sizeOf: footprintOf,
+  partOf,
+  tilesOf,
+} = footprints<Prop>({
   [Prop.Tent]: { x: 2, y: 2 },
   [Prop.Shed]: { x: 3, y: 4 },
   [Prop.Stockpile]: { x: 4, y: 4 },
   [Prop.Bunkhouse]: { x: 10, y: 5 },
-};
-
-export const footprintOf = (kind: Prop): Point => FOOTPRINTS[kind] ?? TILE;
-
-export const partOf = ({ kind, at }: PlacedProp, p: Point): number | undefined => {
-  const { x: width, y: depth } = footprintOf(kind);
-  const [dx, dy] = [p.x - at.x, p.y - at.y];
-  return dx >= 0 && dx < width && dy >= 0 && dy < depth ? dy * width + dx : undefined;
-};
-
-export const tilesOf = (prop: PlacedProp): Point[] => {
-  const { x: width, y: depth } = footprintOf(prop.kind);
-  return Array.from({ length: width * depth }, (_, i) => ({
-    x: prop.at.x + (i % width),
-    y: prop.at.y + Math.floor(i / width),
-  }));
-};
+});

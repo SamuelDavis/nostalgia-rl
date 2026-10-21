@@ -1,23 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { memoize } from "../../lib";
-import { findPeak } from "../landmarks";
+import { memoize } from "procgen";
 import { SURFACE } from "../layer";
-import { regionsAround } from "../region";
-import { createWorldgen } from "../world";
-import { createCaves } from "./caves";
+import { regions } from "../region";
+import { cavesWithWayness } from "./fixture";
 
-const cavesOf = memoize(
-  (seed: number) => {
-    const { fields } = createWorldgen(seed);
-    return createCaves({ seed, fields, peakOf: (r) => findPeak(fields, r), waynessAt: () => 0, waysNear: () => [] });
-  },
-  String,
-  2,
-);
+const cavesOf = memoize((seed: number) => cavesWithWayness(seed, 0).caves, String, 2);
 
 describe("caves", () => {
   const caves = cavesOf(1);
-  const cave = regionsAround({ rx: 0, ry: 0 }, 3)
+  const cave = regions
+    .cellsAround({ col: 0, row: 0 }, 3)
     .flatMap(caves.cavesIn)
     .find((c) => caves.planOf(c).bottom < 0)!;
   const plan = caves.planOf(cave);

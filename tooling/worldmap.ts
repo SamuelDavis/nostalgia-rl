@@ -1,5 +1,5 @@
 import { parseArgs } from "node:util";
-import { floorDiv, memoize } from "../src/lib";
+import { floorDiv, memoize } from "procgen";
 import {
   CHUNK_SIZE,
   type Chunk,

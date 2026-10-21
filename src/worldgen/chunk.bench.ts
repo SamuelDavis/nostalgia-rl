@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { generateChunk } from "./chunk";
+import { generateChunk } from "./world";
 import { createWorldgen } from "./world";
 
 const CHUNK_BUDGET_MS = 8;
