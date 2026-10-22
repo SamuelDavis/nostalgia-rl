@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type CaveFloor, Cover, Prop, Ground, SURFACE, Water, Way } from "../worldgen";
+import { type CaveFloor, Cover, Prop, Ground, type Layer, SURFACE, Water, Way } from "../worldgen";
 import { Direction } from "./movement";
 import { playTurn, startSession } from "./session";
 import { type Terrain, onlySurface } from "./terrain";
@@ -17,7 +17,7 @@ const flat: Terrain = () => ({
 const walledEast: Terrain = (x, y) => (x > 0 ? { ...flat(x, y), prop: Prop.Boulder } : flat(x, y));
 const cave: CaveFloor = { cave: { x: 7, y: 7 }, floor: 0 };
 const mouthEast = {
-  terrainOn: (layer: typeof SURFACE | CaveFloor) => (layer === SURFACE ? walledEast : flat),
+  terrainOn: (layer: Layer) => (layer === SURFACE ? walledEast : flat),
   linkAcross: (_: unknown, from: { x: number }, to: { x: number }) => (from.x === 0 && to.x === 1 ? cave : undefined),
 };
 
@@ -37,7 +37,11 @@ describe("playTurn", () => {
       kind: "step",
       direction: Direction.East,
     });
-    expect(bumped).toMatchObject({ position: { x: 0, y: 0 }, facing: Direction.East, blocked: "obstacle" });
+    expect(bumped).toMatchObject({
+      position: { x: 0, y: 0 },
+      facing: Direction.East,
+      blocked: { blocker: "obstacle", prop: Prop.Boulder },
+    });
     expect(
       playTurn(bumped, onlySurface(walledEast), { kind: "step", direction: Direction.North }).blocked,
     ).toBeUndefined();

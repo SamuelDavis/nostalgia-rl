@@ -25,6 +25,7 @@ import {
   HEIGHT_MODES,
   type HeightMode,
   type Rgb,
+  coverColor,
   hillshade,
   propColor,
   groundColor,
@@ -79,8 +80,10 @@ const CANOPY_SHADE = 0.55;
 const tileColor = (x: number, y: number): Rgb => {
   const chunk = chunkAt(x, y);
   const i = tileIndex(x - chunk.cx * CHUNK_SIZE, y - chunk.cy * CHUNK_SIZE);
+  const cover = chunk.cover[i] as Cover;
+  if (cover === Cover.Thatch || cover === Cover.Slate) return coverColor[cover];
   const color = uncoveredColor(chunk, i, x, y);
-  return chunk.cover[i] === Cover.None ? color : shade(color, CANOPY_SHADE);
+  return cover === Cover.None ? color : shade(color, CANOPY_SHADE);
 };
 
 const uncoveredColor = (chunk: Chunk, i: number, x: number, y: number): Rgb => {

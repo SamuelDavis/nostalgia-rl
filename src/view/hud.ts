@@ -10,6 +10,7 @@ import {
   Ground,
   SEA_LEVEL,
   SURFACE,
+  isStorey,
   Water,
   type Worldgen,
   regions,
@@ -75,6 +76,7 @@ export const createHud = (parent: HTMLElement, world: Worldgen, controls: readon
     const { elevation, temperature, moisture, drainage, landform } = world.fields;
     const form = landform(x + 0.5, y + 0.5);
     const region = regions.cellOf({ x, y });
+    const building = world.buildingAt(session.position);
     const rows: [string, string][] = [
       ["seed", String(world.seed)],
       ["turn", `${turn} @ ${turnMs} ms`],
@@ -85,11 +87,17 @@ export const createHud = (parent: HTMLElement, world: Worldgen, controls: readon
         "floor",
         session.layer === SURFACE
           ? "surface"
-          : `${session.layer.floor} of cave at ${session.layer.cave.x}, ${session.layer.cave.y}`,
+          : isStorey(session.layer)
+            ? `storey ${session.layer.floor + 1}`
+            : `${session.layer.floor} of cave at ${session.layer.cave.x}, ${session.layer.cave.y}`,
       ],
+      ["building", building ? `${building.plan.kind}, door at ${building.door.x}, ${building.door.y}` : "—"],
       ["facing", nameOf(Direction, facing)],
       ["tap", tapTurnsFirst ? "turns, then steps" : "steps"],
-      ["blocked", blocked ?? "—"],
+      [
+        "blocked",
+        !blocked ? "—" : blocked.blocker === "obstacle" ? `by ${nameOf(Prop, blocked.prop)}` : blocked.blocker,
+      ],
       ["swimming", isSwimming(tile) ? "yes" : "no"],
       ["height", `${tile.height} (${(tile.height - SEA_LEVEL) * METRES_PER_LEVEL} m above sea)`],
       ["elevation", fixed(elevation(x + 0.5, y + 0.5))],

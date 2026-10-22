@@ -1,5 +1,5 @@
 import { Prop, Water, Way } from "./terrain";
-import { distance, floorDiv, hash, memoize } from "procgen";
+import { type Vec2, contains, distance, floorDiv, hash, memoize } from "procgen";
 import { describe, expect, it } from "vitest";
 import { type Chunk, FADE_LENGTH, tileIndex } from "./chunk";
 import { CHUNK_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
@@ -110,14 +110,19 @@ describe("generateChunk", () => {
       }
   });
 
-  it("paves roads and bridges rivers", () => {
+  it("paves roads and bridges rivers, except where a deep forest takes a road in", () => {
     const world = worldOf(1);
-    const roads = world.waysNear(regions.cellOf(world.spawn)).filter((link) => link.way === Way.Road);
+    const region = regions.cellOf(world.spawn);
+    const roads = world.waysNear(region).filter((link) => link.way === Way.Road);
+    const forests = regions.cellsAround(region, 1).flatMap(world.deepForestsIn);
+    const isInForest = (p: Vec2 | undefined) =>
+      p !== undefined && forests.some(({ bounds, layout }) => contains(bounds, p) && layout.contains(p));
     expect(roads.length).toBeGreaterThan(0);
     for (const road of roads)
-      for (const node of road.nodes) {
+      for (const [k, node] of road.nodes.entries()) {
         if (distance(node, road.nodes[0]!) < 9 || distance(node, road.nodes.at(-1)!) < 9) continue;
         if (road.fades.some((end) => distance(node, end) < FADE_LENGTH)) continue;
+        if ([road.nodes[k - 1], node, road.nodes[k + 1]].some(isInForest)) continue;
         const { chunk, i } = tileAt(world, Math.floor(node.x), Math.floor(node.y));
         const water = chunk.water[i] !== Water.None;
         if (water) expect(chunk.prop[i]).toBe(Prop.Bridge);

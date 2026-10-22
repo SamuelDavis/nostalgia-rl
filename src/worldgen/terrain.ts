@@ -15,13 +15,14 @@ export const Ground = {
   Rock: 3,
   Snow: 4,
   Dressed: 5,
+  Planks: 6,
 } as const;
 export type Ground = (typeof Ground)[keyof typeof Ground];
 
 export const Way = { None: 0, Road: 1, Path: 2 } as const;
 export type Way = (typeof Way)[keyof typeof Way];
 
-export const Cover = { None: 0, Canopy: 1 } as const;
+export const Cover = { None: 0, Canopy: 1, Thatch: 2, Slate: 3 } as const;
 export type Cover = (typeof Cover)[keyof typeof Cover];
 
 export const Water = { None: 0, Shallow: 1, Deep: 2 } as const;
@@ -50,5 +51,19 @@ export const Prop = {
   Shed: 19,
   Stockpile: 20,
   Bunkhouse: 21,
+  Wall: 22,
+  Door: 23,
+  Hearth: 24,
+  Bed: 25,
+  Table: 26,
+  Bench: 27,
+  Counter: 28,
+  Altar: 29,
+  Anvil: 30,
+  Forge: 31,
+  Barrel: 32,
+  Hay: 33,
+  Well: 34,
+  Railing: 35,
 } as const;
 export type Prop = (typeof Prop)[keyof typeof Prop];

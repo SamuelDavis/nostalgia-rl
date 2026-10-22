@@ -27,6 +27,7 @@ export const groundColor: Record<Ground, Rgb> = {
   [Ground.Rock]: [130, 120, 115],
   [Ground.Snow]: [235, 240, 245],
   [Ground.Dressed]: [165, 158, 148],
+  [Ground.Planks]: [140, 105, 70],
 };
 
 export const wayColor: Record<Exclude<Way, typeof Way.None>, Rgb> = {
@@ -36,6 +37,8 @@ export const wayColor: Record<Exclude<Way, typeof Way.None>, Rgb> = {
 
 export const coverColor: Record<Exclude<Cover, typeof Cover.None>, Rgb> = {
   [Cover.Canopy]: [30, 75, 38],
+  [Cover.Thatch]: [200, 165, 70],
+  [Cover.Slate]: [95, 100, 115],
 };
 
 export const waterColor: Record<Exclude<Water, typeof Water.None>, Rgb> = {
@@ -66,6 +69,20 @@ export const propColor: Record<Prop, Rgb> = {
   [Prop.Shed]: [85, 55, 30],
   [Prop.Stockpile]: [95, 90, 88],
   [Prop.Bunkhouse]: [70, 45, 25],
+  [Prop.Wall]: [92, 78, 66],
+  [Prop.Door]: [235, 200, 140],
+  [Prop.Hearth]: [230, 110, 40],
+  [Prop.Bed]: [215, 205, 185],
+  [Prop.Table]: [235, 205, 160],
+  [Prop.Bench]: [210, 175, 130],
+  [Prop.Counter]: [235, 205, 160],
+  [Prop.Altar]: [245, 225, 150],
+  [Prop.Anvil]: [45, 45, 50],
+  [Prop.Forge]: [255, 120, 30],
+  [Prop.Barrel]: [215, 165, 105],
+  [Prop.Hay]: [225, 200, 100],
+  [Prop.Well]: [70, 90, 140],
+  [Prop.Railing]: [215, 175, 120],
 };
 
 const HYPSOMETRIC_STOPS: readonly (readonly [elevation: number, color: Rgb])[] = [

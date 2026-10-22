@@ -121,7 +121,7 @@ export const createCaves = ({ seed, fields, peaks, waynessAt, waynessReads }: Ca
     const mouthsIn = (region: Cell, isMine: boolean): Opening[] =>
       reader.read(mouths, region).flatMap((mouth) => (mouth.isMine === isMine ? [mouth.opening] : []));
 
-    const linkAcross = (layer: Layer, from: Vec2, to: Vec2): Layer | undefined => {
+    const linkAcross = (layer: typeof SURFACE | CaveFloor, from: Vec2, to: Vec2): Layer | undefined => {
       if (layer === SURFACE) {
         const plan = reader
           .gather(plans, boundsOf([from], TERRITORY_RADIUS + 1))

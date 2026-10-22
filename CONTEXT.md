@@ -54,6 +54,30 @@ One vertical layer of a feature, at the same world coordinates as the feature's 
 **Cover**:
 What a feature shows from outside, such as a roof, parapets, a canopy or a mineshaft head, hiding its interior until a player is inside.
 
+**Settlement**:
+A feature of buildings grown along ways around a square. By tier, a hamlet, a village or a town; each tier is larger and has more landmarks.
+
+**Building**:
+A child feature of a settlement: walls, doors and floor inside, rooms, and furniture, sized to scale for its kind (cottage, house, barn, smithy, shop, inn, chapel, church, hall).
+
+**Landmark**:
+A building a tier of settlement always tries to have, sited first and nearest the square, such as a village's inn or a town's church.
+
+**Square**:
+The levelled open ground at a settlement's anchor where its streets meet.
+
+**Lane**:
+A street a settlement lays itself, radiating from its square where no way leaves it.
+
+**Storey**:
+One floor of a building, 3 m above the one below and reached by stairs; the ground storey is on the surface, each upper storey is its own layer.
+
+**Landing**:
+The floor tile at the top of a flight of stairs, on the storey above.
+
+**Roof**:
+A building's cover: every tile of the building but its doors.
+
 **Cave**:
 A natural feature inside a mountain: winding passages and caverns on several floors.
 

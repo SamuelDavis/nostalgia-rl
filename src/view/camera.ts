@@ -52,6 +52,20 @@ const OBSTACLE_HEIGHTS: Record<Prop, number> = {
   [Prop.Shed]: metresToLevels(3),
   [Prop.Stockpile]: metresToLevels(2),
   [Prop.Bunkhouse]: metresToLevels(4),
+  [Prop.Wall]: metresToLevels(6),
+  [Prop.Door]: 0,
+  [Prop.Hearth]: metresToLevels(1),
+  [Prop.Bed]: metresToLevels(0.5),
+  [Prop.Table]: metresToLevels(1),
+  [Prop.Bench]: metresToLevels(0.5),
+  [Prop.Counter]: metresToLevels(1),
+  [Prop.Altar]: metresToLevels(1),
+  [Prop.Anvil]: metresToLevels(1),
+  [Prop.Forge]: metresToLevels(1.5),
+  [Prop.Barrel]: metresToLevels(1),
+  [Prop.Hay]: metresToLevels(1.5),
+  [Prop.Well]: metresToLevels(1),
+  [Prop.Railing]: metresToLevels(1),
 };
 const STEER = 0.3;
 export const SETTLE_MS = 1500;

@@ -35,6 +35,7 @@ const CAMP_MARK: Rgb = [255, 140, 0];
 const GLADE_MARK: Rgb = [170, 255, 120];
 const CAVE_MARK: Rgb = [40, 30, 25];
 const MINE_MARK: Rgb = [190, 140, 80];
+const SETTLEMENT_MARK: Rgb = [250, 240, 200];
 const FEATURE_OUTLINE: Rgb = [0, 0, 0];
 const FEATURE_RADIUS = 2;
 const DEEP_FOREST_AREA: Rgb = [8, 30, 14];
@@ -88,6 +89,7 @@ export const overviewFeatureMarks = (world: Worldgen, center: Vec2, radius: numb
       ...(camp ? featureMarks(camp, CAMP_MARK) : []),
       ...world.caveMouthsIn(region).flatMap(({ inside }) => featureMarks(inside, CAVE_MARK)),
       ...world.mineEntrancesIn(region).flatMap(({ inside }) => featureMarks(inside, MINE_MARK)),
+      ...world.settlementsIn(region).flatMap(({ anchor }) => featureMarks(anchor, SETTLEMENT_MARK)),
     ];
   });
 

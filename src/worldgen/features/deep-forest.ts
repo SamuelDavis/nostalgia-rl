@@ -56,7 +56,7 @@ export interface DeepForestSiting {
   readonly rivers: Stage<readonly River[]>;
 }
 
-const DEEP_FORESTNESS = 0.7;
+export const DEEP_FORESTNESS = 0.7;
 const SEAM_FORESTNESS = 0.08;
 const CELL = 8;
 const CELLS_PER_SIDE = REGION_SIZE / CELL;

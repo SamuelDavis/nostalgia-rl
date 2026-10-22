@@ -6,6 +6,8 @@ import { regions } from "../region";
 import { type River, distanceToRiver } from "../rivers";
 import { Biome, Ground, Prop, Water } from "../terrain";
 import { type WayLink, distinctWays, isOnWay } from "../ways";
+import { MAX_SETTLEMENT_RADIUS, type Settlement } from "./settlement/layout";
+import { isInSettlement } from "./settlement/siting";
 import { type Anchor, type TileDraft, settle } from "./feature";
 
 export type Camp = Anchor;
@@ -24,6 +26,8 @@ const CAMP_ATTEMPTS = 4;
 const CAMP_MARGIN = 32;
 const CAMP_FLATNESS = metresToLevels(4);
 export const RIVER_CLEARANCE = 10;
+const SETTLEMENT_CLEARANCE = CAMP_RADIUS + 48;
+const SETTLEMENT_SEARCH = MAX_SETTLEMENT_RADIUS + SETTLEMENT_CLEARANCE;
 const SPAWN_SEARCH_STEP = 16;
 const SPAWN_SEARCH_RADIUS = 60 * SPAWN_SEARCH_STEP;
 const SEAM_REACH = (CAMP_RADIUS - CAMP_YARD) * MAX_CLIMB;
@@ -67,9 +71,10 @@ export interface CampSiting {
   readonly level: (p: Vec2) => number;
   readonly biomeAt: (p: Vec2) => Biome;
   readonly riverBands: Stage<readonly River[]>;
+  readonly settlements: Stage<readonly Settlement[]>;
 }
 
-export const campSiting = ({ level, biomeAt, riverBands }: CampSiting) => {
+export const campSiting = ({ level, biomeAt, riverBands, settlements }: CampSiting) => {
   const levelsAround = (p: Vec2, probes: readonly Vec2[]) => probes.map((o) => level({ x: p.x + o.x, y: p.y + o.y }));
 
   const deviatesBy = (levels: readonly number[], from: number, tolerance: number) =>
@@ -85,10 +90,12 @@ export const campSiting = ({ level, biomeAt, riverBands }: CampSiting) => {
     if (biome === Biome.Ocean || biome === Biome.Beach || biome === Biome.Mountain) return false;
     if (deviatesBy(levelsAround(p, FLATNESS_PROBES), level(p), CAMP_FLATNESS)) return false;
     if (deviatesBy(levelsAround(p, SEAM_PROBES), campLevel(p), SEAM_REACH)) return false;
+    if (isInSettlement(reader.gather(settlements, boundsOf([p], SETTLEMENT_SEARCH)), p, SETTLEMENT_CLEARANCE))
+      return false;
     return reader.readAt(riverBands, p).every((river) => distanceToRiver(river, p) > RIVER_CLEARANCE);
   };
 
-  return { campLevel, isSite, riverBands };
+  return { campLevel, isSite, riverBands, settlements };
 };
 
 export type Siting = ReturnType<typeof campSiting>;
@@ -108,7 +115,10 @@ export const createCampSites = (siting: Siting, spawn: Camp) => {
   return stage({
     name: "camps",
     grid: regions,
-    reads: [{ stage: siting.riverBands, radius: 0 }],
+    reads: [
+      { stage: siting.riverBands, radius: 0 },
+      { stage: siting.settlements, radius: SETTLEMENT_SEARCH },
+    ],
     compute: ({ col, row }, context): readonly Camp[] => {
       if (col === spawnRegion.col && row === spawnRegion.row) return [spawn];
       const nearSpawn = Math.abs(col - spawnRegion.col) <= 1 && Math.abs(row - spawnRegion.row) <= 1;

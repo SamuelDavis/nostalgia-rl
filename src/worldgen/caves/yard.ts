@@ -1,5 +1,6 @@
 import { type FeatureType, type Stage, type Vec2, boundsOf, distance, rngOf } from "procgen";
 import { type TileDraft, settle } from "../features/feature";
+import { type Frame, isAcross, toLocal, toWorld } from "../features/frame";
 import { type PlacedProp, footprintOf, partOf, tilesOf } from "../props";
 import { Cover, Ground, Prop, Water, Way } from "../terrain";
 import { type WayLink, distinctWays, isOnWay } from "../ways";
@@ -31,23 +32,18 @@ const MIN_DEPTH = 3;
 const SEAM = 8;
 const YARD_REACH = 32;
 
-const outwardOf = ({ inside, outside }: Mouth): Vec2 => ({ x: outside.x - inside.x, y: outside.y - inside.y });
-const lateralOf = (outward: Vec2): Vec2 => ({ x: -outward.y, y: outward.x });
+const frameOf = ({ inside, outside }: Mouth): Frame => ({
+  origin: inside,
+  forward: { x: outside.x - inside.x, y: outside.y - inside.y },
+});
 
-const worldAt = (mouth: Mouth, u: number, v: number): Vec2 => {
-  const [outward, lateral] = [outwardOf(mouth), lateralOf(outwardOf(mouth))];
-  return { x: mouth.inside.x + lateral.x * u + outward.x * v, y: mouth.inside.y + lateral.y * u + outward.y * v };
-};
+const worldAt = (mouth: Mouth, u: number, v: number): Vec2 => toWorld(frameOf(mouth), u, v);
 
-const localOf = (mouth: Mouth, p: Vec2) => {
-  const [outward, lateral] = [outwardOf(mouth), lateralOf(outwardOf(mouth))];
-  const d = { x: p.x - mouth.inside.x, y: p.y - mouth.inside.y };
-  return { u: d.x * lateral.x + d.y * lateral.y, v: d.x * outward.x + d.y * outward.y };
-};
+const localOf = (mouth: Mouth, p: Vec2) => toLocal(frameOf(mouth), p);
 
 const extentOf = (kind: Prop, mouth: Mouth) => {
   const { x, y } = footprintOf(kind);
-  return outwardOf(mouth).x === 0 ? { u: x, v: y } : { u: y, v: x };
+  return isAcross(frameOf(mouth)) ? { u: x, v: y } : { u: y, v: x };
 };
 
 const columnOf = (kinds: readonly Prop[], side: number, mouth: Mouth) => {

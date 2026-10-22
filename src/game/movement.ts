@@ -39,6 +39,18 @@ const SOLID: ReadonlySet<Prop> = new Set([
   Prop.Shed,
   Prop.Stockpile,
   Prop.Bunkhouse,
+  Prop.Wall,
+  Prop.Hearth,
+  Prop.Bed,
+  Prop.Table,
+  Prop.Counter,
+  Prop.Altar,
+  Prop.Anvil,
+  Prop.Forge,
+  Prop.Barrel,
+  Prop.Hay,
+  Prop.Well,
+  Prop.Railing,
 ]);
 
 export const isTrail = ({ way }: Footing): boolean => way !== Way.None;

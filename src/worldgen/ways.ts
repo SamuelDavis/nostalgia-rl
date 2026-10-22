@@ -27,6 +27,7 @@ import { biomeOf } from "./biome";
 import { SEA_LEVEL, heightLevel } from "./constants";
 import { fewerMoreLikely } from "./counts";
 import type { Camp } from "./features/camp";
+import type { Settlement } from "./features/settlement/layout";
 import type { Opening } from "./features/feature";
 import type { Fields } from "./fields";
 import type { Peak } from "./landmarks";
@@ -73,7 +74,7 @@ export const isOnWay = (links: readonly WayLink[], p: Vec2): boolean =>
     }),
   );
 
-const NodeKind = { Lattice: 0, Camp: 1, Peak: 2, Opening: 3, Stub: 4, Entrance: 5 } as const;
+const NodeKind = { Lattice: 0, Camp: 1, Peak: 2, Opening: 3, Stub: 4, Entrance: 5, Settlement: 6 } as const;
 type NodeKind = (typeof NodeKind)[keyof typeof NodeKind];
 
 interface WayNode extends Vec2 {
@@ -99,7 +100,9 @@ const BIOME_WAYNESS: Record<Biome, number> = {
   [Biome.Mountain]: 0.2,
 };
 const CAMP_PULL = 0.5;
-export const CAMP_PULL_RANGE = 2 * CELL;
+const CAMP_PULL_RANGE = 2 * CELL;
+const SETTLEMENT_PULL = 0.6;
+const SETTLEMENT_PULL_RANGE = 3 * CELL;
 const ROAD_WAYNESS = 0.7;
 const REACH: Record<NodeKind, number> = {
   [NodeKind.Lattice]: 1.5 * CELL,
@@ -108,7 +111,9 @@ const REACH: Record<NodeKind, number> = {
   [NodeKind.Opening]: CELL,
   [NodeKind.Stub]: 0,
   [NodeKind.Entrance]: 3 * CELL,
+  [NodeKind.Settlement]: 3 * CELL,
 };
+const ROAD_ENDS: ReadonlySet<NodeKind> = new Set([NodeKind.Camp, NodeKind.Entrance, NodeKind.Settlement]);
 const STUB_LENGTH = 40;
 const CLEAR_OF_MOUTH = 4;
 const MAX_REACH = REACH[NodeKind.Camp];
@@ -126,16 +131,30 @@ const headingOf = ({ inside, outside }: Opening): Vec2 => {
   return { x: (outside.x - inside.x) / length, y: (outside.y - inside.y) / length };
 };
 
-export const createWayness = ({ fields, camps }: { fields: Fields; camps: Stage<readonly Camp[]> }) => ({
-  camps,
-  at: (reader: Reader, p: Vec2): number => {
-    const pull = Math.max(
-      0,
-      ...reader.gather(camps, around(p, CAMP_PULL_RANGE)).map((camp) => 1 - distance(camp, p) / CAMP_PULL_RANGE),
-    );
-    return BIOME_WAYNESS[biomeOf(fields.conditions(p.x, p.y))] + CAMP_PULL * pull;
-  },
-});
+export interface WaynessInput {
+  readonly fields: Fields;
+  readonly camps: Stage<readonly Camp[]>;
+  readonly settlements: Stage<readonly Settlement[]>;
+}
+
+export const createWayness = ({ fields, camps, settlements }: WaynessInput) => {
+  const pullOf = (reader: Reader, p: Vec2, sites: Stage<readonly Vec2[]>, range: number) =>
+    Math.max(0, ...reader.gather(sites, around(p, range)).map((site) => 1 - distance(site, p) / range));
+  return {
+    camps,
+    settlements,
+    reads: (margin: number): Dependency[] => [
+      { stage: camps, radius: CAMP_PULL_RANGE + margin },
+      { stage: settlements, radius: SETTLEMENT_PULL_RANGE + margin },
+    ],
+    at: (reader: Reader, p: Vec2): number =>
+      BIOME_WAYNESS[biomeOf(fields.conditions(p.x, p.y))] +
+      Math.max(
+        CAMP_PULL * pullOf(reader, p, camps, CAMP_PULL_RANGE),
+        SETTLEMENT_PULL * pullOf(reader, p, settlements, SETTLEMENT_PULL_RANGE),
+      ),
+  };
+};
 
 export type Wayness = ReturnType<typeof createWayness>;
 
@@ -169,15 +188,15 @@ export const createWays = ({
   const nodes = stage({
     name: "way nodes",
     grid: wayCells,
-    reads: [
-      { stage: wayness.camps, radius: CAMP_PULL_RANGE },
-      { stage: peaks, radius: 0 },
-    ],
+    reads: [...wayness.reads(0), { stage: peaks, radius: 0 }],
     compute: (cell, context): readonly WayNode[] => {
       const area = wayCells.boundsOf(cell);
       const region = regions.cellOf({ x: area.minX, y: area.minY });
       const anchors = [
         ...context.read(wayness.camps, region).map((camp) => ({ ...camp, kind: NodeKind.Camp, wayness: 1 })),
+        ...context
+          .read(wayness.settlements, region)
+          .map((settlement) => ({ ...settlement, kind: NodeKind.Settlement, wayness: 1 })),
         ...[context.read(peaks, region) ?? []].flat().map((peak) => ({ ...peak, kind: NodeKind.Peak, wayness: 0 })),
       ]
         .filter((anchor) => contains(area, anchor))
@@ -193,8 +212,7 @@ export const createWays = ({
 
   const join = (from: WayNode, to: WayNode): Joint<LinkedWay> | RouteFailure => {
     const isRoad =
-      [from.kind, to.kind].some((kind) => kind === NodeKind.Camp || kind === NodeKind.Entrance) ||
-      Math.min(from.wayness, to.wayness) >= ROAD_WAYNESS;
+      [from.kind, to.kind].some((kind) => ROAD_ENDS.has(kind)) || Math.min(from.wayness, to.wayness) >= ROAD_WAYNESS;
     const start = from.departure ?? from;
     const found = route(start, to, {
       gradeLevel: isRoad ? level : trailLevel,

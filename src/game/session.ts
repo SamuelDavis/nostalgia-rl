@@ -1,14 +1,19 @@
 import type { Vec2 } from "procgen";
-import { type Layer, SURFACE } from "../worldgen";
+import { type Layer, type Prop, SURFACE } from "../worldgen";
 import { type Blocker, Direction, blockerBetween, stepToward } from "./movement";
 import type { Layers } from "./terrain";
+
+export interface Obstruction {
+  readonly blocker: Blocker;
+  readonly prop: Prop;
+}
 
 export interface Session {
   readonly turn: number;
   readonly position: Vec2;
   readonly layer: Layer;
   readonly facing: Direction;
-  readonly blocked: Blocker | undefined;
+  readonly blocked: Obstruction | undefined;
 }
 
 export interface Action {
@@ -32,8 +37,9 @@ export const playTurn = (session: Session, { terrainOn, linkAcross }: Layers, ac
   const { position, layer } = session;
   const target = stepToward(position, direction);
   const beyond = linkAcross(layer, position, target) ?? layer;
-  const blocked = blockerBetween(terrainOn(layer)(position.x, position.y), terrainOn(beyond)(target.x, target.y));
-  return blocked
-    ? { ...session, turn, facing: direction, blocked }
-    : { turn, position: target, layer: beyond, facing: direction, blocked };
+  const ahead = terrainOn(beyond)(target.x, target.y);
+  const blocker = blockerBetween(terrainOn(layer)(position.x, position.y), ahead);
+  return blocker
+    ? { ...session, turn, facing: direction, blocked: { blocker, prop: ahead.prop } }
+    : { turn, position: target, layer: beyond, facing: direction, blocked: undefined };
 };

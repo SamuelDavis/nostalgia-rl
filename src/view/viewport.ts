@@ -75,6 +75,7 @@ const CLIFF_FACE: Look = { background: [72, 64, 60], glyph: "", color: [0, 0, 0]
 const FACE_MIN_CLIFF_SIDES = 3;
 
 const ENTRANCES: ReadonlySet<Prop> = new Set([Prop.CaveMouth, Prop.MineEntrance]);
+const FILLED: ReadonlySet<Prop> = new Set([Prop.Rock, Prop.Wall]);
 
 const isCliffFace = (terrain: Terrain, x: number, y: number, tile: Tile): boolean =>
   !ENTRANCES.has(tile.prop) &&
@@ -126,7 +127,7 @@ const createLighting = (terrain: Terrain, left: number, top: number, columns: nu
 const lookOf = (tile: Tile, mode: HeightMode, light: number, heightShade: HeightShade, x: number, y: number): Look => {
   const surface = tile.way === Way.Road ? wayColor[Way.Road] : groundColor[tile.ground];
   const surfaceBackground = () => surfaceColor(mode, surface, tile.height, light, heightShade);
-  if (tile.prop === Prop.Rock) return { background: propColor[Prop.Rock], glyph: "", color: propColor[Prop.Rock] };
+  if (FILLED.has(tile.prop)) return { background: propColor[tile.prop], glyph: "", color: propColor[tile.prop] };
   if (tile.prop !== Prop.None) {
     const background = tile.water === Water.None ? surfaceBackground() : waterColor[tile.water];
     return { background, glyph: [...propGlyph[tile.prop]][tile.part]!, color: propColor[tile.prop] };
@@ -149,6 +150,14 @@ const coverLook = (cover: Exclude<Cover, typeof Cover.None>, light: number, x: n
 };
 
 const underCover = (look: Look): Look => ({ ...look, background: shade(look.background, UNDER_COVER_SHADE) });
+
+const ROOFS: ReadonlySet<Cover> = new Set([Cover.Thatch, Cover.Slate]);
+const EAVE_SHADE = 0.7;
+
+const isEave = (terrain: Terrain, x: number, y: number, tile: Tile): boolean =>
+  ROOFS.has(tile.cover) && NEIGHBOURS.some((o) => terrain(x + o.x, y + o.y).cover !== tile.cover);
+
+const eaveOf = (look: Look): Look => ({ ...look, background: shade(look.background, EAVE_SHADE) });
 
 const setGlyphFont = (ctx: CanvasRenderingContext2D, cellPx: number) => {
   ctx.font = `${cellPx - 3}px "DejaVu Sans Mono", Menlo, Consolas, monospace`;
@@ -202,7 +211,7 @@ const drawTiles = (
   ctx: CanvasRenderingContext2D,
   source: Terrain,
   { left, top, columns, rows, cellPx }: TileWindow,
-  isInside: boolean,
+  interior: Interior,
   mode: HeightMode,
 ): Float32Array => {
   const terrain = snapshot(
@@ -216,10 +225,13 @@ const drawTiles = (
 
   setGlyphFont(ctx, cellPx);
 
-  const isHidden = (tile: Tile) => !isInside && tile.cover !== Cover.None;
+  const isHidden = (x: number, y: number, tile: Tile) => tile.cover !== Cover.None && !interior.contains(x, y, tile);
   const lightAt = createLighting(terrain, left, top, columns, rows);
   const lookAt = (tile: Tile, x: number, y: number): Look => {
-    if (tile.cover !== Cover.None && !isInside) return coverLook(tile.cover, lightAt(x, y), x, y);
+    if (isHidden(x, y, tile)) {
+      const look = coverLook(tile.cover as Exclude<Cover, typeof Cover.None>, lightAt(x, y), x, y);
+      return isEave(terrain, x, y, tile) ? eaveOf(look) : look;
+    }
     if (isThreshold(terrain, x, y, tile)) return THRESHOLD;
     const look = isCliffFace(terrain, x, y, tile) ? CLIFF_FACE : lookOf(tile, mode, lightAt(x, y), UNSHADED, x, y);
     return tile.cover === Cover.None ? look : underCover(look);
@@ -231,31 +243,36 @@ const drawTiles = (
       const tile = terrain(x, y);
       const look = lookAt(tile, x, y);
       reliefLevels[(y - top) * columns + x - left] =
-        isHidden(tile) || tile.water !== Water.None ? Number.NaN : tile.height;
+        isHidden(x, y, tile) || tile.water !== Water.None ? Number.NaN : tile.height;
       ctx.fillStyle = css(look.background);
       ctx.fillRect(px, py, cellPx, cellPx);
-      const stairs = !isHidden(tile) && hasStairs(terrain, x, y, tile);
+      const stairs = !isHidden(x, y, tile) && hasStairs(terrain, x, y, tile);
       ctx.fillStyle = css(look.color);
       ctx.fillText(stairs ? STAIRS_GLYPH : look.glyph, px + cellPx / 2, py + cellPx / 2 + 1);
     }
 
-  const contourAt = (tile: Tile, next: Tile): Contour =>
-    tile.water !== Water.None || next.water !== Water.None || isCliff(tile, next) || isHidden(tile) || isHidden(next)
+  const contourAt = (x: number, y: number, nx: number, ny: number): Contour => {
+    const [tile, next] = [terrain(x, y), terrain(nx, ny)];
+    return tile.water !== Water.None ||
+      next.water !== Water.None ||
+      isCliff(tile, next) ||
+      isHidden(x, y, tile) ||
+      isHidden(nx, ny, next)
       ? "none"
       : contourBetween(tile.height, next.height);
+  };
   for (const [contour, style] of Object.entries(CONTOUR_STYLE)) {
     ctx.strokeStyle = style.color;
     ctx.lineWidth = style.width;
     ctx.beginPath();
     for (let y = top - 1; y < top + rows; y++)
       for (let x = left - 1; x < left + columns; x++) {
-        const tile = terrain(x, y);
         const { px, py } = screen(x + 1, y + 1);
-        if (contourAt(tile, terrain(x + 1, y)) === contour) {
+        if (contourAt(x, y, x + 1, y) === contour) {
           ctx.moveTo(px, py - cellPx);
           ctx.lineTo(px, py);
         }
-        if (contourAt(tile, terrain(x, y + 1)) === contour) {
+        if (contourAt(x, y, x, y + 1) === contour) {
           ctx.moveTo(px - cellPx, py);
           ctx.lineTo(px, py);
         }
@@ -273,7 +290,7 @@ const drawTiles = (
       const face = isCliffFace(terrain, x, y, tile);
       const edgeShown = (nx: number, ny: number) => {
         const next = terrain(nx, ny);
-        if (isHidden(tile) || isHidden(next)) return false;
+        if (isHidden(x, y, tile) || isHidden(nx, ny, next)) return false;
         return isCliff(tile, next) && !(face && isCliffFace(terrain, nx, ny, next));
       };
       if (edgeShown(x + 1, y)) {
@@ -287,6 +304,35 @@ const drawTiles = (
     }
   ctx.stroke();
   return reliefLevels;
+};
+
+interface Interior {
+  readonly key: string;
+  readonly contains: (x: number, y: number, tile: Tile) => boolean;
+}
+
+const OUTSIDE: Interior = { key: "outside", contains: () => false };
+const UNDER_CANOPY: Interior = { key: "canopy", contains: (_x, _y, tile) => tile.cover === Cover.Canopy };
+const MAX_ROOFED_TILES = 4096;
+
+const roofedRoom = (terrain: Terrain, from: Vec2, cover: Cover): Interior => {
+  const tiles = new Set<string>();
+  const queue = [from];
+  while (queue.length > 0 && tiles.size < MAX_ROOFED_TILES) {
+    const { x, y } = queue.pop()!;
+    const key = `${x},${y}`;
+    if (tiles.has(key) || terrain(x, y).cover !== cover) continue;
+    tiles.add(key);
+    for (const o of NEIGHBOURS) queue.push({ x: x + o.x, y: y + o.y });
+  }
+  const [first] = [...tiles].sort();
+  return { key: `roof ${first}`, contains: (x, y) => tiles.has(`${x},${y}`) };
+};
+
+const interiorOf = (terrain: Terrain, { x, y }: Vec2): Interior => {
+  const { cover } = terrain(x, y);
+  if (cover === Cover.None) return OUTSIDE;
+  return cover === Cover.Canopy ? UNDER_CANOPY : roofedRoom(terrain, { x, y }, cover);
 };
 
 const LAYER_MARGIN_SHARE = 0.25;
@@ -327,12 +373,16 @@ export const createViewport = (ctx: CanvasRenderingContext2D) => {
   const relief = document.createElement("canvas").getContext("2d")!;
   let drawn: Drawn | undefined;
   let reliefPainted = "";
+  let seen: { readonly at: string; readonly terrain: Terrain; readonly interior: Interior } | undefined;
   return (terrain: Terrain, { centre, tilePx, restingTilePx }: View, player: Player, mode: HeightMode): void => {
     const { clientWidth: width, clientHeight: height } = ctx.canvas;
     const visibleLeft = centre.x - width / 2 / tilePx;
     const visibleTop = centre.y - height / 2 / tilePx;
-    const eye = terrain(player.position.x, player.position.y);
-    const key = [devicePixelRatio, eye.cover, mode, layerKey(player.layer)].join();
+    const at = `${layerKey(player.layer)}:${player.position.x},${player.position.y}`;
+    if (seen?.at !== at || seen.terrain !== terrain)
+      seen = { at, terrain, interior: interiorOf(terrain, player.position) };
+    const { interior } = seen;
+    const key = [devicePixelRatio, interior.key, mode, layerKey(player.layer)].join();
     const isSharp = (cellPx: number) =>
       (tilePx > restingTilePx || tilePx <= cellPx * MAX_UPSCALE) &&
       (tilePx !== restingTilePx || cellPx === resolutionFor(restingTilePx));
@@ -357,7 +407,7 @@ export const createViewport = (ctx: CanvasRenderingContext2D) => {
       layer.canvas.width = Math.round(area.columns * cellPx * devicePixelRatio);
       layer.canvas.height = Math.round(area.rows * cellPx * devicePixelRatio);
       layer.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-      const reliefLevels = drawTiles(layer, terrain, area, eye.cover !== Cover.None, mode);
+      const reliefLevels = drawTiles(layer, terrain, area, interior, mode);
       relief.canvas.width = area.columns;
       relief.canvas.height = area.rows;
       drawn = { area, key, reliefLevels };

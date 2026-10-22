@@ -2,7 +2,7 @@
 
 A real-time, open-world roguelike with peer-to-peer drop-in multiplayer, in the browser.
 
-It follows the classic roguelike conventions: a grid, turn-based movement, cardinal facing, and glyph-first presentation. The difference is that turns run on a real-time clock, as in _Crypt of the NecroDancer_: the world advances one turn about every 250 ms whether or not you act. The world is one seeded, infinite, contiguous map with Minecraft-style terrain and features (camps and deep forests, later towns and caves), not a stack of separate dungeon maps. Friends join a running world in real time.
+It follows the classic roguelike conventions: a grid, turn-based movement, cardinal facing, and glyph-first presentation. The difference is that turns run on a real-time clock, as in _Crypt of the NecroDancer_: the world advances one turn about every 250 ms whether or not you act. The world is one seeded, infinite, contiguous map with Minecraft-style terrain and features (camps, deep forests, caves, mines and settlements), not a stack of separate dungeon maps. Friends join a running world in real time.
 
 This file is the handoff document for a fresh session. It gives intent and current state and links to topical docs. Read the linked docs only when your task touches them. Domain vocabulary is in [CONTEXT.md](CONTEXT.md); architectural decisions are in [docs/adr](docs/adr).
 
@@ -35,7 +35,7 @@ These are requirements, not designs. How to meet them is decided in the multipla
 
 - **Phase 1, world generation:** in progress. See [docs/phases/01-worldgen.md](docs/phases/01-worldgen.md).
 - A deterministic, seeded world generator exists in `src/worldgen`. It was carried over from an earlier prototype as a starting point; treat it as a draft that playtests will reshape, not a settled design. How it works: [docs/worldgen.md](docs/worldgen.md).
-- `npm run dev` gives a walkable world: `@` on the turn clock (WASD, or press a screen triangle), caves and mines under mountains, glyph canvas with a camera that leads the facing direction and zooms out on high ground, debug HUD with a button for each toggle (starts collapsed; I expands it), M map, H height mode, +/− or wheel zoom. URL params: `seed`, `turn` (ms), `repeat` (ms a key is held before it repeats), `x`, `y` (start tile); the URL follows the player.
+- `npm run dev` gives a walkable world: `@` on the turn clock (WASD, or press a screen triangle), caves and mines under mountains, settlements (hamlets, villages, towns) with buildings you can walk into, glyph canvas with a camera that leads the facing direction and zooms out on high ground, debug HUD with a button for each toggle (starts collapsed; I expands it), M map, H height mode, +/− or wheel zoom. URL params: `seed`, `turn` (ms), `repeat` (ms a key is held before it repeats), `x`, `y` (start tile); the URL follows the player.
 
 ## Layout
 
