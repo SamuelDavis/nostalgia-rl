@@ -5,7 +5,7 @@ import { type PlacedProp, partOf, tilesOf } from "../props";
 import { regions } from "../region";
 import { type River, distanceToRiver } from "../rivers";
 import { Biome, Ground, Prop, Water } from "../terrain";
-import { type WayLink, isOnWay } from "../ways";
+import { type WayLink, distinctWays, isOnWay } from "../ways";
 import { type Anchor, type TileDraft, settle } from "./feature";
 
 export type Camp = Anchor;
@@ -149,7 +149,7 @@ export const campFeature = (
     build: (camp, { gather }) => ({
       camp,
       level: siting.campLevel(camp),
-      tents: tentsOf(camp, [...new Set(gather(waysNear, boundsOf([camp], CAMP_RADIUS)))]),
+      tents: tentsOf(camp, distinctWays(gather(waysNear, boundsOf([camp], CAMP_RADIUS)))),
     }),
     bounds: ({ camp }) => boundsOf([camp], CAMP_RADIUS),
     paint: ({ camp, level: campLevel, tents }, draft, x, y) => {

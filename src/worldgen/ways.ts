@@ -43,6 +43,15 @@ export interface WayLink {
   readonly bounds: Bounds;
 }
 
+const wayKey = ({ nodes, way }: WayLink) => {
+  const [first, last] = [nodes[0]!, nodes.at(-1)!];
+  return `${way}|${first.x},${first.y}|${last.x},${last.y}`;
+};
+
+export const distinctWays = (links: readonly WayLink[]): WayLink[] => [
+  ...new Map(links.map((link) => [wayKey(link), link])).values(),
+];
+
 export interface CaveMouth {
   readonly opening: Opening;
   readonly isMine: boolean;

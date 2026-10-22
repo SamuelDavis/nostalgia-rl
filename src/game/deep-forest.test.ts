@@ -24,6 +24,36 @@ const regionDistance = (a: { anchor: Vec2 }, b: { anchor: Vec2 }) => {
   return Math.abs(ra.col - rb.col) + Math.abs(ra.row - rb.row);
 };
 
+const tileAt = (k: string) => {
+  const [x, y] = k.split(",").map(Number);
+  return terrain(x!, y!);
+};
+
+const largestGroup = (tiles: ReadonlySet<string>): number => {
+  const seen = new Set<string>();
+  let largest = 0;
+  for (const start of tiles) {
+    if (seen.has(start)) continue;
+    seen.add(start);
+    const frontier = [start];
+    let size = 0;
+    while (frontier.length > 0) {
+      const [x, y] = frontier.pop()!.split(",").map(Number);
+      size++;
+      for (const o of NEIGHBOURS) {
+        const next = key({ x: x! + o.x, y: y! + o.y });
+        if (!tiles.has(next) || seen.has(next)) continue;
+        seen.add(next);
+        frontier.push(next);
+      }
+    }
+    largest = Math.max(largest, size);
+  }
+  return largest;
+};
+
+const MAX_CROSSING_TILES = 16;
+
 const reachable = (start: Vec2, layouts: readonly DeepForestLayout[]): Set<string> => {
   const reached = new Set([key(start)]);
   const frontier = [start];
@@ -92,6 +122,30 @@ describe("deep forests", () => {
         const { x, y } = tileOf(opening.inside);
         expect(terrain(x, y).cover, `opening at ${x},${y}`).toBe(Cover.None);
       }
+    }
+  });
+
+  it("cross rivers on their paths rather than follow them", () => {
+    const wetPaths = forests.map(
+      ({ layout }) => new Set([...layout.paths].filter((tile) => tileAt(tile).water !== Water.None)),
+    );
+    expect(wetPaths.some((wet) => wet.size > 0)).toBe(true);
+    wetPaths.forEach((wet, i) =>
+      expect(largestGroup(wet), `forest at ${key(forests[i]!.anchor)}`).toBeLessThanOrEqual(MAX_CROSSING_TILES),
+    );
+  });
+
+  it("keep their paths under the canopy except where notched", () => {
+    const notched = new Set(forests.flatMap(({ layout }) => [...layout.mouths]));
+    for (const { layout } of forests)
+      for (const tile of layout.paths)
+        if (!notched.has(tile)) expect(tileAt(tile).cover, `path at ${tile}`).toBe(Cover.Canopy);
+  });
+
+  it("list each opening once", () => {
+    for (const { layout } of forests) {
+      const openings = layout.openings.map(({ inside, outside }) => `${key(inside)}>${key(outside)}`);
+      expect(new Set(openings).size).toBe(openings.length);
     }
   });
 

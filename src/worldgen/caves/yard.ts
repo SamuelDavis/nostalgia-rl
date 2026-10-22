@@ -2,7 +2,7 @@ import { type FeatureType, type Stage, type Vec2, boundsOf, distance, rngOf } fr
 import { type TileDraft, settle } from "../features/feature";
 import { type PlacedProp, footprintOf, partOf, tilesOf } from "../props";
 import { Cover, Ground, Prop, Water, Way } from "../terrain";
-import { type WayLink, isOnWay } from "../ways";
+import { type WayLink, distinctWays, isOnWay } from "../ways";
 import type { CavePlan, Mouth } from "./plan";
 import { type Cave, TERRITORY_RADIUS } from "./siting";
 
@@ -111,7 +111,7 @@ export const createMineYards = ({
     ],
     build: (cave, { read, gather }) => {
       const plan = read(plans, cave.region).find((p) => p.cave.id === cave.id)!;
-      return yardOf(plan, [...new Set(gather(waysNear, boundsOf([plan.mouth.outside], YARD_REACH)))]);
+      return yardOf(plan, distinctWays(gather(waysNear, boundsOf([plan.mouth.outside], YARD_REACH))));
     },
     bounds: ({ mouth, half, depth }) => boundsOf([worldAt(mouth, -half, 1), worldAt(mouth, half, depth)], SEAM),
     paint: ({ mouth, half, depth, props }, draft, x, y) => {

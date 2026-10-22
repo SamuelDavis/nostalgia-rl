@@ -61,6 +61,7 @@ const createStages = (seed: number, fields: Fields, world: World) => {
     level,
     forestness: (p) => fields.forestness(p.x, p.y),
     camps,
+    rivers: rivers.near(regions),
   });
   const ways = createWays({
     seed,
