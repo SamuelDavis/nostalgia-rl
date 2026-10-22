@@ -79,7 +79,7 @@ const createStages = (seed: number, fields: Fields, world: World) => {
     mineYard: caves.yardFeature(waysNearRegions),
     caveMouth: caves.mouthFeature,
   };
-  const featuresNearChunks = featuresNear<TileDraft>("features near chunks", chunks, [
+  const featuresNearChunks = featuresNear("features near chunks", chunks, [
     features.deepForest,
     features.camp,
     features.mineYard,
