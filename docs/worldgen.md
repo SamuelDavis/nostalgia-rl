@@ -49,7 +49,7 @@ Each stage depends only on coarser stages within a bounded neighbourhood. That i
    - add decorations.
      Snow appears in cold areas, with a noise-dithered edge.
 
-Stage results are cached per cell, and features and links are built once per world, only when a cell their extent can reach asks for them. The first chunk in a new region pays for the links and features near it: on the author's machine a cold chunk takes about 230 ms, and 550–900 ms in a settlement (its layout 35–150 ms, the rest the extra roads it draws) (median of 12 sampled regions and seeds; before the move onto procgen, about 520 ms), and a warm chunk fits the `npm run bench` budget.
+Stage results are cached per cell, and features and links are built once per world, only when a cell their extent can reach asks for them. The first chunk in a new region pays for the links and features near it: on the author's machine a cold chunk in a fresh world takes 160–1300 ms, median about 440 ms (18 regions over seeds 1–3, 2026-10-24). Most of it is siting way nodes across the way network's dependency radius (twice the longest node reach, 768 tiles), whose siting samples the fields; choosing links costs little. A warm chunk fits the `npm run bench` budget.
 
 In the browser a Web Worker (`src/chunk-worker.ts`) generates chunks with its own world object. The main thread prefetches chunks nearest first within two view spans of the player (`src/game/chunk-store.ts`), and generates a chunk itself only when it is needed before the worker delivers it, as at startup. Output is identical either way, so this only moves cost.
 
