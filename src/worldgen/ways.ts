@@ -63,6 +63,18 @@ export const WAY_SHAPES: Record<LinkedWay, { readonly halfWidth: number; readonl
   [Way.Path]: { halfWidth: 0.8, clearance: 0.6 },
 };
 
+export const nearestWayPoint = (ways: readonly WayLink[], p: Vec2): { at: Vec2; distance: number } | undefined => {
+  let best: { at: Vec2; distance: number } | undefined;
+  for (const { nodes } of ways)
+    nodes.slice(1).forEach((b, i) => {
+      const a = nodes[i]!;
+      const { distance: gap, t } = projectOntoSegment(p, a, b);
+      if (best && gap >= best.distance) return;
+      best = { at: { x: Math.round(a.x + (b.x - a.x) * t), y: Math.round(a.y + (b.y - a.y) * t) }, distance: gap };
+    });
+  return best;
+};
+
 export const isOnWay = (links: readonly WayLink[], p: Vec2): boolean =>
   links.some(({ nodes, way }) =>
     nodes.some((a, i) => {

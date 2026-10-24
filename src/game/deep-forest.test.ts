@@ -125,7 +125,7 @@ describe("deep forests", () => {
     }
   });
 
-  it("cross rivers on their paths rather than follow them", () => {
+  it("cross rivers on their paths rather than follow them", { tags: "slow" }, () => {
     const wetPaths = forests.map(
       ({ layout }) => new Set([...layout.paths].filter((tile) => tileAt(tile).water !== Water.None)),
     );
@@ -135,7 +135,7 @@ describe("deep forests", () => {
     );
   });
 
-  it("keep their paths under the canopy except where notched", () => {
+  it("keep their paths under the canopy except where notched", { tags: "slow" }, () => {
     const notched = new Set(forests.flatMap(({ layout }) => [...layout.mouths]));
     for (const { layout } of forests)
       for (const tile of layout.paths)

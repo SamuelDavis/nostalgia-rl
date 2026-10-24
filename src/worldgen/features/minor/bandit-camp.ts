@@ -2,15 +2,15 @@ import { distance } from "procgen";
 import { metresToLevels } from "../../constants";
 import { type PlacedProp, partOf } from "../../props";
 import { Biome, Ground, Prop, Water } from "../../terrain";
+import { nearestWayPoint } from "../../ways";
 import { settle } from "../feature";
 import { Occupant, Role } from "../purpose";
-import { type MinorDesign, gapFrom, isFlat, medianLevel, nearestWayPoint, ringAround } from "./kind";
+import { type MinorDesign, gapFrom, isFlat, medianLevel, ringAround } from "./kind";
 
 const RADIUS = 11;
 const YARD = 7;
 const PALISADE = 8;
 const GATE = 2.5;
-const WAY_RANGE = [24, 80] as const;
 const FLATNESS = metresToLevels(3);
 const LANDS: ReadonlySet<Biome> = new Set([Biome.Grassland, Biome.Forest, Biome.Desert]);
 const TENT_SPOTS = [
@@ -27,15 +27,14 @@ const CRATE_SPOTS = [
 
 export const banditCamp: MinorDesign = {
   radius: RADIUS,
-  fits: (p, land, { ways }) => {
-    if (!LANDS.has(land.biomeAt(p))) return false;
-    const way = nearestWayPoint(ways, p);
-    return !!way && way.distance >= WAY_RANGE[0] && way.distance <= WAY_RANGE[1] && isFlat(land, p, 6, FLATNESS);
-  },
+  fits: (p, land) => LANDS.has(land.biomeAt(p)) && isFlat(land, p, 6, FLATNESS),
   build: (site, land, { ways }, rng) => {
     const level = medianLevel(land, ringAround(site, YARD));
-    const prey = nearestWayPoint(ways, site)!.at;
-    const toward = { x: prey.x - site.x, y: prey.y - site.y };
+    const prey = nearestWayPoint(ways, site);
+    const toward =
+      prey && (prey.at.x !== site.x || prey.at.y !== site.y)
+        ? { x: prey.at.x - site.x, y: prey.at.y - site.y }
+        : { x: 0, y: 1 };
     const length = Math.sqrt(toward.x * toward.x + toward.y * toward.y);
     const gate = { x: site.x + (toward.x / length) * PALISADE, y: site.y + (toward.y / length) * PALISADE };
     const tents = rng
@@ -51,7 +50,7 @@ export const banditCamp: MinorDesign = {
         role: Role.Hideout,
         occupants: [Occupant.Bandits],
         produces: [],
-        relation: { kind: "preys on", target: prey },
+        ...(prey ? { relation: { kind: "preys on" as const, target: prey.at } } : {}),
       },
       buildings: [],
       paint: (draft, x, y) => {

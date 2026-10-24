@@ -14,7 +14,7 @@ import {
   scatter,
   stage,
 } from "procgen";
-import type { Settlement } from "../settlement/layout";
+import { MAX_SETTLEMENT_RADIUS, type Settlement } from "../settlement/layout";
 import { isInSettlement } from "../settlement/siting";
 import { CAMP_RADIUS, type Camp } from "../camp";
 import { DEEP_FORESTNESS } from "../deep-forest";
@@ -22,7 +22,8 @@ import type { TileDraft } from "../feature";
 import { type Province, Identity, PROVINCE_REACH } from "../../provinces";
 import { type River, distanceToRiver } from "../../rivers";
 import { Biome } from "../../terrain";
-import { type WayLink, distinctWays } from "../../ways";
+import { Way } from "../../terrain";
+import { type CaveMouth, type WayLink, distinctWays } from "../../ways";
 import { banditCamp } from "./bandit-camp";
 import { den } from "./den";
 import {
@@ -32,7 +33,6 @@ import {
   type MinorPlan,
   type MinorSite,
   type Surroundings,
-  nearestWayPoint,
   ringAround,
 } from "./kind";
 import { smallCave } from "./small-cave";
@@ -52,26 +52,26 @@ export const MINOR_DESIGNS: Record<MinorKind, MinorDesign> = {
 const WEIGHTS: Record<Identity, readonly (readonly [MinorKind, number])[]> = {
   [Identity.Farmland]: [
     [MinorKind.Woodcutter, 1.5],
-    [MinorKind.BanditCamp, 1],
-    [MinorKind.Den, 0.5],
-    [MinorKind.SmallCave, 0.5],
+    [MinorKind.Den, 1],
+    [MinorKind.BanditCamp, 0.6],
+    [MinorKind.SmallCave, 0.6],
   ],
   [Identity.Woodland]: [
     [MinorKind.Woodcutter, 3],
     [MinorKind.Den, 2],
-    [MinorKind.BanditCamp, 1],
     [MinorKind.SmallCave, 1],
+    [MinorKind.BanditCamp, 0.6],
   ],
   [Identity.Highland]: [
     [MinorKind.SmallCave, 3],
     [MinorKind.Den, 2],
-    [MinorKind.BanditCamp, 1],
+    [MinorKind.BanditCamp, 0.6],
     [MinorKind.Woodcutter, 0.5],
   ],
   [Identity.Wilds]: [
-    [MinorKind.BanditCamp, 1.5],
     [MinorKind.Den, 2],
     [MinorKind.SmallCave, 2],
+    [MinorKind.BanditCamp, 1],
     [MinorKind.Woodcutter, 0.5],
   ],
   [Identity.Uncanny]: [
@@ -87,18 +87,18 @@ export interface MinorLayout extends MinorPlan {
 
 export const MINOR_CELL = 160;
 const MINOR_SPACING = 150;
-const CANDIDATES = 3;
+const CANDIDATES = 5;
 const CANDIDATE_MARGIN = 16;
-const MAX_RADIUS = Math.max(...Object.values(MINOR_DESIGNS).map(({ radius }) => radius));
+export const MAX_MINOR_RADIUS = Math.max(...Object.values(MINOR_DESIGNS).map(({ radius }) => radius));
 const WAY_REACH = 96;
 const SETTLEMENT_REACH = 640;
 const SETTLEMENT_CLEARANCE = 32;
+const SETTLEMENT_SEARCH = MAX_SETTLEMENT_RADIUS + SETTLEMENT_CLEARANCE + MAX_MINOR_RADIUS;
 const CAMP_CLEARANCE = CAMP_RADIUS + 24;
 const RIVER_CLEARANCE = 4;
-const WAY_CLEARANCE = 2;
 const FOREST_MARGIN = 0.05;
 const FOREST_GAP = 2;
-const UNSITED: ReadonlySet<Biome> = new Set([Biome.Ocean, Biome.Mountain]);
+const MOUTH_CLEARANCE = 32;
 
 export const minorCells = grid(MINOR_CELL);
 
@@ -109,6 +109,7 @@ export interface MinorSiting {
   readonly provinces: Stage<readonly Province[]>;
   readonly settlements: Stage<readonly Settlement[]>;
   readonly camps: Stage<readonly Camp[]>;
+  readonly mouths: Stage<readonly CaveMouth[]>;
   readonly rivers: Stage<readonly River[]>;
   readonly waysNear: Stage<readonly WayLink[]>;
 }
@@ -132,21 +133,22 @@ const weightedOrder = (entries: readonly (readonly [MinorKind, number])[], rng: 
   return order;
 };
 
-const isClear = (reader: Reader, siting: MinorSiting, around: Surroundings, p: Vec2, radius: number): boolean => {
+const isClear = (reader: Reader, siting: MinorSiting, p: Vec2, radius: number): boolean => {
   const { land } = siting;
-  if (UNSITED.has(land.biomeAt(p))) return false;
+  if (land.biomeAt(p) === Biome.Ocean) return false;
+  const mouths = reader.gather(siting.mouths, boundsOf([p], MOUTH_CLEARANCE + radius));
+  if (mouths.some(({ opening }) => distance(opening.outside, p) <= MOUTH_CLEARANCE + radius)) return false;
   const reach = [p, ...ringAround(p, radius / 2), ...ringAround(p, radius + FOREST_GAP)];
   if (reach.some((q) => land.conditions(q).forestness > DEEP_FORESTNESS - FOREST_MARGIN)) return false;
-  if (isInSettlement(around.settlements, p, SETTLEMENT_CLEARANCE + radius)) return false;
+  const settlements = reader.gather(siting.settlements, boundsOf([p], SETTLEMENT_SEARCH));
+  if (isInSettlement(settlements, p, SETTLEMENT_CLEARANCE + radius)) return false;
   if (
     reader
       .gather(siting.camps, boundsOf([p], CAMP_CLEARANCE + radius))
       .some((c) => distance(c, p) <= CAMP_CLEARANCE + radius)
   )
     return false;
-  if (reader.readAt(siting.rivers, p).some((river) => distanceToRiver(river, p) <= radius + RIVER_CLEARANCE))
-    return false;
-  return (nearestWayPoint(around.ways, p)?.distance ?? Infinity) > radius + WAY_CLEARANCE;
+  return reader.readAt(siting.rivers, p).every((river) => distanceToRiver(river, p) > radius + RIVER_CLEARANCE);
 };
 
 export const createMinorSites = (siting: MinorSiting) => {
@@ -155,19 +157,18 @@ export const createMinorSites = (siting: MinorSiting) => {
     grid: minorCells,
     reads: [
       { stage: siting.provinces, radius: PROVINCE_REACH },
-      { stage: siting.settlements, radius: SETTLEMENT_REACH },
-      { stage: siting.camps, radius: CAMP_CLEARANCE + MAX_RADIUS },
+      { stage: siting.settlements, radius: SETTLEMENT_SEARCH },
+      { stage: siting.camps, radius: CAMP_CLEARANCE + MAX_MINOR_RADIUS },
+      { stage: siting.mouths, radius: MOUTH_CLEARANCE + MAX_MINOR_RADIUS },
       { stage: siting.rivers, radius: 0 },
-      { stage: siting.waysNear, radius: WAY_REACH },
     ],
     compute: (cell, context): readonly MinorSite[] => {
       const { rng } = context;
       return scatter({ grid: minorCells, rng, count: CANDIDATES, margin: CANDIDATE_MARGIN })(cell).flatMap((p, i) => {
-        const around = surroundingsOf(context, siting, p);
         const { identity } = siting.provinceAt(context, p);
         const kind = weightedOrder(WEIGHTS[identity], rng, i).find((k) => {
           const design = MINOR_DESIGNS[k];
-          return isClear(context, siting, around, p, design.radius) && design.fits(p, siting.land, around);
+          return isClear(context, siting, p, design.radius) && design.fits(p, siting.land);
         });
         return kind ? [{ ...p, id: rng.u32(i, 9), kind }] : [];
       });
@@ -198,7 +199,7 @@ export const minorFeature = (
   name: "minor",
   priority: 2,
   sites,
-  reach: MAX_RADIUS,
+  reach: MAX_MINOR_RADIUS,
   extent: minorBounds,
   reads: [
     { stage: siting.waysNear, radius: WAY_REACH },
@@ -209,5 +210,5 @@ export const minorFeature = (
     ...MINOR_DESIGNS[site.kind].build(site, siting.land, surroundingsOf(context, siting, site), context.rng),
   }),
   bounds: ({ site }) => minorBounds(site),
-  paint: (layout, draft, x, y) => layout.paint(draft, x, y),
+  paint: (layout, draft, x, y) => draft.way === Way.None && layout.paint(draft, x, y),
 });

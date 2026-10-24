@@ -11,14 +11,15 @@ const HOLLOW = 3.5;
 const WALL = 4.5;
 const OPENING = 1.6;
 const BONES = 3;
+const SCRUB = 0.25;
 const FLATNESS = metresToLevels(4);
-const LANDS: ReadonlySet<Biome> = new Set([Biome.Grassland, Biome.Forest, Biome.Desert]);
+const LANDS: ReadonlySet<Biome> = new Set([Biome.Grassland, Biome.Forest, Biome.Desert, Biome.Mountain]);
 
 export const den: MinorDesign = {
   radius: RADIUS,
   fits: (p, land) =>
     LANDS.has(land.biomeAt(p)) &&
-    land.conditions(p).forestness >= FOREST_THRESHOLD - 0.1 &&
+    land.conditions(p).forestness >= FOREST_THRESHOLD - SCRUB &&
     isFlat(land, p, 4, FLATNESS),
   build: (site, land, _, rng) => {
     const level = medianLevel(land, ringAround(site, HOLLOW));

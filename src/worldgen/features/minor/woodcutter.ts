@@ -5,14 +5,15 @@ import { Biome, Cover, Ground, Prop, Water, Way } from "../../terrain";
 import { DEEP_FORESTNESS } from "../deep-forest";
 import { type Building, boundsOfBuilding, footprintOf, frameOf, paintBuilding } from "../building/building";
 import { BuildingKind, planBuilding } from "../building/plan";
+import { nearestWayPoint } from "../../ways";
 import { settle } from "../feature";
 import { Good, Occupant, type Purpose, Role } from "../purpose";
-import { type MinorDesign, gapFrom, isFlat, medianLevel, nearestCardinal, nearestWayPoint } from "./kind";
+import { type MinorDesign, gapFrom, isFlat, medianLevel, nearestCardinal } from "./kind";
 
 const RADIUS = 15;
 const CLEARING = 8;
 const DOOR_OFFSET = 2;
-const WAY_RANGE = 90;
+const SOUTH = { x: 0, y: 1 };
 const EDGE = 0.15;
 const SUPPLY_RANGE = 640;
 const STUMP_SHARE = 0.25;
@@ -25,15 +26,18 @@ const step = (p: Vec2, d: Vec2, n: number): Vec2 => ({ x: p.x + d.x * n, y: p.y 
 
 export const woodcutter: MinorDesign = {
   radius: RADIUS,
-  fits: (p, land, { ways }) => {
+  fits: (p, land) => {
     const { forestness } = land.conditions(p);
-    if (!LANDS.has(land.biomeAt(p)) || forestness < FOREST_THRESHOLD - EDGE || forestness > DEEP_FORESTNESS - 0.1)
-      return false;
-    const way = nearestWayPoint(ways, p);
-    return !!way && way.distance <= WAY_RANGE && isFlat(land, p, 5, FLATNESS);
+    return (
+      LANDS.has(land.biomeAt(p)) &&
+      forestness >= FOREST_THRESHOLD - EDGE &&
+      forestness <= DEEP_FORESTNESS - 0.1 &&
+      isFlat(land, p, 5, FLATNESS)
+    );
   },
   build: (site, land, { ways, settlements }, rng) => {
-    const facing = nearestCardinal(site, nearestWayPoint(ways, site)!.at);
+    const way = nearestWayPoint(ways, site);
+    const facing = way ? nearestCardinal(site, way.at) : SOUTH;
     const plan = planBuilding(BuildingKind.Cottage, rng.child("hut"));
     const door = step(site, facing, DOOR_OFFSET);
     const frame = frameOf({ plan, door, facing });

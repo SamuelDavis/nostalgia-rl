@@ -31,6 +31,12 @@ The unit of height: half a metre.
 **Region**:
 A fixed square of the world's grid; each feature type sites its anchors region by region.
 
+**Province**:
+The Voronoi cell around a province seat, about a kilometre across, whose identity weights which features appear in it.
+
+**Identity**:
+A province's character, taken from the land at its seat: farmland, woodland, highland, wilds, or uncanny where the uncanny field is high.
+
 ## Features
 
 **Feature**:
@@ -53,6 +59,15 @@ One vertical layer of a feature, at the same world coordinates as the feature's 
 
 **Cover**:
 What a feature shows from outside, such as a roof, parapets, a canopy or a mineshaft head, hiding its interior until a player is inside.
+
+**Purpose**:
+Why a feature exists: its role, its occupants, what it produces, and the place it supplies or preys on. NPC intent and quests read it.
+
+**Minor feature**:
+A small free-standing feature spread between larger ones so a walker meets something every 15–30 seconds, such as a bandit camp, woodcutter's hut, den, small cave or standing stones.
+
+**Farm**:
+A farmhouse, barn and field beside a road out of a settlement, which it supplies with grain, fruit or livestock.
 
 **Settlement**:
 A feature of buildings grown along ways around a square. By tier, a hamlet, a village or a town; each tier is larger and has more landmarks.

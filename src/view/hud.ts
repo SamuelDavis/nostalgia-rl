@@ -85,7 +85,7 @@ export const createHud = (parent: HTMLElement, world: Worldgen, controls: readon
     const form = landform(x + 0.5, y + 0.5);
     const region = regions.cellOf({ x, y });
     const building = world.buildingAt(session.position);
-    const place = world.minorAt(session.position);
+    const place = world.placeAt(session.position);
     const rows: [string, string][] = [
       ["seed", String(world.seed)],
       ["turn", `${turn} @ ${turnMs} ms`],
@@ -101,7 +101,7 @@ export const createHud = (parent: HTMLElement, world: Worldgen, controls: readon
             : `${session.layer.floor} of cave at ${session.layer.cave.x}, ${session.layer.cave.y}`,
       ],
       ["province", world.provinceAt(session.position).identity],
-      ["place", place ? `${place.site.kind}: ${describePurpose(place.purpose)}` : "—"],
+      ["place", place ? `${place.name}: ${describePurpose(place.purpose)}` : "—"],
       ["building", building ? `${building.plan.kind}, door at ${building.door.x}, ${building.door.y}` : "—"],
       ["facing", nameOf(Direction, facing)],
       ["tap", tapTurnsFirst ? "turns, then steps" : "steps"],

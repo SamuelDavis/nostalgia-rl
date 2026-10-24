@@ -11,7 +11,7 @@ const CHAMBER = 2.5;
 const INSET = 3;
 const PROBE = 6;
 const RISE = metresToLevels(3);
-const LANDS: ReadonlySet<Biome> = new Set([Biome.Grassland, Biome.Forest, Biome.Desert]);
+const LANDS: ReadonlySet<Biome> = new Set([Biome.Grassland, Biome.Forest, Biome.Desert, Biome.Mountain]);
 
 const uphillOf = (p: Vec2, level: (p: Vec2) => number): Vec2 =>
   CARDINALS.reduce((best, d) =>

@@ -1,4 +1,4 @@
-import { type Rng, type Vec2, distance, projectOntoSegment } from "procgen";
+import { type Rng, type Vec2, distance } from "procgen";
 import type { Conditions } from "../../fields";
 import type { Biome } from "../../terrain";
 import type { WayLink } from "../../ways";
@@ -39,7 +39,7 @@ export interface MinorPlan {
 
 export interface MinorDesign {
   readonly radius: number;
-  readonly fits: (p: Vec2, land: Land, around: Surroundings) => boolean;
+  readonly fits: (p: Vec2, land: Land) => boolean;
   readonly build: (site: MinorSite, land: Land, around: Surroundings, rng: Rng) => MinorPlan;
 }
 
@@ -75,18 +75,6 @@ export const isFlat = (land: Land, p: Vec2, radius: number, tolerance: number): 
 export const centreOf = (p: Vec2): Vec2 => ({ x: p.x + 0.5, y: p.y + 0.5 });
 
 export const gapFrom = (site: Vec2, x: number, y: number): number => distance(centreOf({ x, y }), centreOf(site));
-
-export const nearestWayPoint = (ways: readonly WayLink[], p: Vec2): { at: Vec2; distance: number } | undefined => {
-  let best: { at: Vec2; distance: number } | undefined;
-  for (const { nodes } of ways)
-    nodes.slice(1).forEach((b, i) => {
-      const a = nodes[i]!;
-      const { distance: gap, t } = projectOntoSegment(p, a, b);
-      if (best && gap >= best.distance) return;
-      best = { at: { x: Math.round(a.x + (b.x - a.x) * t), y: Math.round(a.y + (b.y - a.y) * t) }, distance: gap };
-    });
-  return best;
-};
 
 export const nearestCardinal = (from: Vec2, to: Vec2): Vec2 =>
   CARDINALS.reduce((best, c) =>

@@ -28,11 +28,13 @@ import type { Settlement } from "./features/settlement/layout";
 import { SETTLEMENT_RIVER_CLEARANCE, createSettlementSites } from "./features/settlement/siting";
 import { type PaintedSettlement, settlementFeature } from "./features/settlement/settlement";
 import type { Opening, TileDraft } from "./features/feature";
+import { type Farm, type FarmLayout, createFarms, farmFeature } from "./features/farm";
 import { type MinorLayout, type MinorSite, createMinorSites, minorFeature } from "./features/minor/minor";
 import { type Fields, createFields } from "./fields";
 import { type CaveFloor, type Layer, SURFACE, isStorey } from "./layer";
 import { storeyChunk, storeyLinks } from "./features/building/storeys";
 import type { Building } from "./features/building/building";
+import type { Purpose } from "./features/purpose";
 import { createPeaks } from "./landmarks";
 import { type Province, createProvinces } from "./provinces";
 import { regions } from "./region";
@@ -48,9 +50,15 @@ export { TIERS, Tier, type Settlement } from "./features/settlement/layout";
 export { Identity, type Province } from "./provinces";
 export { MinorKind, type MinorLayout, type MinorSite } from "./features/minor/minor";
 export type { Purpose } from "./features/purpose";
+export type { Farm } from "./features/farm";
 
 const WAY_MARGIN = 8;
 const MINOR_RIVER_MARGIN = 24;
+
+export interface Place {
+  readonly name: string;
+  readonly purpose: Purpose;
+}
 
 export interface Worldgen {
   readonly seed: number;
@@ -72,7 +80,8 @@ export interface Worldgen {
   readonly buildingAt: (p: Vec2) => Building | undefined;
   readonly provinceAt: (p: Vec2) => Province;
   readonly minorsIn: (region: Cell) => readonly Placed<TileDraft, MinorSite, MinorLayout>[];
-  readonly minorAt: (p: Vec2) => MinorLayout | undefined;
+  readonly farmsIn: (region: Cell) => readonly Placed<TileDraft, Farm, FarmLayout>[];
+  readonly placeAt: (p: Vec2) => Place | undefined;
   readonly provincesAround: (p: Vec2) => readonly Province[];
 }
 
@@ -127,10 +136,22 @@ const createStages = (seed: number, fields: Fields, world: World) => {
     provinces: provinces.seats,
     settlements,
     camps,
+    mouths: caves.mouths,
     rivers: rivers.coursesNear(regions, MINOR_RIVER_MARGIN),
     waysNear: waysNearRegions,
   };
   const minorSites = createMinorSites(minorSiting);
+  const farmSiting = {
+    level,
+    biomeAt,
+    forestness: (p: Vec2) => fields.forestness(p.x, p.y),
+    settlements,
+    camps,
+    rivers: rivers.coursesNear(regions, MINOR_RIVER_MARGIN),
+    waysNear: waysNearRegions,
+    minors: minorSites,
+  };
+  const farms = createFarms(farmSiting);
   const features = {
     deepForest: deepForests.feature(waysNearRegions),
     camp: campFeature(seed, siting, camps, waysNearRegions),
@@ -143,6 +164,7 @@ const createStages = (seed: number, fields: Fields, world: World) => {
       waysNear: waysNearRegions,
     }),
     caveMouth: caves.mouthFeature,
+    farm: farmFeature(farmSiting, farms),
     minor: minorFeature(minorSiting, minorSites),
   };
   const featuresNearChunks = featuresNear("features near chunks", chunks, [
@@ -151,6 +173,7 @@ const createStages = (seed: number, fields: Fields, world: World) => {
     features.settlement,
     features.mineYard,
     features.caveMouth,
+    features.farm,
     features.minor,
   ]);
   const surface = createSurface({
@@ -185,13 +208,21 @@ export const createWorldgen = (seed: number): Worldgen => {
   const settlementsPlaced = placedOf(features.settlement);
   const minorsPlaced = placedOf(features.minor);
   const minorsNear = (p: Vec2) => world.gather(minorsPlaced, boundsOf([p], features.minor.reach));
-  const minorAt = (p: Vec2) => minorsNear(p).find(({ bounds }) => contains(bounds, p))?.layout;
+  const farmsPlaced = placedOf(features.farm);
+  const farmsNear = (p: Vec2) => world.gather(farmsPlaced, boundsOf([p], features.farm.reach));
+  const placeAt = (p: Vec2): Place | undefined => {
+    const minor = minorsNear(p).find(({ bounds }) => contains(bounds, p))?.layout;
+    if (minor) return { name: minor.site.kind, purpose: minor.purpose };
+    const farm = farmsNear(p).find(({ bounds }) => contains(bounds, p))?.layout;
+    return farm && { name: `${farm.farm.produce} farm`, purpose: farm.purpose };
+  };
   const buildingAt = (p: Vec2) =>
     [
       ...world
         .gather(settlementsPlaced, boundsOf([p], features.settlement.reach))
         .flatMap(({ layout }) => layout.buildingsAt(p)),
       ...minorsNear(p).flatMap(({ layout }) => layout.buildings),
+      ...farmsNear(p).flatMap(({ layout }) => layout.buildings),
     ].find(({ bounds }) => contains(bounds, p));
   const climb = storeyLinks(buildingAt);
 
@@ -222,7 +253,8 @@ export const createWorldgen = (seed: number): Worldgen => {
       world
         .gather(minorsPlaced, regions.boundsOf(region))
         .filter(({ anchor }) => contains(regions.boundsOf(region), anchor)),
-    minorAt,
+    farmsIn: (region) => world.read(farmsPlaced, region),
+    placeAt,
     provincesAround: (p) => provinces.seatsAround(world, p),
   };
 };

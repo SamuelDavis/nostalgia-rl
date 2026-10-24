@@ -37,6 +37,7 @@ const GLADE_MARK: Rgb = [170, 255, 120];
 const CAVE_MARK: Rgb = [40, 30, 25];
 const MINE_MARK: Rgb = [190, 140, 80];
 const SETTLEMENT_MARK: Rgb = [250, 240, 200];
+const FARM_MARK: Rgb = [230, 200, 60];
 const MINOR_MARKS: Record<MinorKind, Rgb> = {
   [MinorKind.BanditCamp]: [220, 40, 40],
   [MinorKind.Woodcutter]: [150, 200, 60],
@@ -99,6 +100,7 @@ export const overviewFeatureMarks = (world: Worldgen, center: Vec2, radius: numb
       ...world.caveMouthsIn(region).flatMap(({ inside }) => featureMarks(inside, CAVE_MARK)),
       ...world.mineEntrancesIn(region).flatMap(({ inside }) => featureMarks(inside, MINE_MARK)),
       ...world.settlementsIn(region).flatMap(({ anchor }) => featureMarks(anchor, SETTLEMENT_MARK)),
+      ...world.farmsIn(region).map(({ anchor }) => ({ point: anchor, color: FARM_MARK, radius: 1 })),
       ...world.minorsIn(region).flatMap(({ anchor }) => featureMarks(anchor, MINOR_MARKS[anchor.kind])),
     ];
   });
