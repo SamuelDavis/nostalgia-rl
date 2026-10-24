@@ -1,7 +1,7 @@
 import { createWorld } from "procgen";
-import { createFields } from "../fields";
-import { createPeaks } from "../landmarks";
-import { createCaves } from "./caves";
+import { createFields } from "../../fields";
+import { createPeaks } from "../../landmarks";
+import { createCaves } from "./cave";
 
 export const cavesWithWayness = (seed: number, wayness: number) => {
   const fields = createFields(seed);

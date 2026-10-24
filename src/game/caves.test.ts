@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { type Vec2, distance, memoize } from "procgen";
 import { type Layer, SURFACE, createWorldgen, layerKey, regions } from "../worldgen";
-import type { Cave } from "../worldgen/caves/caves";
-import { TERRITORY_RADIUS } from "../worldgen/caves/siting";
+import type { Cave } from "../worldgen/features/cave/cave";
+import { TERRITORY_RADIUS } from "../worldgen/features/cave/siting";
 import { blockerBetween } from "./movement";
 import { generatedLayers } from "./terrain";
 

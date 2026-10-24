@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { memoize } from "procgen";
-import { SURFACE } from "../layer";
-import { regions } from "../region";
+import { SURFACE } from "../../layer";
+import { regions } from "../../region";
 import { cavesWithWayness } from "./fixture";
 
 const cavesOf = memoize((seed: number) => cavesWithWayness(seed, 0).caves, String, 2);

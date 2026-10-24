@@ -10,7 +10,7 @@ import {
   stage,
 } from "procgen";
 import { BIOMES, biomeOf } from "./biome";
-import type { FloorLayout, FloorMark } from "./caves/floor";
+import type { FloorLayout, FloorMark } from "./features/cave/floor";
 import { CHUNK_SIZE, MAX_CLIMB, SEA_LEVEL, heightLevel } from "./constants";
 import type { TileDraft } from "./features/feature";
 import type { Fields } from "./fields";

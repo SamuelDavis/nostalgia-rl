@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type Vec2, memoize } from "procgen";
-import { MAX_CLIMB, heightLevel } from "../constants";
-import { regions } from "../region";
+import { MAX_CLIMB, heightLevel } from "../../constants";
+import { regions } from "../../region";
 import { cavesWithWayness } from "./fixture";
 import { CEILING } from "./plan";
 

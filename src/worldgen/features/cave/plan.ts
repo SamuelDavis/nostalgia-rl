@@ -1,9 +1,9 @@
 import { type Dependency, type Reader, type Vec2, clamp, distance, inverseLerp, rngOf, stage } from "procgen";
-import { fewerMoreLikely } from "../counts";
-import { MOUNTAIN_LEVEL } from "../biome";
-import { heightLevel, metresToLevels } from "../constants";
-import type { Fields } from "../fields";
-import { regions } from "../region";
+import { fewerMoreLikely } from "../../counts";
+import { MOUNTAIN_LEVEL } from "../../biome";
+import { heightLevel, metresToLevels } from "../../constants";
+import type { Fields } from "../../fields";
+import { regions } from "../../region";
 import { type Cave, type CaveSiting, TERRITORY_RADIUS } from "./siting";
 
 export interface LevelledTile extends Vec2 {

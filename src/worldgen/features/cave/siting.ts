@@ -10,11 +10,11 @@ import {
   samePoint,
   stage,
 } from "procgen";
-import { MOUNTAIN_LEVEL } from "../biome";
-import { heightLevel } from "../constants";
-import type { Fields } from "../fields";
-import type { Peak } from "../landmarks";
-import { regions } from "../region";
+import { MOUNTAIN_LEVEL } from "../../biome";
+import { heightLevel } from "../../constants";
+import type { Fields } from "../../fields";
+import type { Peak } from "../../landmarks";
+import { regions } from "../../region";
 
 export interface Cave extends Vec2 {
   readonly id: number;

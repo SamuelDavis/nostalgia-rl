@@ -9,9 +9,9 @@ import {
   rngOf,
   simplex2,
 } from "procgen";
-import { MAX_CLIMB, heightLevel } from "../constants";
-import type { Fields } from "../fields";
-import { pathOf, route } from "../routing";
+import { MAX_CLIMB, heightLevel } from "../../constants";
+import type { Fields } from "../../fields";
+import { pathOf, route } from "../../routing";
 import { CEILING, type LevelledTile, RAMP_GAP, type CavePlan, type Ramp, isOnFloors, rampFrom } from "./plan";
 import type { Junction } from "./junctions";
 import { type Chamber, type Entry, type Tunnel, type Workings, sidesOf, workFloor } from "./mine";

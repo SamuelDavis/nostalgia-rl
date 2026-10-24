@@ -10,10 +10,10 @@ import {
   placedOf,
 } from "procgen";
 import { biomeOf } from "./biome";
-import { type Explored, MOUTH_REACH, createCaves } from "./caves/caves";
-import type { FloorLayout } from "./caves/floor";
-import type { MineYard } from "./caves/yard";
-import type { Cave } from "./caves/siting";
+import { type Explored, MOUTH_REACH, createCaves } from "./features/cave/cave";
+import type { FloorLayout } from "./features/cave/floor";
+import type { MineYard } from "./features/cave/yard";
+import type { Cave } from "./features/cave/siting";
 import { CHUNK_RIVER_MARGIN, CHUNK_WAY_MARGIN, type Chunk, chunks, createSurface, floorChunk } from "./chunk";
 import { heightLevel } from "./constants";
 import { type Camp, RIVER_CLEARANCE, campFeature, campSiting, createCampSites, findSpawn } from "./features/camp";

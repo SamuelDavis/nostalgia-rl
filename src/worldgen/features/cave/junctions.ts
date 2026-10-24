@@ -1,7 +1,7 @@
 import { type Reader, type Stage, type Vec2, boundsOf, clamp, distance, rngOf, stage } from "procgen";
-import { heightLevel } from "../constants";
-import type { Fields } from "../fields";
-import { regions } from "../region";
+import { heightLevel } from "../../constants";
+import type { Fields } from "../../fields";
+import { regions } from "../../region";
 import { CEILING, FLOOR_SPACING, type CavePlan, type LevelledTile, RAMP_GAP, cardinalOf, stepsFrom } from "./plan";
 import { type Cave, type CaveSiting, TERRITORY_RADIUS } from "./siting";
 

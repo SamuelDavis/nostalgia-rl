@@ -1,9 +1,9 @@
 import { type FeatureType, type Stage, type Vec2, boundsOf, distance, rngOf } from "procgen";
-import { type TileDraft, settle } from "../features/feature";
-import { type Frame, isAcross, toLocal, toWorld } from "../features/frame";
-import { type PlacedProp, footprintOf, partOf, tilesOf } from "../props";
-import { Cover, Ground, Prop, Water, Way } from "../terrain";
-import { type WayLink, distinctWays, isOnWay } from "../ways";
+import { type TileDraft, settle } from "../feature";
+import { type Frame, isAcross, toLocal, toWorld } from "../frame";
+import { type PlacedProp, footprintOf, partOf, tilesOf } from "../../props";
+import { Cover, Ground, Prop, Water, Way } from "../../terrain";
+import { type WayLink, distinctWays, isOnWay } from "../../ways";
 import type { CavePlan, Mouth } from "./plan";
 import { type Cave, TERRITORY_RADIUS } from "./siting";
 

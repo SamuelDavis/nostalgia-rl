@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { distance, memoize } from "procgen";
-import { MOUNTAIN_LEVEL } from "../biome";
-import { heightLevel } from "../constants";
-import { regions } from "../region";
+import { MOUNTAIN_LEVEL } from "../../biome";
+import { heightLevel } from "../../constants";
+import { regions } from "../../region";
 import { cavesWithWayness } from "./fixture";
 import { CAVE_SPACING, TERRITORY_RADIUS } from "./siting";
 

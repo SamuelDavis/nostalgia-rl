@@ -9,13 +9,13 @@ import {
   memoize,
   stage,
 } from "procgen";
-import type { Opening, TileDraft } from "../features/feature";
-import type { Fields } from "../fields";
-import { type CaveFloor, type Layer, SURFACE } from "../layer";
-import type { Peak } from "../landmarks";
-import { regions } from "../region";
-import { Cover, Prop, Water, Way } from "../terrain";
-import type { CaveMouth, WayLink } from "../ways";
+import type { Opening, TileDraft } from "../feature";
+import type { Fields } from "../../fields";
+import { type CaveFloor, type Layer, SURFACE } from "../../layer";
+import type { Peak } from "../../landmarks";
+import { regions } from "../../region";
+import { Cover, Prop, Water, Way } from "../../terrain";
+import type { CaveMouth, WayLink } from "../../ways";
 import { type CaveSite, createCaveFloors } from "./floor";
 import { createJunctions } from "./junctions";
 import { type CavePlan, type Mouth, type Ramp, createCavePlans, isOnFloors } from "./plan";

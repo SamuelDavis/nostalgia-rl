@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { floorDiv, memoize } from "procgen";
-import { tileIndex } from "../chunk";
-import { generateChunk } from "../world";
-import { CHUNK_SIZE } from "../constants";
-import { partOf, tilesOf } from "../props";
-import { regions } from "../region";
-import { Prop, Way } from "../terrain";
-import { createWorldgen } from "../world";
+import { tileIndex } from "../../chunk";
+import { generateChunk } from "../../world";
+import { CHUNK_SIZE } from "../../constants";
+import { partOf, tilesOf } from "../../props";
+import { regions } from "../../region";
+import { Prop, Way } from "../../terrain";
+import { createWorldgen } from "../../world";
 import { BIG_MINE_FLOORS, MEDIUM_MINE_FLOORS } from "./yard";
 
 const worldOf = memoize(createWorldgen, String, 4);
