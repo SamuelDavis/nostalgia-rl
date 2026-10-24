@@ -1,19 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { type CaveFloor, Cover, Prop, Ground, type Layer, SURFACE, Water, Way } from "../worldgen";
+import { type CaveFloor, Prop, type Layer, SURFACE } from "../worldgen";
 import { Direction } from "./movement";
 import { playTurn, startSession } from "./session";
 import { type Terrain, onlySurface } from "./terrain";
+import { GRASS } from "./terrain.fixtures";
 
-const flat: Terrain = () => ({
-  height: 100,
-  ground: Ground.Grass,
-  water: Water.None,
-  prop: Prop.None,
-  part: 0,
-  biome: 2,
-  way: Way.None,
-  cover: Cover.None,
-});
+const flat: Terrain = () => GRASS;
 const walledEast: Terrain = (x, y) => (x > 0 ? { ...flat(x, y), prop: Prop.Boulder } : flat(x, y));
 const cave: CaveFloor = { cave: { x: 7, y: 7 }, floor: 0 };
 const mouthEast = {

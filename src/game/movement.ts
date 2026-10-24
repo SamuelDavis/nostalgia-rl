@@ -1,5 +1,5 @@
 import type { Vec2 } from "procgen";
-import { Prop, MAX_CLIMB, Water, Way } from "../worldgen";
+import { MAX_CLIMB, PROPS, Prop, Water, Way } from "../worldgen";
 
 export const Direction = { North: 0, East: 1, South: 2, West: 3 } as const;
 export type Direction = (typeof Direction)[keyof typeof Direction];
@@ -25,34 +25,6 @@ interface Footing {
   readonly prop: Prop;
 }
 
-const SOLID: ReadonlySet<Prop> = new Set([
-  Prop.Oak,
-  Prop.Pine,
-  Prop.Cactus,
-  Prop.Boulder,
-  Prop.Tent,
-  Prop.Campfire,
-  Prop.Rock,
-  Prop.Stalagmite,
-  Prop.CaveMouth,
-  Prop.MineEntrance,
-  Prop.Shed,
-  Prop.Stockpile,
-  Prop.Bunkhouse,
-  Prop.Wall,
-  Prop.Hearth,
-  Prop.Bed,
-  Prop.Table,
-  Prop.Counter,
-  Prop.Altar,
-  Prop.Anvil,
-  Prop.Forge,
-  Prop.Barrel,
-  Prop.Hay,
-  Prop.Well,
-  Prop.Railing,
-]);
-
 export const isTrail = ({ way }: Footing): boolean => way !== Way.None;
 
 export const isStairs = (from: Footing, to: Footing): boolean =>
@@ -64,7 +36,7 @@ export const isCliff = (from: Footing, to: Footing): boolean =>
 export const isSwimming = ({ water, prop }: Footing): boolean => water === Water.Deep && prop !== Prop.Bridge;
 
 export const blockerBetween = (from: Footing, to: Footing): Blocker | undefined => {
-  if (SOLID.has(to.prop)) return "obstacle";
+  if (PROPS[to.prop].solid) return "obstacle";
   if (isCliff(from, to)) return "cliff";
   return undefined;
 };

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { Biome, Cover, Ground, Prop, Water, Way } from "../worldgen";
+import { Cover, Ground, Prop, Water, Way } from "../worldgen";
 import type { Tile } from "../game/terrain";
+import { GRASS } from "../game/terrain.fixtures";
 import { contourBetween, hillshade, mapColorOf, propColor, reliefTint, waterColor, wayColor } from "./palette";
 
 describe("hillshade", () => {
@@ -54,16 +55,7 @@ describe("reliefTint", () => {
 });
 
 describe("mapColorOf", () => {
-  const tile: Tile = {
-    height: 10,
-    ground: Ground.Planks,
-    water: Water.None,
-    prop: Prop.None,
-    part: 0,
-    biome: Biome.Grassland,
-    way: Way.None,
-    cover: Cover.Thatch,
-  };
+  const tile: Tile = { ...GRASS, ground: Ground.Planks, cover: Cover.Thatch };
 
   it("shows what lies under a roof or canopy", () => {
     expect(mapColorOf({ ...tile, prop: Prop.Bed }, "shade", 1)).toEqual(propColor[Prop.Bed]);

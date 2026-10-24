@@ -1,7 +1,8 @@
-import { type Direction, blockerBetween, stepToward } from "../game/movement";
+import { type Direction, stepToward } from "../game/movement";
+import { clearSight } from "../game/sight";
 import type { Terrain } from "../game/terrain";
 import { type Vec2, clamp, lerp } from "procgen";
-import { Prop, metresToLevels } from "../worldgen";
+import { metresToLevels } from "../worldgen";
 
 export interface Extent {
   readonly width: number;
@@ -27,46 +28,6 @@ const SPAN_PER_CLEAR_TILE = 2.5;
 export const SIGHT_REACH = 24;
 const SIGHT_CONE = 90;
 const SIGHT_RAY_COUNT = 9;
-const SIGHT_STEP = 0.25;
-const EYE_HEIGHT = metresToLevels(1.5);
-const OBSTACLE_HEIGHTS: Record<Prop, number> = {
-  [Prop.None]: 0,
-  [Prop.Oak]: metresToLevels(6),
-  [Prop.Pine]: metresToLevels(6),
-  [Prop.Cactus]: metresToLevels(2),
-  [Prop.Bush]: metresToLevels(1),
-  [Prop.Boulder]: metresToLevels(1),
-  [Prop.Flowers]: 0,
-  [Prop.Tuft]: 0,
-  [Prop.Tent]: metresToLevels(2),
-  [Prop.Campfire]: metresToLevels(0.5),
-  [Prop.Bridge]: 0,
-  [Prop.Rock]: Infinity,
-  [Prop.Stalagmite]: metresToLevels(2),
-  [Prop.CaveMouth]: Infinity,
-  [Prop.RampDown]: 0,
-  [Prop.RampUp]: 0,
-  [Prop.Ramp]: 0,
-  [Prop.CaveExit]: 0,
-  [Prop.MineEntrance]: Infinity,
-  [Prop.Shed]: metresToLevels(3),
-  [Prop.Stockpile]: metresToLevels(2),
-  [Prop.Bunkhouse]: metresToLevels(4),
-  [Prop.Wall]: metresToLevels(6),
-  [Prop.Door]: 0,
-  [Prop.Hearth]: metresToLevels(1),
-  [Prop.Bed]: metresToLevels(0.5),
-  [Prop.Table]: metresToLevels(1),
-  [Prop.Bench]: metresToLevels(0.5),
-  [Prop.Counter]: metresToLevels(1),
-  [Prop.Altar]: metresToLevels(1),
-  [Prop.Anvil]: metresToLevels(1),
-  [Prop.Forge]: metresToLevels(1.5),
-  [Prop.Barrel]: metresToLevels(1),
-  [Prop.Hay]: metresToLevels(1.5),
-  [Prop.Well]: metresToLevels(1),
-  [Prop.Railing]: metresToLevels(1),
-};
 const STEER = 0.3;
 export const SETTLE_MS = 1500;
 const LEAD = 0.25;
@@ -128,25 +89,6 @@ const rotate = ({ x, y }: Vec2, angle: number): Vec2 => ({
   y: x * Math.sin(angle) + y * Math.cos(angle),
 });
 
-const clearAlong = (terrain: Terrain, from: Vec2, direction: Vec2, eye: number): number => {
-  let last = from;
-  for (let t = SIGHT_STEP; t <= SIGHT_REACH; t += SIGHT_STEP) {
-    const at = { x: Math.floor(from.x + 0.5 + direction.x * t), y: Math.floor(from.y + 0.5 + direction.y * t) };
-    if (at.x === last.x && at.y === last.y) continue;
-    const blocks = (to: Vec2) => {
-      const [here, there] = [terrain(last.x, last.y), terrain(to.x, to.y)];
-      const blocker = blockerBetween(here, there);
-      const top = there.height + (blocker === "obstacle" ? OBSTACLE_HEIGHTS[there.prop] : 0);
-      return blocker !== undefined && top >= eye;
-    };
-    const isCorner = at.x !== last.x && at.y !== last.y;
-    const throughCorner = isCorner && blocks({ x: at.x, y: last.y }) && blocks({ x: last.x, y: at.y });
-    if (blocks(at) || throughCorner) return Math.hypot(last.x - from.x, last.y - from.y);
-    last = at;
-  }
-  return SIGHT_REACH;
-};
-
 export interface Sight {
   readonly distance: number;
   readonly lead: Vec2;
@@ -154,10 +96,9 @@ export interface Sight {
 
 export const sightAhead = (terrain: Terrain, from: Vec2, facing: Direction): Sight => {
   const ahead = stepToward({ x: 0, y: 0 }, facing);
-  const eye = terrain(from.x, from.y).height + EYE_HEIGHT;
   const lines = SIGHT_RAYS.map((angle) => {
     const direction = rotate(ahead, angle);
-    return { direction, clear: clearAlong(terrain, from, direction, eye), weight: Math.cos(2 * angle) };
+    return { direction, clear: clearSight(terrain, from, direction, SIGHT_REACH), weight: Math.cos(2 * angle) };
   });
   const nearness = sum(lines.map(({ clear, weight }) => weight / (1 + clear))) / sum(lines.map(({ weight }) => weight));
   const reach = sum(SIGHT_RAYS.map(Math.cos)) * SIGHT_REACH;

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Direction } from "../game/movement";
-import type { Terrain } from "../game/terrain";
+import { fieldOf } from "../game/terrain.fixtures";
 import { type Vec2 } from "procgen";
-import { Biome, Cover, Ground, Prop, Water, Way } from "../worldgen";
+import { Prop } from "../worldgen";
 import {
   SETTLE_MS,
   approach,
@@ -98,23 +98,10 @@ describe("practicalSpan", () => {
   });
 });
 
-const field =
-  (prop: (x: number, y: number) => Prop, height: (x: number, y: number) => number = () => 100): Terrain =>
-  (x, y) => ({
-    height: height(x, y),
-    ground: Ground.Grass,
-    water: Water.None,
-    prop: prop(x, y),
-    part: 0,
-    biome: Biome.Grassland,
-    way: Way.None,
-    cover: Cover.None,
-  });
-
 describe("sightAhead", () => {
-  const open = field(() => Prop.None);
-  const wallAt = (at: number) => field((x) => (x === at ? Prop.Oak : Prop.None));
-  const scattered = (every: number) => field((x, y) => ((x * 7 + y * 3) % every === 0 ? Prop.Oak : Prop.None));
+  const open = fieldOf(() => Prop.None);
+  const wallAt = (at: number) => fieldOf((x) => (x === at ? Prop.Oak : Prop.None));
+  const scattered = (every: number) => fieldOf((x, y) => ((x * 7 + y * 3) % every === 0 ? Prop.Oak : Prop.None));
 
   it("sees to its reach over open ground", () => {
     expect(sightAhead(open, ORIGIN, Direction.East).distance).toBeCloseTo(SIGHT_REACH);
@@ -129,39 +116,14 @@ describe("sightAhead", () => {
   });
 
   it("is shortened only partly by a single obstacle a few tiles ahead", () => {
-    const tree = field((x, y) => (x === 3 && y === 0 ? Prop.Oak : Prop.None));
+    const tree = fieldOf((x, y) => (x === 3 && y === 0 ? Prop.Oak : Prop.None));
     const sight = sightAhead(tree, ORIGIN, Direction.East).distance;
     expect(sight).toBeGreaterThan(0);
     expect(sight).toBeLessThan(SIGHT_REACH);
   });
 
-  it("sees over obstacles whose tops are below eye level, not at it", () => {
-    const below = (drop: number, prop: Prop) =>
-      field(
-        (x) => (x >= 2 ? prop : Prop.None),
-        (x) => (x >= 2 ? 100 - drop : 100),
-      );
-    expect(sightAhead(below(16, Prop.Pine), ORIGIN, Direction.East).distance).toBeCloseTo(SIGHT_REACH);
-    expect(sightAhead(below(2, Prop.Boulder), ORIGIN, Direction.East).distance).toBeCloseTo(SIGHT_REACH);
-    expect(sightAhead(below(2, Prop.Pine), ORIGIN, Direction.East).distance).toBeLessThan(2);
-    expect(sightAhead(below(9, Prop.Pine), ORIGIN, Direction.East).distance).toBeLessThan(2);
-  });
-
-  it("sees across a dip back to ground no higher than its eye", () => {
-    const dip = field(
-      () => Prop.None,
-      (x) => (x === 1 ? 84 : 101),
-    );
-    expect(sightAhead(dip, ORIGIN, Direction.East).distance).toBeCloseTo(SIGHT_REACH);
-  });
-
-  it("does not slip between obstacles that meet at a corner", () => {
-    const diagonalWall = field((x, y) => (x + y === 3 ? Prop.Oak : Prop.None));
-    expect(sightAhead(diagonalWall, ORIGIN, Direction.East).distance).toBeLessThan(3);
-  });
-
   it("weighs near obstacles more than far open sight lines", () => {
-    const nearOnOneSide = field((x, y) => (y < 0 && x >= 1 ? Prop.Oak : Prop.None));
+    const nearOnOneSide = fieldOf((x, y) => (y < 0 && x >= 1 ? Prop.Oak : Prop.None));
     expect(sightAhead(nearOnOneSide, ORIGIN, Direction.East).distance).toBeLessThan(SIGHT_REACH / 2);
   });
 
@@ -172,23 +134,9 @@ describe("sightAhead", () => {
     expect(sparse).toBeLessThan(SIGHT_REACH);
   });
 
-  const stepAt2 = (height: number) =>
-    field(
-      () => Prop.None,
-      (x) => (x >= 2 ? height : 100),
-    );
-
-  it("is stopped by a cliff rising ahead", () => {
-    expect(sightAhead(stepAt2(120), ORIGIN, Direction.East).distance).toBeLessThan(2);
-  });
-
-  it("sees over a cliff dropping away ahead", () => {
-    expect(sightAhead(stepAt2(80), ORIGIN, Direction.East).distance).toBeCloseTo(SIGHT_REACH);
-  });
-
   it("narrows less for an obstacle to the side than for one straight ahead", () => {
-    const ahead = field((x, y) => (x === 2 && y === 0 ? Prop.Oak : Prop.None));
-    const aside = field((x, y) => (x === 2 && y === -2 ? Prop.Oak : Prop.None));
+    const ahead = fieldOf((x, y) => (x === 2 && y === 0 ? Prop.Oak : Prop.None));
+    const aside = fieldOf((x, y) => (x === 2 && y === -2 ? Prop.Oak : Prop.None));
     expect(sightAhead(aside, ORIGIN, Direction.East).distance).toBeGreaterThan(
       sightAhead(ahead, ORIGIN, Direction.East).distance,
     );
@@ -201,7 +149,7 @@ describe("sightAhead", () => {
   });
 
   it("leads toward the clear side", () => {
-    const blockedLeft = field((x, y) => (y < 0 && x >= 1 ? Prop.Oak : Prop.None));
+    const blockedLeft = fieldOf((x, y) => (y < 0 && x >= 1 ? Prop.Oak : Prop.None));
     const { lead } = sightAhead(blockedLeft, ORIGIN, Direction.East);
     expect(lead.x).toBeGreaterThan(0);
     expect(lead.y).toBeGreaterThan(0.1);
