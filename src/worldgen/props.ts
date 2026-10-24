@@ -62,7 +62,5 @@ export const {
   partOf,
   tilesOf,
 } = footprints<Prop>(
-  Object.fromEntries(
-    Object.entries(PROPS).flatMap(([prop, { footprint }]) => (footprint ? [[prop, footprint]] : [])),
-  ),
+  Object.fromEntries(Object.entries(PROPS).flatMap(([prop, { footprint }]) => (footprint ? [[prop, footprint]] : []))),
 );
