@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { contourBetween, hillshade, reliefTint } from "./palette";
+import { Biome, Cover, Ground, Prop, Water, Way } from "../worldgen";
+import type { Tile } from "../game/terrain";
+import { contourBetween, hillshade, mapColorOf, propColor, reliefTint, waterColor, wayColor } from "./palette";
 
 describe("hillshade", () => {
   it("leaves flat ground unchanged", () => {
@@ -48,5 +50,31 @@ describe("reliefTint", () => {
     expect(alpha(32)).toBeGreaterThan(alpha(16));
     expect(alpha(-32)).toBeGreaterThan(alpha(-16));
     expect(alpha(1000)).toBeLessThan(1);
+  });
+});
+
+describe("mapColorOf", () => {
+  const tile: Tile = {
+    height: 10,
+    ground: Ground.Planks,
+    water: Water.None,
+    prop: Prop.None,
+    part: 0,
+    biome: Biome.Grassland,
+    way: Way.None,
+    cover: Cover.Thatch,
+  };
+
+  it("shows what lies under a roof or canopy", () => {
+    expect(mapColorOf({ ...tile, prop: Prop.Bed }, "shade", 1)).toEqual(propColor[Prop.Bed]);
+    expect(mapColorOf(tile, "shade", 1)).toEqual(mapColorOf({ ...tile, cover: Cover.None }, "shade", 1));
+  });
+
+  it("shows every way tile", () => {
+    expect(mapColorOf({ ...tile, way: Way.Path }, "shade", 1)).toEqual(wayColor[Way.Path]);
+  });
+
+  it("shows water over the ground beneath it", () => {
+    expect(mapColorOf({ ...tile, water: Water.Shallow }, "shade", 1)).toEqual(waterColor[Water.Shallow]);
   });
 });

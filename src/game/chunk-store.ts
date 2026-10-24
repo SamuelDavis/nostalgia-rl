@@ -35,6 +35,7 @@ export const createChunkStore = (generate: LayerChunkAt, request: (layer: Layer,
   };
   return {
     receive,
+    peek: (layer: Layer, cx: number, cy: number): Chunk | undefined => held.get(keyOf(layer, cx, cy)),
     chunkAt: (layer: Layer, cx: number, cy: number): Chunk => {
       const chunk = held.get(keyOf(layer, cx, cy));
       if (chunk) return chunk;

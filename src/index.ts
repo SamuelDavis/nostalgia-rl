@@ -141,7 +141,7 @@ const controls: readonly Control[] = [
       dirty = true;
     },
   },
-  { keys: ["KeyM"], label: "M map", run: () => map.toggle(session.position, mode) },
+  { keys: ["KeyM"], label: "M map", run: () => map.cycle(session, mode) },
   {
     keys: ["KeyH"],
     label: "H height mode",
@@ -154,7 +154,7 @@ const controls: readonly Control[] = [
   { keys: ["Minus", "NumpadSubtract"], label: "− zoom out", run: () => zoomBy(ZOOM_STEP) },
 ];
 const hud = createHud(document.body, world, controls);
-const map = createMap(document.body, world);
+const map = createMap(document.body, world, chunks);
 
 const resize = () => {
   const ratio = devicePixelRatio;

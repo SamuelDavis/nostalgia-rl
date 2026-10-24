@@ -26,10 +26,6 @@ Close the view in dense trees, as the camera already closes when looking uphill.
 
 Keep the turn clock short and give each action a cost in ticks, so speed varies per action and entity: slower up steep inclines, faster on a horse. Decouples responsiveness and network budget (the tick) from pace (the cost).
 
-## Feature interiors on the map
-
-The map is a surface overview: it marks where features are (a deep forest's extent and glade, a cave's mouth) but not their insides. The user doesn't want interiors on the surface map (forests don't show theirs), but would like the map to show the feature the player is in, on their current floor, since forests and mines can be confusing to navigate.
-
 ## Mining camp on its own flat
 
 A big mine's bunkhouse and campfire on a small flat of their own beside the yard, joined by a short path, instead of on the yard's terrace: miners sleep away from the work, and from afar a big mine shows two flats. The user chose one terrace for now.

@@ -1,4 +1,5 @@
 import { Biome, Cover, Prop, Ground, HEIGHT_LEVELS, SEA_LEVEL, Water, Way, metresToLevels } from "../worldgen";
+import type { Tile } from "../game/terrain";
 
 export type Rgb = readonly [number, number, number];
 
@@ -151,3 +152,10 @@ export const surfaceColor = (
   light: number,
   heightShade: HeightShade = absoluteHeightShade,
 ): Rgb => shade(mode === "tint" ? hypsometricColor(level) : shade(base, heightShade(level)), light);
+
+export const mapColorOf = (tile: Tile, mode: HeightMode, light: number): Rgb => {
+  if (tile.prop !== Prop.None) return propColor[tile.prop];
+  if (tile.water !== Water.None) return waterColor[tile.water];
+  if (tile.way !== Way.None) return wayColor[tile.way];
+  return surfaceColor(mode, groundColor[tile.ground], tile.height, light);
+};
