@@ -1,4 +1,4 @@
-import { type Vec2, contains } from "procgen";
+import { type Vec2, contains, distance } from "procgen";
 import {
   Biome,
   type Conditions,
@@ -41,6 +41,7 @@ const FEATURE_RADIUS = 2;
 const DEEP_FOREST_AREA: Rgb = [8, 30, 14];
 const DEEP_FOREST_TINT = 0.7;
 const INDEX_CONTOUR_SHADE = 0.7;
+const PROVINCE_BORDER_SHADE = 0.45;
 
 export interface FieldNeighbours {
   readonly westLevel: number;
@@ -101,10 +102,21 @@ export const overviewMarks = (world: Worldgen, center: Vec2, radius: number): Ma
   ...overviewFeatureMarks(world, center, radius),
 ];
 
-export const createOverviewTint = (world: Worldgen, center: Vec2, radius: number) => {
+export const createOverviewTint = (world: Worldgen, center: Vec2, radius: number, spacing: number) => {
   const forests = regionsWithin(center, radius).flatMap(world.deepForestsIn);
-  return (color: Rgb, p: Vec2): Rgb =>
-    forests.some(({ bounds, layout }) => contains(bounds, p) && layout.contains(p))
-      ? mix(color, DEEP_FOREST_AREA, DEEP_FOREST_TINT)
-      : color;
+  const seats = world.provincesAround(center);
+  const provinceOf = (p: Vec2) =>
+    seats.reduce((best, seat) => (distance(seat, p) < distance(best, p) ? seat : best));
+  const isBorder = (p: Vec2) => {
+    const here = provinceOf(p);
+    return [
+      { x: p.x - spacing, y: p.y },
+      { x: p.x, y: p.y - spacing },
+    ].some((q) => provinceOf(q) !== here);
+  };
+  return (color: Rgb, p: Vec2): Rgb => {
+    const forested = forests.some(({ bounds, layout }) => contains(bounds, p) && layout.contains(p));
+    const tinted = forested ? mix(color, DEEP_FOREST_AREA, DEEP_FOREST_TINT) : color;
+    return isBorder(p) ? shade(tinted, PROVINCE_BORDER_SHADE) : tinted;
+  };
 };

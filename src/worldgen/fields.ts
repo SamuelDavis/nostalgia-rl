@@ -20,6 +20,7 @@ export interface Fields {
   readonly forestness: Field2;
   readonly groves: Field2;
   readonly frostEdge: Field2;
+  readonly uncanny: Field2;
   readonly conditions: (x: number, y: number) => Conditions;
   readonly landform: (x: number, y: number) => Landform;
 }
@@ -53,6 +54,7 @@ export const createFields = (seed: number): Fields => {
   const forestEdge = layer(seed, "forest edge", 2, 1 / 24);
   const groveNoise = noise(seed, "groves");
   const frostNoise = noise(seed, "ground");
+  const uncanny = layer(seed, "uncanny", 2, 1 / 2500);
 
   const landform = (x: number, y: number): Landform => {
     const natural = naturalLandform(x, y);
@@ -110,6 +112,7 @@ export const createFields = (seed: number): Fields => {
     forestness: (x, y) => conditions(x, y).forestness,
     groves: (x, y) => groveNoise(x / 40, y / 40),
     frostEdge: (x, y) => frostNoise(x / 7, y / 7),
+    uncanny,
     conditions,
     landform,
   };

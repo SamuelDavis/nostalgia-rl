@@ -60,7 +60,7 @@ const tileColor = (x: number, y: number): Rgb => {
 const center = { x: centerX, y: centerY };
 const radius = (size * scale) / 2;
 const isTiles = values.layer === "tiles";
-const tint = createOverviewTint(world, center, radius);
+const tint = createOverviewTint(world, center, radius, scale);
 
 const overlay = new Map<string, Rgb>();
 const marks: Mark[] = isTiles ? overviewFeatureMarks(world, center, radius) : overviewMarks(world, center, radius);

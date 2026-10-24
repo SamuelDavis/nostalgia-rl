@@ -91,6 +91,7 @@ export const createHud = (parent: HTMLElement, world: Worldgen, controls: readon
             ? `storey ${session.layer.floor + 1}`
             : `${session.layer.floor} of cave at ${session.layer.cave.x}, ${session.layer.cave.y}`,
       ],
+      ["province", world.provinceAt(session.position).identity],
       ["building", building ? `${building.plan.kind}, door at ${building.door.x}, ${building.door.y}` : "—"],
       ["facing", nameOf(Direction, facing)],
       ["tap", tapTurnsFirst ? "turns, then steps" : "steps"],

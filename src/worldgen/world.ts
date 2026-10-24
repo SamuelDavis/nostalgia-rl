@@ -33,6 +33,7 @@ import { type CaveFloor, type Layer, SURFACE, isStorey } from "./layer";
 import { storeyChunk, storeyLinks } from "./features/building/storeys";
 import type { Building } from "./features/building/building";
 import { createPeaks } from "./landmarks";
+import { type Province, createProvinces } from "./provinces";
 import { regions } from "./region";
 import { type River, createRivers } from "./rivers";
 import { type WayLink, createWayness, createWays } from "./ways";
@@ -43,6 +44,7 @@ export type { PaintedSettlement } from "./features/settlement/settlement";
 export { BuildingKind } from "./features/building/plan";
 export type { Building } from "./features/building/building";
 export { TIERS, Tier, type Settlement } from "./features/settlement/layout";
+export { Identity, type Province } from "./provinces";
 
 const WAY_MARGIN = 8;
 
@@ -64,6 +66,8 @@ export interface Worldgen {
   readonly caveFloorOf: (layer: CaveFloor) => FloorLayout | undefined;
   readonly linkAcross: (layer: Layer, from: Vec2, to: Vec2) => Layer | undefined;
   readonly buildingAt: (p: Vec2) => Building | undefined;
+  readonly provinceAt: (p: Vec2) => Province;
+  readonly provincesAround: (p: Vec2) => readonly Province[];
 }
 
 const createStages = (seed: number, fields: Fields, world: World) => {
@@ -71,6 +75,7 @@ const createStages = (seed: number, fields: Fields, world: World) => {
   const biomeAt = (p: Vec2) => biomeOf(fields.conditions(p.x, p.y));
 
   const rivers = createRivers(seed, fields);
+  const provinces = createProvinces(fields);
   const settlements = createSettlementSites({
     seed,
     level,
@@ -136,14 +141,27 @@ const createStages = (seed: number, fields: Fields, world: World) => {
     rivers: rivers.near(chunks, CHUNK_RIVER_MARGIN),
     ways: ways.near(chunks, CHUNK_WAY_MARGIN),
   });
-  return { spawn, rivers, settlements, camps, peaks, caves, deepForests, ways, waysNearRegions, features, surface };
+  return {
+    spawn,
+    rivers,
+    provinces,
+    settlements,
+    camps,
+    peaks,
+    caves,
+    deepForests,
+    ways,
+    waysNearRegions,
+    features,
+    surface,
+  };
 };
 
 export const createWorldgen = (seed: number): Worldgen => {
   const fields = createFields(seed);
   const world = createWorld(seed);
   const stages = createStages(seed, fields, world);
-  const { spawn, rivers, camps, waysNearRegions, features } = stages;
+  const { spawn, rivers, provinces, camps, waysNearRegions, features } = stages;
   const caves = stages.caves.explore(world);
   const settlementsPlaced = placedOf(features.settlement);
   const buildingAt = (p: Vec2) =>
@@ -175,6 +193,8 @@ export const createWorldgen = (seed: number): Worldgen => {
       return caves.linkAcross(layer, from, to);
     },
     buildingAt,
+    provinceAt: (p) => provinces.provinceAt(world, p),
+    provincesAround: (p) => provinces.seatsAround(world, p),
   };
 };
 

@@ -57,7 +57,7 @@ export const createMap = (parent: HTMLElement, world: Worldgen, chunks: HeldChun
 
   const draw = (center: Vec2, mode: HeightMode) => {
     const id = ++render;
-    const tint = createOverviewTint(world, center, MAP_RADIUS);
+    const tint = createOverviewTint(world, center, MAP_RADIUS, TILES_PER_PX);
     const image = ctx.createImageData(MAP_PX, MAP_PX);
     let row = 0;
     let previous: number[] = [];
