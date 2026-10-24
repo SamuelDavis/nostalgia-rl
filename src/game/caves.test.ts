@@ -4,6 +4,7 @@ import { type Layer, SURFACE, createWorldgen, layerKey, regions } from "../world
 import type { Cave } from "../worldgen/features/cave/cave";
 import { TERRITORY_RADIUS } from "../worldgen/features/cave/siting";
 import { blockerBetween } from "./movement";
+import { withRandomSeed } from "./seeds.fixtures";
 import { generatedLayers } from "./terrain";
 
 const NEIGHBOURS: readonly Vec2[] = [
@@ -12,6 +13,8 @@ const NEIGHBOURS: readonly Vec2[] = [
   { x: 0, y: 1 },
   { x: 0, y: -1 },
 ];
+
+const MINE_SEEDS = [1, 2, 3];
 
 const walkerOf = memoize(
   (seed: number) => {
@@ -65,11 +68,17 @@ describe("caves", () => {
     expect(reached).toContain(layerKey(junction!.other));
   });
 
-  it("lead walkers in at a mine's entrance and down every floor it works", { tags: "slow" }, () => {
-    const { caves, nearby, floorsReachedFrom } = walkerOf(3);
-    const cave = nearby.find((c) => caves.planOf(c).mine)!;
-    const { top, bottom } = caves.planOf(cave).mine!;
-    const reached = floorsReachedFrom(cave, [cave]);
-    for (let floor = top; floor >= bottom; floor--) expect(reached).toContain(layerKey({ cave, floor }));
+  it("lead walkers in at every mine's entrance and down every floor it works", { tags: "slow" }, () => {
+    for (const seed of withRandomSeed(MINE_SEEDS)) {
+      const { caves, nearby, floorsReachedFrom } = walkerOf(seed);
+      for (const cave of nearby.filter((c) => caves.planOf(c).mine)) {
+        const { top, bottom } = caves.planOf(cave).mine!;
+        const reached = floorsReachedFrom(cave, [cave]);
+        for (let floor = top; floor >= bottom; floor--)
+          expect(reached, `seed ${seed}, mine at ${cave.x},${cave.y}, floor ${floor}`).toContain(
+            layerKey({ cave, floor }),
+          );
+      }
+    }
   });
 });

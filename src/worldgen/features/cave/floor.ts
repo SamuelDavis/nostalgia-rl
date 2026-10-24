@@ -14,7 +14,7 @@ import type { Fields } from "../../fields";
 import { pathOf, route } from "../../routing";
 import { CEILING, type LevelledTile, RAMP_GAP, type CavePlan, type Ramp, isOnFloors, rampFrom } from "./plan";
 import type { Junction } from "./junctions";
-import { type Chamber, type Entry, type Tunnel, type Workings, sidesOf, workFloor } from "./mine";
+import { CARDINALS, type Chamber, type Entry, type Tunnel, type Workings, sidesOf, workFloor } from "./mine";
 import { type Cave, TERRITORY_RADIUS } from "./siting";
 
 export type FloorMark = "slope" | "down" | "up" | "exit";
@@ -104,6 +104,8 @@ const NEIGHBOURS: readonly Vec2[] = [
 const tileCentre = (p: Vec2): Vec2 => ({ x: p.x + 0.5, y: p.y + 0.5 });
 const plus = (a: Vec2, b: Vec2): Vec2 => ({ x: a.x + b.x, y: a.y + b.y });
 const minus = (a: Vec2, b: Vec2): Vec2 => ({ x: a.x - b.x, y: a.y - b.y });
+const towardMouth = (floor: number) => (floor < 0 ? floor + 1 : floor);
+const arrivalBy = (ramp: Ramp | undefined, floor: number): Flight | undefined => ramp && { ramp, isUpper: floor > 0 };
 const halfOf = ({ ramp, isUpper }: Flight) => (isUpper ? ramp.tiles.slice(0, ramp.link) : ramp.tiles.slice(ramp.link));
 const endOf = ({ ramp, isUpper }: Flight) => (isUpper ? ramp.tiles[0]! : ramp.tiles.at(-1)!);
 const marksOf = ({ ramp, isUpper }: Flight): [Vec2, FloorMark][] =>
@@ -289,18 +291,15 @@ export const createCaveFloors = ({ seed, fields }: CaveFloorInput) => {
     return [...(below ? [{ ramp: below, isUpper: true }] : []), ...(above ? [{ ramp: above, isUpper: false }] : [])];
   };
 
-  const arrivalOn = (site: CaveSite, floor: number): Flight | undefined => {
-    if (floor === 0) return undefined;
-    const ramp = stairBelow(site, floor < 0 ? floor + 1 : floor);
-    return ramp && { ramp, isUpper: floor > 0 };
-  };
+  const arrivalOn = (site: CaveSite, floor: number): Flight | undefined =>
+    floor === 0 ? undefined : arrivalBy(stairBelow(site, towardMouth(floor)), floor);
 
   const entryOf = (site: CaveSite, floor: number): Entry | undefined => {
     if (floor === 0) {
       const { passage } = site.plan.mouth;
       return { at: passage[0]!, heading: minus(passage[0]!, passage[1]!) };
     }
-    const arrival = arrivalOn(site, floor);
+    const arrival = arrivalOn(site, floor) ?? arrivalBy(site.plan.rampBelow(towardMouth(floor)), floor);
     if (!arrival) return undefined;
     const { tiles } = arrival.ramp;
     const [end, before] = arrival.isUpper ? [tiles[0]!, tiles[1]!] : [tiles.at(-1)!, tiles.at(-2)!];
@@ -322,31 +321,36 @@ export const createCaveFloors = ({ seed, fields }: CaveFloorInput) => {
     const taken = new Set(reserved.map(indexOf));
     const features = [...here.features, ...there.features];
     const stairs = rng.child("stairs", site.cave.id, floor, to);
-    for (const room of stairs.shuffle(workings.rooms, 0))
-      for (const { edge, outward } of stairs.shuffle(sidesOf(room), room.centre.x, room.centre.y)) {
-        const far = plus(edge, { x: outward.x * STAIR_LENGTH, y: outward.y * STAIR_LENGTH });
-        const ramp =
-          to < floor
-            ? rampFrom(plus(edge, outward), outward, baseOf(floor), baseOf(to), STAIR_LENGTH)
-            : rampFrom(far, { x: -outward.x, y: -outward.y }, baseOf(to), baseOf(floor), STAIR_LENGTH);
-        const arrival = plus(far, outward);
-        const fits =
-          worked.has(indexOf(edge)) &&
-          there.isOwned(arrival) &&
-          ramp.tiles.every((t) => {
-            const i = indexOf(t);
-            return (
-              i >= 0 &&
-              isTerritory(t) &&
-              groundAt(t) >= t.level + CEILING &&
-              [here, there].every((plan) => plan.kinds[i] === ROCK && !plan.isBlocked(i)) &&
-              !worked.has(i) &&
-              !taken.has(i) &&
-              features.every((f) => distance(f, t) > RAMP_GAP)
-            );
-          });
-        if (fits) return ramp;
-      }
+    const fromRooms = stairs
+      .shuffle(workings.rooms, 0)
+      .flatMap((room) => stairs.shuffle(sidesOf(room), room.centre.x, room.centre.y));
+    const fromAnyWorking = [...workings.tiles]
+      .sort((a, b) => groundAt(b) - groundAt(a) || a.x - b.x || a.y - b.y)
+      .flatMap((edge) => CARDINALS.map((outward) => ({ edge, outward })));
+    for (const { edge, outward } of [...fromRooms, ...fromAnyWorking]) {
+      const far = plus(edge, { x: outward.x * STAIR_LENGTH, y: outward.y * STAIR_LENGTH });
+      const ramp =
+        to < floor
+          ? rampFrom(plus(edge, outward), outward, baseOf(floor), baseOf(to), STAIR_LENGTH)
+          : rampFrom(far, { x: -outward.x, y: -outward.y }, baseOf(to), baseOf(floor), STAIR_LENGTH);
+      const arrival = plus(far, outward);
+      const fits =
+        worked.has(indexOf(edge)) &&
+        there.isOwned(arrival) &&
+        ramp.tiles.every((t) => {
+          const i = indexOf(t);
+          return (
+            i >= 0 &&
+            isTerritory(t) &&
+            groundAt(t) >= t.level + CEILING &&
+            [here, there].every((plan) => plan.kinds[i] === ROCK && !plan.isBlocked(i)) &&
+            !worked.has(i) &&
+            !taken.has(i) &&
+            features.every((f) => distance(f, t) > RAMP_GAP)
+          );
+        });
+      if (fits) return ramp;
+    }
     return undefined;
   };
 
@@ -365,7 +369,7 @@ export const createCaveFloors = ({ seed, fields }: CaveFloorInput) => {
           chambers: plan.chambers,
           tunnels: plan.tunnels,
           canDig: (p) => plan.isAllowed(p) && !arriving.has(indexOf(p)),
-          canCut: (p) => !plan.isBlocked(indexOf(p)) && !arriving.has(indexOf(p)),
+          canCut: (p) => plan.isOwned(p) && !arriving.has(indexOf(p)),
         },
         entry,
         rng.child("workings", site.cave.id, floor),
