@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { type Vec2, distance, memoize } from "procgen";
-import { MinorKind, REGION_SIZE, SURFACE, createWorldgen, regions } from "../worldgen";
+import { type Vec2, distance, memoize, samePoint } from "procgen";
+import { Cover, MinorKind, Prop, REGION_SIZE, SURFACE, createWorldgen, regions } from "../worldgen";
 import { blockerBetween, stepToward, Direction } from "./movement";
 import { generatedLayers } from "./terrain";
 
@@ -21,7 +21,6 @@ const worldOf = memoize(
       layers: generatedLayers(world),
       minors: cells.flatMap(world.minorsIn),
       farms: cells.flatMap(world.farmsIn),
-      settlements: cells.flatMap(world.settlementsIn),
       interests: cells.flatMap((region): Vec2[] => [
         ...world.minorsIn(region).map(({ anchor }) => anchor),
         ...world.farmsIn(region).map(({ anchor }) => anchor),
@@ -58,11 +57,12 @@ describe("world variety", () => {
 
   it("grows farms that supply the settlement they surround", { tags: "slow" }, () => {
     for (const seed of SEEDS) {
-      const { farms, settlements } = worldOf(seed);
+      const { world, farms } = worldOf(seed);
       expect(farms.length, `seed ${seed}`).toBeGreaterThan(0);
-      for (const { layout } of farms) {
-        const target = layout.purpose.relation?.target;
-        expect(settlements.some(({ anchor }) => anchor.x === target?.x && anchor.y === target?.y)).toBe(true);
+      for (const { anchor, layout } of farms) {
+        const target = layout.purpose.relation!.target;
+        const supplied = world.settlementsIn(regions.cellOf(target)).find((s) => samePoint(s.anchor, target));
+        expect(supplied, `farm at ${anchor.x},${anchor.y}`).toBeDefined();
       }
     }
   });
@@ -97,6 +97,27 @@ describe("world variety", () => {
           blockerBetween(from, to),
           `${building.plan.kind} at ${building.door.x},${building.door.y}`,
         ).toBeUndefined();
+      }
+    }
+  });
+
+  it("marks the mouth of every small cave and lets walkers in through it", { tags: "slow" }, () => {
+    for (const seed of SEEDS) {
+      const { layers, minors } = worldOf(seed);
+      const terrain = layers.terrainOn(SURFACE);
+      for (const { anchor, bounds } of minors.filter(({ anchor }) => anchor.kind === MinorKind.SmallCave)) {
+        const mouths: Vec2[] = [];
+        for (let y = bounds.minY; y <= bounds.maxY; y++)
+          for (let x = bounds.minX; x <= bounds.maxX; x++)
+            if (terrain(x, y).prop === Prop.Hollow) mouths.push({ x, y });
+        expect(mouths, `small cave at ${anchor.x},${anchor.y}`).toHaveLength(1);
+        const mouth = terrain(mouths[0]!.x, mouths[0]!.y);
+        const isEnterable = Object.values(Direction).some((d) => {
+          const p = stepToward(mouths[0]!, d);
+          const outside = terrain(p.x, p.y);
+          return outside.cover === Cover.None && !blockerBetween(outside, mouth);
+        });
+        expect(isEnterable, `small cave at ${anchor.x},${anchor.y}`).toBe(true);
       }
     }
   });

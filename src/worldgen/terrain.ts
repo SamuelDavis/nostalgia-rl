@@ -75,5 +75,6 @@ export const Prop = {
   Crop: 42,
   FruitTree: 43,
   Fence: 44,
+  Hollow: 45,
 } as const;
 export type Prop = (typeof Prop)[keyof typeof Prop];

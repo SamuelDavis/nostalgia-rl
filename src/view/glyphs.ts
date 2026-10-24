@@ -2,7 +2,8 @@ import { Cover, Prop, Ground, Water, Way, footprintOf } from "../worldgen";
 
 export const PLAYER_GLYPH = "@";
 export const STAIRS_GLYPH = "≡";
-export const THRESHOLD_GLYPH = "∩";
+export const CAVE_MOUTH_GLYPH = "∩";
+export const FOREST_GATE_GLYPH = "⊓";
 
 const framed = (prop: Prop, fill: string): string => {
   const { x: width, y: depth } = footprintOf(prop);
@@ -31,8 +32,8 @@ export const propGlyph: Record<Prop, string> = {
   [Prop.Bridge]: "#",
   [Prop.Rock]: "",
   [Prop.Stalagmite]: "^",
-  [Prop.CaveMouth]: THRESHOLD_GLYPH,
-  [Prop.CaveExit]: THRESHOLD_GLYPH,
+  [Prop.CaveMouth]: CAVE_MOUTH_GLYPH,
+  [Prop.CaveExit]: CAVE_MOUTH_GLYPH,
   [Prop.RampDown]: ">",
   [Prop.RampUp]: "<",
   [Prop.Ramp]: STAIRS_GLYPH,
@@ -63,6 +64,7 @@ export const propGlyph: Record<Prop, string> = {
   [Prop.Crop]: "ψ",
   [Prop.FruitTree]: "♣",
   [Prop.Fence]: "‡",
+  [Prop.Hollow]: "◠",
 };
 
 export const coverGlyph: Record<Exclude<Cover, typeof Cover.None>, string> = {

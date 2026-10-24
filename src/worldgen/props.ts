@@ -64,6 +64,7 @@ export const PROPS: Record<Prop, PropTraits> = {
   [Prop.Crop]: open(1),
   [Prop.FruitTree]: solid(4),
   [Prop.Fence]: solid(1),
+  [Prop.Hollow]: open(),
 };
 
 export const {

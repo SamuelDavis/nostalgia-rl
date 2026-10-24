@@ -18,3 +18,14 @@ Decided in an interview with the user (2026-10-24).
 ## Playtest log
 
 _Record user feedback verbatim, newest first, with the commit it refers to._
+
+### 7aa6468: provinces, minor features, farms
+
+> There's a small cave at `?seed=1&x=-454&y=-71`; the entrance is unmarked. There need to be dedicated tiles to distinguish enterances for the different features.
+> I see no standing stones at `?seed=3&x=-1163&y=2007`
+>
+> Farms need not be extremely large and, like camps, they should be able to level terrain. Farms should also be able to clear forests. It's important they be placable.
+>
+> What factors are driving up cost? Why are the deep forests hitting the slow tag?
+
+The small cave's mouth lay one tile outside its mound, so the mound's edge stayed roofed; it is now a `◠` hollow, and caves are sited only where the ground before the mouth is walkable. Each entrance has its own glyph: door `+`, cave mouth `∩`, mine portal `Π`, small cave `◠`, forest gate `⊓` (it shared `∩` with caves). The stones link was stale, taken before a last siting change. Farms are smaller, level and clear their ground, sit on rings around their settlement and no longer read ways; 21 of a possible 22 around the origin of seed 1, against 7. They had been listed under their settlement's region, so chunks far from it never painted them; procgen now throws on any feature listed outside its cell.

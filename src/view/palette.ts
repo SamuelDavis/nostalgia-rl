@@ -95,6 +95,7 @@ export const propColor: Record<Prop, Rgb> = {
   [Prop.Crop]: [215, 190, 80],
   [Prop.FruitTree]: [70, 130, 40],
   [Prop.Fence]: [170, 130, 80],
+  [Prop.Hollow]: [200, 190, 175],
 };
 
 const HYPSOMETRIC_STOPS: readonly (readonly [elevation: number, color: Rgb])[] = [

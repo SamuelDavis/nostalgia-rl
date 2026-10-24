@@ -6,7 +6,7 @@ import { Cover, type Layer, Prop, Water, Way, layerKey } from "../worldgen";
 import {
   PLAYER_GLYPH,
   STAIRS_GLYPH,
-  THRESHOLD_GLYPH,
+  FOREST_GATE_GLYPH,
   coverGlyph,
   propGlyph,
   groundGlyph,
@@ -61,7 +61,7 @@ const NEIGHBOURS: readonly Vec2[] = [
   { x: 0, y: -1 },
 ];
 
-const THRESHOLD: Look = { background: [55, 38, 20], glyph: THRESHOLD_GLYPH, color: [255, 215, 130] };
+const THRESHOLD: Look = { background: [55, 38, 20], glyph: FOREST_GATE_GLYPH, color: [255, 215, 130] };
 
 const isThreshold = (terrain: Terrain, x: number, y: number, tile: Tile): boolean =>
   isTrail(tile) &&
