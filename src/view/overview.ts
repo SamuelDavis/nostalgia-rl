@@ -2,6 +2,7 @@ import { type Vec2, contains, distance } from "procgen";
 import {
   Biome,
   type Conditions,
+  MinorKind,
   REGION_SIZE,
   Water,
   Way,
@@ -36,6 +37,13 @@ const GLADE_MARK: Rgb = [170, 255, 120];
 const CAVE_MARK: Rgb = [40, 30, 25];
 const MINE_MARK: Rgb = [190, 140, 80];
 const SETTLEMENT_MARK: Rgb = [250, 240, 200];
+const MINOR_MARKS: Record<MinorKind, Rgb> = {
+  [MinorKind.BanditCamp]: [220, 40, 40],
+  [MinorKind.Woodcutter]: [150, 200, 60],
+  [MinorKind.Den]: [110, 60, 30],
+  [MinorKind.SmallCave]: [150, 150, 160],
+  [MinorKind.StandingStones]: [200, 120, 255],
+};
 const FEATURE_OUTLINE: Rgb = [0, 0, 0];
 const FEATURE_RADIUS = 2;
 const DEEP_FOREST_AREA: Rgb = [8, 30, 14];
@@ -91,6 +99,7 @@ export const overviewFeatureMarks = (world: Worldgen, center: Vec2, radius: numb
       ...world.caveMouthsIn(region).flatMap(({ inside }) => featureMarks(inside, CAVE_MARK)),
       ...world.mineEntrancesIn(region).flatMap(({ inside }) => featureMarks(inside, MINE_MARK)),
       ...world.settlementsIn(region).flatMap(({ anchor }) => featureMarks(anchor, SETTLEMENT_MARK)),
+      ...world.minorsIn(region).flatMap(({ anchor }) => featureMarks(anchor, MINOR_MARKS[anchor.kind])),
     ];
   });
 
@@ -105,8 +114,7 @@ export const overviewMarks = (world: Worldgen, center: Vec2, radius: number): Ma
 export const createOverviewTint = (world: Worldgen, center: Vec2, radius: number, spacing: number) => {
   const forests = regionsWithin(center, radius).flatMap(world.deepForestsIn);
   const seats = world.provincesAround(center);
-  const provinceOf = (p: Vec2) =>
-    seats.reduce((best, seat) => (distance(seat, p) < distance(best, p) ? seat : best));
+  const provinceOf = (p: Vec2) => seats.reduce((best, seat) => (distance(seat, p) < distance(best, p) ? seat : best));
   const isBorder = (p: Vec2) => {
     const here = provinceOf(p);
     return [

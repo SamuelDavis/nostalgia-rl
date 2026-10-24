@@ -28,6 +28,7 @@ import type { Settlement } from "./features/settlement/layout";
 import { SETTLEMENT_RIVER_CLEARANCE, createSettlementSites } from "./features/settlement/siting";
 import { type PaintedSettlement, settlementFeature } from "./features/settlement/settlement";
 import type { Opening, TileDraft } from "./features/feature";
+import { type MinorLayout, type MinorSite, createMinorSites, minorFeature } from "./features/minor/minor";
 import { type Fields, createFields } from "./fields";
 import { type CaveFloor, type Layer, SURFACE, isStorey } from "./layer";
 import { storeyChunk, storeyLinks } from "./features/building/storeys";
@@ -45,8 +46,11 @@ export { BuildingKind } from "./features/building/plan";
 export type { Building } from "./features/building/building";
 export { TIERS, Tier, type Settlement } from "./features/settlement/layout";
 export { Identity, type Province } from "./provinces";
+export { MinorKind, type MinorLayout, type MinorSite } from "./features/minor/minor";
+export type { Purpose } from "./features/purpose";
 
 const WAY_MARGIN = 8;
+const MINOR_RIVER_MARGIN = 24;
 
 export interface Worldgen {
   readonly seed: number;
@@ -67,6 +71,8 @@ export interface Worldgen {
   readonly linkAcross: (layer: Layer, from: Vec2, to: Vec2) => Layer | undefined;
   readonly buildingAt: (p: Vec2) => Building | undefined;
   readonly provinceAt: (p: Vec2) => Province;
+  readonly minorsIn: (region: Cell) => readonly Placed<TileDraft, MinorSite, MinorLayout>[];
+  readonly minorAt: (p: Vec2) => MinorLayout | undefined;
   readonly provincesAround: (p: Vec2) => readonly Province[];
 }
 
@@ -114,6 +120,17 @@ const createStages = (seed: number, fields: Fields, world: World) => {
     caveMouthReach: MOUTH_REACH,
   });
   const waysNearRegions = ways.near(regions, WAY_MARGIN);
+  const minorSiting = {
+    seed,
+    land: { level, biomeAt, conditions: (p: Vec2) => fields.conditions(p.x, p.y) },
+    provinceAt: provinces.provinceAt,
+    provinces: provinces.seats,
+    settlements,
+    camps,
+    rivers: rivers.coursesNear(regions, MINOR_RIVER_MARGIN),
+    waysNear: waysNearRegions,
+  };
+  const minorSites = createMinorSites(minorSiting);
   const features = {
     deepForest: deepForests.feature(waysNearRegions),
     camp: campFeature(seed, siting, camps, waysNearRegions),
@@ -126,6 +143,7 @@ const createStages = (seed: number, fields: Fields, world: World) => {
       waysNear: waysNearRegions,
     }),
     caveMouth: caves.mouthFeature,
+    minor: minorFeature(minorSiting, minorSites),
   };
   const featuresNearChunks = featuresNear("features near chunks", chunks, [
     features.deepForest,
@@ -133,6 +151,7 @@ const createStages = (seed: number, fields: Fields, world: World) => {
     features.settlement,
     features.mineYard,
     features.caveMouth,
+    features.minor,
   ]);
   const surface = createSurface({
     seed,
@@ -164,11 +183,16 @@ export const createWorldgen = (seed: number): Worldgen => {
   const { spawn, rivers, provinces, camps, waysNearRegions, features } = stages;
   const caves = stages.caves.explore(world);
   const settlementsPlaced = placedOf(features.settlement);
+  const minorsPlaced = placedOf(features.minor);
+  const minorsNear = (p: Vec2) => world.gather(minorsPlaced, boundsOf([p], features.minor.reach));
+  const minorAt = (p: Vec2) => minorsNear(p).find(({ bounds }) => contains(bounds, p))?.layout;
   const buildingAt = (p: Vec2) =>
-    world
-      .gather(settlementsPlaced, boundsOf([p], features.settlement.reach))
-      .flatMap(({ layout }) => layout.buildingsAt(p))
-      .find(({ bounds }) => contains(bounds, p));
+    [
+      ...world
+        .gather(settlementsPlaced, boundsOf([p], features.settlement.reach))
+        .flatMap(({ layout }) => layout.buildingsAt(p)),
+      ...minorsNear(p).flatMap(({ layout }) => layout.buildings),
+    ].find(({ bounds }) => contains(bounds, p));
   const climb = storeyLinks(buildingAt);
 
   return {
@@ -194,6 +218,11 @@ export const createWorldgen = (seed: number): Worldgen => {
     },
     buildingAt,
     provinceAt: (p) => provinces.provinceAt(world, p),
+    minorsIn: (region) =>
+      world
+        .gather(minorsPlaced, regions.boundsOf(region))
+        .filter(({ anchor }) => contains(regions.boundsOf(region), anchor)),
+    minorAt,
     provincesAround: (p) => provinces.seatsAround(world, p),
   };
 };

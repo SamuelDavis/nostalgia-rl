@@ -151,7 +151,7 @@ const coverLook = (cover: Exclude<Cover, typeof Cover.None>, light: number, x: n
 
 const underCover = (look: Look): Look => ({ ...look, background: shade(look.background, UNDER_COVER_SHADE) });
 
-const ROOFS: ReadonlySet<Cover> = new Set([Cover.Thatch, Cover.Slate]);
+const ROOFS: ReadonlySet<Cover> = new Set([Cover.Thatch, Cover.Slate, Cover.Rock]);
 const EAVE_SHADE = 0.7;
 
 const isEave = (terrain: Terrain, x: number, y: number, tile: Tile): boolean =>

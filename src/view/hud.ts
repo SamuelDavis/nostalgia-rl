@@ -12,6 +12,7 @@ import {
   SURFACE,
   isStorey,
   Water,
+  type Purpose,
   type Worldgen,
   regions,
 } from "../worldgen";
@@ -36,6 +37,13 @@ export interface Control {
 }
 
 const fixed = (value: number) => value.toFixed(3);
+
+export const describePurpose = ({ role, occupants, produces, relation }: Purpose): string =>
+  [
+    occupants.length > 0 ? `${role} of ${occupants.join(" and ")}` : role,
+    ...(produces.length > 0 ? [`makes ${produces.join(" and ")}`] : []),
+    ...(relation ? [`${relation.kind} ${relation.target.x}, ${relation.target.y}`] : []),
+  ].join(", ");
 
 export const createHud = (parent: HTMLElement, world: Worldgen, controls: readonly Control[]) => {
   const panel = document.createElement("aside");
@@ -77,6 +85,7 @@ export const createHud = (parent: HTMLElement, world: Worldgen, controls: readon
     const form = landform(x + 0.5, y + 0.5);
     const region = regions.cellOf({ x, y });
     const building = world.buildingAt(session.position);
+    const place = world.minorAt(session.position);
     const rows: [string, string][] = [
       ["seed", String(world.seed)],
       ["turn", `${turn} @ ${turnMs} ms`],
@@ -92,6 +101,7 @@ export const createHud = (parent: HTMLElement, world: Worldgen, controls: readon
             : `${session.layer.floor} of cave at ${session.layer.cave.x}, ${session.layer.cave.y}`,
       ],
       ["province", world.provinceAt(session.position).identity],
+      ["place", place ? `${place.site.kind}: ${describePurpose(place.purpose)}` : "—"],
       ["building", building ? `${building.plan.kind}, door at ${building.door.x}, ${building.door.y}` : "—"],
       ["facing", nameOf(Direction, facing)],
       ["tap", tapTurnsFirst ? "turns, then steps" : "steps"],

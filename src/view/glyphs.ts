@@ -54,12 +54,22 @@ export const propGlyph: Record<Prop, string> = {
   [Prop.Hay]: "%",
   [Prop.Well]: "O",
   [Prop.Railing]: "¦",
+  [Prop.Stump]: "◦",
+  [Prop.LogPile]: "▤",
+  [Prop.Crate]: "□",
+  [Prop.Stake]: "↟",
+  [Prop.Bones]: "×",
+  [Prop.StandingStone]: "▮",
+  [Prop.Crop]: "ψ",
+  [Prop.FruitTree]: "♣",
+  [Prop.Fence]: "‡",
 };
 
 export const coverGlyph: Record<Exclude<Cover, typeof Cover.None>, string> = {
   [Cover.Canopy]: "♣",
   [Cover.Thatch]: "",
   [Cover.Slate]: "",
+  [Cover.Rock]: "",
 };
 
 export const groundGlyph: Record<Ground, string> = {
@@ -70,6 +80,7 @@ export const groundGlyph: Record<Ground, string> = {
   [Ground.Snow]: "·",
   [Ground.Dressed]: "·",
   [Ground.Planks]: "",
+  [Ground.Tilled]: "~",
 };
 
 export const wayGlyph: Record<Exclude<Way, typeof Way.None>, string> = {

@@ -51,7 +51,8 @@ const CANOPY_SHADE = 0.55;
 
 const tileColor = (x: number, y: number): Rgb => {
   const tile = terrain(x, y);
-  if (tile.cover === Cover.Thatch || tile.cover === Cover.Slate) return coverColor[tile.cover];
+  if (tile.cover === Cover.Thatch || tile.cover === Cover.Slate || tile.cover === Cover.Rock)
+    return coverColor[tile.cover];
   const light = hillshade(tile.height - terrain(x - 1, y).height, tile.height - terrain(x, y - 1).height);
   const color = mapColorOf(tile, mode, light);
   return tile.cover === Cover.None ? color : shade(color, CANOPY_SHADE);
