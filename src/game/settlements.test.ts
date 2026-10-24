@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type Vec2, contains, memoize } from "procgen";
 import { Cover, type Layer, Prop, SURFACE, Way, createWorldgen, layerKey, regions } from "../worldgen";
-import { type Building, footprintOf } from "../worldgen/features/settlement/layout";
+import { type Building, footprintOf } from "../worldgen/features/building/building";
 import { blockerBetween } from "./movement";
 import { generatedLayers } from "./terrain";
 

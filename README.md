@@ -33,7 +33,8 @@ These are requirements, not designs. How to meet them is decided in the multipla
 
 ## Current state
 
-- **Phase 1, world generation:** in progress. See [docs/phases/01-worldgen.md](docs/phases/01-worldgen.md).
+- **Phase 1, world generation:** done. See [docs/phases/01-worldgen.md](docs/phases/01-worldgen.md).
+- **Phase 2, world variety:** in progress. See [docs/phases/02-world-variety.md](docs/phases/02-world-variety.md).
 - A deterministic, seeded world generator exists in `src/worldgen`. It was carried over from an earlier prototype as a starting point; treat it as a draft that playtests will reshape, not a settled design. How it works: [docs/worldgen.md](docs/worldgen.md).
 - `npm run dev` gives a walkable world: `@` on the turn clock (WASD, or press a screen triangle), caves and mines under mountains, settlements (hamlets, villages, towns) with buildings you can walk into, glyph canvas with a camera that leads the facing direction and zooms out on high ground, debug HUD with a button for each toggle (starts collapsed; I expands it), M map (overview, local, closed), H height mode, +/− or wheel zoom. URL params: `seed`, `turn` (ms), `repeat` (ms a key is held before it repeats), `x`, `y` (start tile); the URL follows the player.
 

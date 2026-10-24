@@ -14,11 +14,8 @@ import { type River, distanceToRiver } from "../../rivers";
 import { Biome, Cover, Ground, Prop, Water, Way } from "../../terrain";
 import { WAY_SHAPES, type WayLink, distinctWays } from "../../ways";
 import { type TileDraft, settle } from "../feature";
-import { toLocal } from "../frame";
-import { cellOf } from "./building";
-import { levelOf } from "./storeys";
+import { type Building, paintBuilding } from "../building/building";
 import {
-  type Building,
   MAX_SETTLEMENT_RADIUS,
   type Street,
   TIERS,
@@ -110,18 +107,6 @@ const groundOf = (input: SettlementInput, rivers: readonly River[]): SettlementG
       return buildable;
     },
   };
-};
-
-const paintBuilding = (building: Building, draft: TileDraft, p: Vec2) => {
-  const { u, v } = toLocal(building.frame, p);
-  const cell = cellOf(building.plan, u, v);
-  draft.height = levelOf(building, 0, p);
-  draft.ground = Ground.Planks;
-  draft.water = Water.None;
-  draft.way = Way.None;
-  draft.prop = cell;
-  draft.part = 0;
-  draft.cover = cell === Prop.Door ? Cover.None : building.roof;
 };
 
 const paintOpen = (draft: TileDraft) => {

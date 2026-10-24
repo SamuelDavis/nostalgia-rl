@@ -4,8 +4,8 @@ import { CHUNK_SIZE } from "../../constants";
 import { type Layer, SURFACE, type Storey, isStorey } from "../../layer";
 import { Ground, Water, Way } from "../../terrain";
 import { toLocal } from "../frame";
-import { STOREY, cellOf, riseOf, stairTiles } from "./building";
-import type { Building } from "./layout";
+import { STOREY, cellOf, riseOf, stairTiles } from "./plan";
+import type { Building } from "./building";
 
 export type BuildingAt = (p: Vec2) => Building | undefined;
 

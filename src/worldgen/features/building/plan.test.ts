@@ -12,7 +12,7 @@ import {
   planBuilding,
   riseOf,
   stairTiles,
-} from "./building";
+} from "./plan";
 
 const KINDS = Object.values(BuildingKind);
 const plansOf = (kind: BuildingKind) => Array.from({ length: 40 }, (_, i) => planBuilding(kind, rngOf(i, "plans")));

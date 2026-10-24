@@ -1,20 +1,9 @@
-import {
-  type Bounds,
-  type Rng,
-  type Vec2,
-  atan2,
-  boundsOf,
-  byPosition,
-  cos,
-  distance,
-  projectOntoSegment,
-  sin,
-} from "procgen";
+import { type Bounds, type Rng, type Vec2, atan2, byPosition, cos, distance, projectOntoSegment, sin } from "procgen";
 import { Cover, Way } from "../../terrain";
 import { WAY_SHAPES, type WayLink } from "../../ways";
 import type { Anchor } from "../feature";
-import { type Frame, lateralOf, toWorld } from "../frame";
-import { BuildingKind, type Plan, planBuilding } from "./building";
+import { type Building, boundsOfBuilding, footprintOf, frameOf } from "../building/building";
+import { BuildingKind, type Plan, planBuilding } from "../building/plan";
 
 export const Tier = { Hamlet: 0, Village: 1, Town: 2 } as const;
 export type Tier = (typeof Tier)[keyof typeof Tier];
@@ -96,16 +85,6 @@ export interface SettlementGround {
   readonly level: (p: Vec2) => number;
 }
 
-export interface Building {
-  readonly plan: Plan;
-  readonly frame: Frame;
-  readonly level: number;
-  readonly bounds: Bounds;
-  readonly door: Vec2;
-  readonly path: readonly Vec2[];
-  readonly roof: Cover;
-}
-
 export interface Square {
   readonly radius: number;
   readonly level: number;
@@ -152,9 +131,6 @@ const nearestCardinal = (d: Vec2): Vec2 =>
 const tileOf = (p: Vec2): Vec2 => ({ x: Math.floor(p.x), y: Math.floor(p.y) });
 const centreOf = (p: Vec2): Vec2 => ({ x: p.x + 0.5, y: p.y + 0.5 });
 const step = (p: Vec2, d: Vec2): Vec2 => ({ x: p.x + d.x, y: p.y + d.y });
-
-export const footprintOf = ({ plan, frame }: Pick<Building, "plan" | "frame">): Vec2[] =>
-  Array.from({ length: plan.width * plan.depth }, (_, i) => toWorld(frame, i % plan.width, Math.floor(i / plan.width)));
 
 const ringOf = (bounds: Bounds): Vec2[] => {
   const ring: Vec2[] = [];
@@ -313,15 +289,13 @@ const siteBackFrom = (
   ground: SettlementGround,
 ): Building | undefined => {
   const facing = nearestCardinal({ x: -slot.normal.x, y: -slot.normal.y });
-  const forward = { x: -facing.x, y: -facing.y };
   const door = tileOf({
     x: slot.at.x + slot.normal.x * (slot.halfWidth + setback),
     y: slot.at.y + slot.normal.y * (slot.halfWidth + setback),
   });
-  const lateral = lateralOf(forward);
-  const frame = { origin: { x: door.x - lateral.x * plan.doors[0]!, y: door.y - lateral.y * plan.doors[0]! }, forward };
+  const frame = frameOf({ plan, door, facing });
   const footprint = footprintOf({ plan, frame });
-  const bounds = boundsOf(footprint);
+  const bounds = boundsOfBuilding({ plan, frame });
   const fits = footprint.every(
     (p) => uses.at(p) === Use.Free && distance(centreOf(p), settlement) <= radius && ground.isBuildable(p),
   );

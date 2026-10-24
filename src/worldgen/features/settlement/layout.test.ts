@@ -2,16 +2,9 @@ import { describe, expect, it } from "vitest";
 import { type Vec2, distance, overlaps, expand, projectOntoSegment, rngOf } from "procgen";
 import { Way } from "../../terrain";
 import { WAY_SHAPES } from "../../ways";
-import { BuildingKind } from "./building";
-import {
-  type Street,
-  TIERS,
-  Tier,
-  type SettlementGround,
-  type SettlementLayout,
-  footprintOf,
-  layOutSettlement,
-} from "./layout";
+import { footprintOf } from "../building/building";
+import { BuildingKind } from "../building/plan";
+import { type Street, TIERS, Tier, type SettlementGround, type SettlementLayout, layOutSettlement } from "./layout";
 
 const CENTRE = { x: 1000, y: 2000 };
 const crossroads: Street[] = [

@@ -30,8 +30,8 @@ import { type PaintedSettlement, settlementFeature } from "./features/settlement
 import type { Opening, TileDraft } from "./features/feature";
 import { type Fields, createFields } from "./fields";
 import { type CaveFloor, type Layer, SURFACE, isStorey } from "./layer";
-import { storeyChunk, storeyLinks } from "./features/settlement/storeys";
-import type { Building } from "./features/settlement/layout";
+import { storeyChunk, storeyLinks } from "./features/building/storeys";
+import type { Building } from "./features/building/building";
 import { createPeaks } from "./landmarks";
 import { regions } from "./region";
 import { type River, createRivers } from "./rivers";
@@ -40,8 +40,9 @@ import { type WayLink, createWayness, createWays } from "./ways";
 export type { Camp } from "./features/camp";
 export type { DeepForestLayout } from "./features/deep-forest";
 export type { PaintedSettlement } from "./features/settlement/settlement";
-export { BuildingKind } from "./features/settlement/building";
-export { TIERS, Tier, type Building, type Settlement } from "./features/settlement/layout";
+export { BuildingKind } from "./features/building/plan";
+export type { Building } from "./features/building/building";
+export { TIERS, Tier, type Settlement } from "./features/settlement/layout";
 
 const WAY_MARGIN = 8;
 
