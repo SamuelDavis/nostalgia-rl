@@ -37,6 +37,12 @@ Judged in this phase: feel of the turn clock, readability of height, biome and t
 
 _Record user feedback verbatim, newest first, with the commit it refers to._
 
+### 9e9c77f: settlements of buildings with storeys
+
+> this is great
+
+> I did play-test it and I think it's great.
+
 ### 9cc7758: no spoil heap
 
 > mines yards should scale to their size; a small mine just needs a small terrace with a camp fire and maybe a tent, while a big one would have a large terrace, stock pile, sheds, cabin, etc.
