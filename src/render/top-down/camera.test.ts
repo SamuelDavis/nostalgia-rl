@@ -26,7 +26,9 @@ const SOUTH: Vec2 = { x: 0, y: 1 };
 const STILL: Vec2 = { x: 0, y: 0 };
 const ORIGIN: Vec2 = { x: 0, y: 0 };
 
-const walk = (steps: readonly Vec2[], from: Vec2 = STILL) => steps.reduce(steer, from);
+const STEP_MS = 100;
+const walk = (steps: readonly Vec2[], from: Vec2 = STILL) =>
+  steps.reduce((heading, step) => steer(heading, step, STEP_MS), from);
 
 describe("openness", () => {
   it("is closed in every direction on level ground", () => {

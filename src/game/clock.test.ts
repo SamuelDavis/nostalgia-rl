@@ -1,23 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { createTurnClock } from "./clock";
+import { createTickClock } from "./clock";
 
-describe("createTurnClock", () => {
-  it("is not due before its first turn", () => {
-    expect(createTurnClock(100, 0).due(99)).toBeUndefined();
+describe("createTickClock", () => {
+  it("is not due before its first tick", () => {
+    expect(createTickClock(10, 0).due(9)).toEqual([]);
   });
 
-  it("reports each turn at its scheduled moment, not when it was noticed", () => {
-    const clock = createTurnClock(100, 0);
-    expect(clock.due(116)).toBe(100);
-    expect(clock.due(150)).toBeUndefined();
-    expect(clock.due(203)).toBe(200);
+  it("reports every tick due, each at its scheduled moment, not when it was noticed", () => {
+    const clock = createTickClock(10, 0);
+    expect(clock.due(36)).toEqual([10, 20, 30]);
+    expect(clock.due(38)).toEqual([]);
+    expect(clock.due(41)).toEqual([40]);
   });
 
-  it("plays one catch-up turn after a stall, then resumes its pace, rather than replaying the missed turns", () => {
-    const clock = createTurnClock(100, 0);
-    expect(clock.due(1000)).toBe(100);
-    expect(clock.due(1001)).toBe(1000);
-    expect(clock.due(1050)).toBeUndefined();
-    expect(clock.due(1100)).toBe(1100);
+  it("catches up at most a bounded span after a stall, then resumes its pace", () => {
+    const clock = createTickClock(10, 0);
+    const caughtUp = clock.due(10_000);
+    expect(caughtUp.length).toBeLessThan(100);
+    expect(caughtUp.at(-1)).toBe(10_000);
+    expect(clock.due(10_010)).toEqual([10_010]);
   });
 });

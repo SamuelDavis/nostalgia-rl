@@ -25,27 +25,27 @@ const fitBacking = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): b
 
 export const createTopDown = (
   canvas: HTMLCanvasElement,
-  { layers, session: start, turnMs, now }: Stage,
+  { layers, session: start, tickMs, now }: Stage,
   mode: HeightMode,
 ): TopDown => {
   const ctx = canvas.getContext("2d")!;
   const drawViewport = createViewport(ctx);
   let session = start;
   const here = () => layers.terrainOn(session.layer);
-  const motion = createMotion(turnMs, start, here(), now);
+  const motion = createMotion(tickMs, start, layers, now);
   const framing = createFraming(start, here(), now);
   let zoom: Zoom = { span: framing.naturalSpan(), natural: framing.naturalSpan(), modifier: 0 };
   let drawn = "";
 
   return {
-    turned: (turn) => {
-      session = turn.session;
-      motion.turned(turn);
-      framing.turned(turn, here());
+    ticked: (ticks) => {
+      session = ticks.session;
+      motion.ticked(ticks);
+      framing.ticked(ticks, here());
     },
     draw: (now) => {
       const resized = fitBacking(canvas, ctx);
-      const { shown, angle, eyeLevel } = motion.poseAt(now, session, here());
+      const { shown, angle, eyeLevel } = motion.poseAt(now);
       const framed = framing.frame(now, shown, { width: canvas.clientWidth, height: canvas.clientHeight });
       const { view } = framed;
       zoom = framed.zoom;

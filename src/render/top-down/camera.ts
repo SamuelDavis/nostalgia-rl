@@ -29,7 +29,7 @@ const SPAN_PER_CLEAR_TILE = 2.5;
 export const SIGHT_REACH = 24;
 const SIGHT_CONE = 90;
 const SIGHT_RAY_COUNT = 9;
-const STEER = 0.3;
+const HEADING_EASING_MS = 280;
 export const SETTLE_MS = 1500;
 const LEAD = 0.25;
 const LEAN = 0.5;
@@ -58,9 +58,9 @@ export const openness = (levelAt: (x: number, y: number) => number, at: Vec2): r
   });
 };
 
-export const steer = (heading: Vec2, step: Vec2): Vec2 => ({
-  x: lerp(heading.x, step.x, STEER),
-  y: lerp(heading.y, step.y, STEER),
+export const steer = (heading: Vec2, facing: Vec2, elapsedMs: number): Vec2 => ({
+  x: approach(heading.x, facing.x, elapsedMs, HEADING_EASING_MS),
+  y: approach(heading.y, facing.y, elapsedMs, HEADING_EASING_MS),
 });
 
 const opennessAhead = (open: readonly number[], heading: Vec2): number => {

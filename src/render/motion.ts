@@ -1,7 +1,8 @@
 import { Direction } from "../game/movement";
-import type { Turn } from "../game/play";
+import type { Ticks } from "../game/play";
 import type { Session } from "../game/session";
-import type { Terrain } from "../game/terrain";
+import type { Layers } from "../game/terrain";
+import type { Layer } from "../worldgen";
 import { type Vec2, clamp, hash, lerp, mod, unit } from "procgen";
 
 const EYE_EASING_MS = 300;
@@ -14,23 +15,10 @@ const strideTo = ({ x, y }: Vec2) => STRIDE + STRIDE_VARIANCE * (2 * unit(hash(x
 const footstep = (progress: number, stride: number): number =>
   progress - (stride * Math.sin(2 * Math.PI * progress)) / (2 * Math.PI);
 
-const between = (from: Vec2, to: Vec2, progress: number): Vec2 => {
-  const t = footstep(clamp(progress, 0, 1), strideTo(to));
-  return { x: lerp(from.x, to.x, t), y: lerp(from.y, to.y, t) };
-};
+const between = (from: Vec2, to: Vec2, t: number): Vec2 => ({ x: lerp(from.x, to.x, t), y: lerp(from.y, to.y, t) });
 
-export const createGlide = (durationMs: number, start: Vec2) => {
-  let from = start;
-  let to = start;
-  let startedAt = -Infinity;
-  const shownAt = (now: number) => between(from, to, (now - startedAt) / durationMs);
-  const moveTo = (target: Vec2, at: number) => {
-    from = shownAt(at);
-    to = target;
-    startedAt = at;
-  };
-  return { shownAt, moveTo };
-};
+export const shownOf = ({ position, stride }: Session): Vec2 =>
+  stride ? between(position, stride.to, footstep(stride.spent / stride.ticks, strideTo(stride.to))) : position;
 
 const QUARTER_TURNS_FROM_EAST: Record<Direction, number> = {
   [Direction.East]: 0,
@@ -55,23 +43,31 @@ export interface Pose {
   readonly eyeLevel: number;
 }
 
-const levelUnder = (session: Session, terrain: Terrain) => terrain(session.position.x, session.position.y).height;
+const heightOn = (layers: Layers, layer: Layer, { x, y }: Vec2) => layers.terrainOn(layer)(x, y).height;
 
-export const createMotion = (turnMs: number, start: Session, terrain: Terrain, now: number) => {
-  const glide = createGlide(turnMs, start.position);
+const levelOf = ({ position, layer, stride }: Session, layers: Layers): number => {
+  const here = heightOn(layers, layer, position);
+  return stride ? lerp(here, heightOn(layers, stride.layer, stride.to), stride.spent / stride.ticks) : here;
+};
+
+export const createMotion = (tickMs: number, start: Session, layers: Layers, now: number) => {
+  let latest: Pick<Ticks, "prior" | "session" | "scheduled"> = { prior: start, session: start, scheduled: now };
   let angle = facingAngle(start.facing);
-  let eyeLevel = levelUnder(start, terrain);
+  let eyeLevel = levelOf(start, layers);
   let lastFrame = now;
   return {
-    turned: ({ session, scheduled, moved }: Turn) => {
-      if (moved) glide.moveTo(session.position, scheduled);
+    ticked: (ticks: Ticks) => {
+      latest = ticks;
     },
-    poseAt: (now: number, session: Session, terrain: Terrain): Pose => {
+    poseAt: (now: number): Pose => {
       const elapsed = now - lastFrame;
       lastFrame = now;
+      const { prior, session, scheduled } = latest;
+      const t = clamp((now - scheduled) / tickMs, 0, 1);
       angle = turnToward(angle, facingAngle(session.facing), elapsed, TURN_EASING_MS);
-      eyeLevel = approach(eyeLevel, levelUnder(session, terrain), elapsed, EYE_EASING_MS);
-      return { shown: glide.shownAt(now), angle, eyeLevel };
+      const level = lerp(levelOf(prior, layers), levelOf(session, layers), t);
+      eyeLevel = approach(eyeLevel, level, elapsed, EYE_EASING_MS);
+      return { shown: between(shownOf(prior), shownOf(session), t), angle, eyeLevel };
     },
   };
 };

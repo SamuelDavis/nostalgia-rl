@@ -2,7 +2,7 @@
 
 A real-time, open-world roguelike with peer-to-peer drop-in multiplayer, in the browser.
 
-It follows the classic roguelike conventions: a grid, turn-based movement, cardinal facing, and glyph-first presentation. The difference is that turns run on a real-time clock, as in _Crypt of the NecroDancer_: the world advances one turn about every 250 ms whether or not you act. The world is one seeded, infinite, contiguous map with Minecraft-style terrain and features (camps, deep forests, caves, mines and settlements), not a stack of separate dungeon maps. Friends join a running world in real time.
+It follows the classic roguelike conventions: a grid, turn-based movement, cardinal facing, and glyph-first presentation. The difference is that the world runs on a real-time clock, as in _Crypt of the NecroDancer_: it advances one tick every 10 ms whether or not you act, and each action costs ticks (a step on grass costs 10). The world is one seeded, infinite, contiguous map with Minecraft-style terrain and features (camps, deep forests, caves, mines and settlements), not a stack of separate dungeon maps. Friends join a running world in real time.
 
 This file is the handoff document for a fresh session. It gives intent and current state and links to topical docs. Read the linked docs only when your task touches them. Domain vocabulary is in [CONTEXT.md](CONTEXT.md); architectural decisions are in [docs/adr](docs/adr).
 
@@ -28,7 +28,7 @@ These are requirements, not designs. How to meet them is decided in the multipla
 - **Serverless peer-to-peer:** WebRTC, using STUN and the user's Cloudflare TURN server for traversal. There is no game server, and running costs stay minimal.
 - **Minecraft-style hosting:** a player generates a world, plays it, and shares a key. Friends join and leave in real time. There are no lobbies or accounts, and chat happens on other platforms.
 - **Any number of players:** no hard cap. The game warns or suggests limits based on observed network traffic and known peer-to-peer constraints.
-- **Intercontinental latency:** play stays fair and responsive between continents. The ~250 ms turn clock is the main budget for absorbing latency.
+- **Intercontinental latency:** play stays fair and responsive between continents. The time an action takes (100 ms for a step on grass) is the main budget for absorbing latency.
 - **Determinism:** each peer generates terrain locally from the seed (see [docs/worldgen.md](docs/worldgen.md#determinism)). Only changes and live state cross the network.
 
 ## Current state
@@ -36,7 +36,7 @@ These are requirements, not designs. How to meet them is decided in the multipla
 - **Phase 1, world generation:** done. See [docs/phases/01-worldgen.md](docs/phases/01-worldgen.md).
 - **Phase 2, world variety:** in progress. See [docs/phases/02-world-variety.md](docs/phases/02-world-variety.md).
 - A deterministic, seeded world generator exists in `src/worldgen`. It was carried over from an earlier prototype as a starting point; treat it as a draft that playtests will reshape, not a settled design. How it works: [docs/worldgen.md](docs/worldgen.md).
-- `npm run dev` gives a walkable world: `@` on the turn clock (WASD, or press a screen triangle), caves and mines under mountains, settlements (hamlets, villages, towns) with buildings you can walk into and farms around them, minor features (bandit camps, woodcutters' huts, dens, small caves, standing stones) weighted by 1 km provinces, glyph canvas with a camera that leads the facing direction and zooms out on high ground, debug HUD with a button for each toggle (starts collapsed; I expands it), M map (overview, local, closed), H height mode, +/− or wheel zoom. URL params: `seed`, `turn` (ms), `repeat` (ms a key is held before it repeats), `x`, `y` (start tile); the URL follows the player.
+- `npm run dev` gives a walkable world: `@` on the tick clock (WASD, or press a screen triangle), every step costing ticks by terrain, slope, trees and cliffs climbed (walls, rock and buildings stay impassable), caves and mines under mountains, settlements (hamlets, villages, towns) with buildings you can walk into and farms around them, minor features (bandit camps, woodcutters' huts, dens, small caves, standing stones) weighted by 1 km provinces, glyph canvas with a camera that leads the facing direction and zooms out on high ground, debug HUD with a button for each toggle (starts collapsed; I expands it), M map (overview, local, closed), H height mode, +/− or wheel zoom. URL params: `seed`, `tick` (ms), `repeat` (ms a key is held before it repeats), `x`, `y` (start tile); the URL follows the player.
 
 ## Layout
 
@@ -45,7 +45,7 @@ The game depends on [procgen](../procgen), a portable procedural generation libr
 | Path           | Contents                                                                                 |
 | -------------- | ---------------------------------------------------------------------------------------- |
 | `src/worldgen` | World generation ([docs/worldgen.md](docs/worldgen.md)); `features/` holds feature types |
-| `src/game`     | Game state, rules and the turn loop; no DOM                                              |
+| `src/game`     | Game state, rules and the tick loop; no DOM                                              |
 | `src/input`    | Devices (keys, taps, wheel) to actions and commands                                      |
 | `src/render`   | Renderers behind one contract; `top-down/`, `map/`; palette shared with `tooling`        |
 | `src/ui`       | DOM overlays: HUD, debug readout, map overlay                                            |

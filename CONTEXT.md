@@ -37,6 +37,15 @@ The Voronoi cell around a province seat, about a kilometre across, whose identit
 **Identity**:
 A province's character, taken from the land at its seat: farmland, woodland, highland, wilds, or uncanny where the uncanny field is high.
 
+**Tick**:
+The world clock's unit, 10 ms. Every action costs ticks.
+
+**Stride**:
+A move toward a neighbouring tile, completed once enough ticks are spent on it; the player stays on the tile they left until then.
+
+**Crossing**:
+How a prop is passed: walked through, pushed through, climbed over, or never.
+
 ## Features
 
 **Feature**:

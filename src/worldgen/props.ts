@@ -4,66 +4,70 @@ import { Prop } from "./terrain";
 
 export type PlacedProp = Placed<Prop>;
 
+export type Crossing = "walk" | "push" | "climb" | "never";
+
 export interface PropTraits {
   readonly solid: boolean;
+  readonly crossing: Crossing;
   readonly height: number;
   readonly footprint?: Vec2;
 }
 
-const solid = (metres: number, footprint?: Vec2): PropTraits => ({
+const solid = (crossing: Exclude<Crossing, "walk">, metres: number, footprint?: Vec2): PropTraits => ({
   solid: true,
+  crossing,
   height: metresToLevels(metres),
   footprint,
 });
 
-const open = (metres = 0): PropTraits => ({ solid: false, height: metresToLevels(metres) });
+const open = (metres = 0): PropTraits => ({ solid: false, crossing: "walk", height: metresToLevels(metres) });
 
 export const PROPS: Record<Prop, PropTraits> = {
   [Prop.None]: open(),
-  [Prop.Oak]: solid(6),
-  [Prop.Pine]: solid(6),
-  [Prop.Cactus]: solid(2),
+  [Prop.Oak]: solid("push", 6),
+  [Prop.Pine]: solid("push", 6),
+  [Prop.Cactus]: solid("push", 2),
   [Prop.Bush]: open(1),
-  [Prop.Boulder]: solid(1),
+  [Prop.Boulder]: solid("climb", 1),
   [Prop.Flowers]: open(),
   [Prop.Tuft]: open(),
-  [Prop.Tent]: solid(2, { x: 2, y: 2 }),
-  [Prop.Campfire]: solid(0.5),
+  [Prop.Tent]: solid("never", 2, { x: 2, y: 2 }),
+  [Prop.Campfire]: solid("climb", 0.5),
   [Prop.Bridge]: open(),
-  [Prop.Rock]: solid(Infinity),
-  [Prop.Stalagmite]: solid(2),
-  [Prop.CaveMouth]: solid(Infinity),
+  [Prop.Rock]: solid("never", Infinity),
+  [Prop.Stalagmite]: solid("climb", 2),
+  [Prop.CaveMouth]: solid("never", Infinity),
   [Prop.RampDown]: open(),
   [Prop.RampUp]: open(),
   [Prop.Ramp]: open(),
   [Prop.CaveExit]: open(),
-  [Prop.MineEntrance]: solid(Infinity),
-  [Prop.Shed]: solid(3, { x: 3, y: 4 }),
-  [Prop.Stockpile]: solid(2, { x: 4, y: 4 }),
-  [Prop.Bunkhouse]: solid(4, { x: 10, y: 5 }),
-  [Prop.Wall]: solid(6),
+  [Prop.MineEntrance]: solid("never", Infinity),
+  [Prop.Shed]: solid("never", 3, { x: 3, y: 4 }),
+  [Prop.Stockpile]: solid("never", 2, { x: 4, y: 4 }),
+  [Prop.Bunkhouse]: solid("never", 4, { x: 10, y: 5 }),
+  [Prop.Wall]: solid("never", 6),
   [Prop.Door]: open(),
-  [Prop.Hearth]: solid(1),
-  [Prop.Bed]: solid(0.5),
-  [Prop.Table]: solid(1),
+  [Prop.Hearth]: solid("climb", 1),
+  [Prop.Bed]: solid("climb", 0.5),
+  [Prop.Table]: solid("climb", 1),
   [Prop.Bench]: open(0.5),
-  [Prop.Counter]: solid(1),
-  [Prop.Altar]: solid(1),
-  [Prop.Anvil]: solid(1),
-  [Prop.Forge]: solid(1.5),
-  [Prop.Barrel]: solid(1),
-  [Prop.Hay]: solid(1.5),
-  [Prop.Well]: solid(1),
-  [Prop.Railing]: solid(1),
-  [Prop.Stump]: solid(0.5),
-  [Prop.LogPile]: solid(1.5),
-  [Prop.Crate]: solid(1),
-  [Prop.Stake]: solid(2),
+  [Prop.Counter]: solid("climb", 1),
+  [Prop.Altar]: solid("climb", 1),
+  [Prop.Anvil]: solid("climb", 1),
+  [Prop.Forge]: solid("climb", 1.5),
+  [Prop.Barrel]: solid("climb", 1),
+  [Prop.Hay]: solid("climb", 1.5),
+  [Prop.Well]: solid("never", 1),
+  [Prop.Railing]: solid("climb", 1),
+  [Prop.Stump]: solid("climb", 0.5),
+  [Prop.LogPile]: solid("climb", 1.5),
+  [Prop.Crate]: solid("climb", 1),
+  [Prop.Stake]: solid("climb", 2),
   [Prop.Bones]: open(),
-  [Prop.StandingStone]: solid(3),
+  [Prop.StandingStone]: solid("climb", 3),
   [Prop.Crop]: open(1),
-  [Prop.FruitTree]: solid(4),
-  [Prop.Fence]: solid(1),
+  [Prop.FruitTree]: solid("push", 4),
+  [Prop.Fence]: solid("climb", 1),
   [Prop.Hollow]: open(),
 };
 

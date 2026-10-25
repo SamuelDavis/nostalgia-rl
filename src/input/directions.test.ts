@@ -66,6 +66,13 @@ describe("actionFor", () => {
     });
   });
 
+  it("keeps pushing whichever way is held", () => {
+    expect(actionFor(repeat(Direction.North), Direction.East, false)).toEqual({
+      kind: "push",
+      direction: Direction.North,
+    });
+  });
+
   describe("when taps turn first", () => {
     it("turns on a tap in a new direction", () => {
       expect(actionFor(tap(Direction.North), Direction.East, true)).toEqual({
@@ -78,9 +85,9 @@ describe("actionFor", () => {
       expect(actionFor(tap(Direction.East), Direction.East, true)).toEqual({ kind: "step", direction: Direction.East });
     });
 
-    it("steps on a held key", () => {
+    it("pushes on a held key", () => {
       expect(actionFor(repeat(Direction.North), Direction.East, true)).toEqual({
-        kind: "step",
+        kind: "push",
         direction: Direction.North,
       });
     });

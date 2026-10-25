@@ -17,7 +17,7 @@ import { createAddressSync, launchFrom } from "./address";
 const ZOOM_STEP = 4;
 
 export const startGame = (host: HTMLElement, search: string) => {
-  const { seed, turnMs, repeatDelayMs, start } = launchFrom(search);
+  const { seed, tickMs, repeatDelayMs, start } = launchFrom(search);
   const world = createWorldgen(seed);
   const worker = new Worker(new URL("../chunk-worker.ts", import.meta.url), { type: "module" });
   const chunks = createChunkStore(
@@ -32,10 +32,10 @@ export const startGame = (host: HTMLElement, search: string) => {
   const canvas = document.createElement("canvas");
   host.append(canvas);
   const now = performance.now();
-  const play = createPlay(layers, startSession(start ?? world.spawn), turnMs, now);
+  const play = createPlay(layers, startSession(start ?? world.spawn), tickMs, now);
   let mode: HeightMode = HEIGHT_MODES[0];
   let tapTurnsFirst = false;
-  const view = createTopDown(canvas, { layers, session: play.session(), turnMs, now }, mode);
+  const view = createTopDown(canvas, { layers, session: play.session(), tickMs, now }, mode);
 
   const act: Act = (at, session) => {
     const press = directions.take(at);
@@ -67,17 +67,17 @@ export const startGame = (host: HTMLElement, search: string) => {
   const describe = (session: Session): readonly Row[] => {
     if (described?.session !== session) {
       const tile = layers.terrainOn(session.layer)(session.position.x, session.position.y);
-      described = { session, rows: sessionRows(world, session, tile, turnMs) };
+      described = { session, rows: sessionRows(world, session, tile, tickMs) };
     }
     return described.rows;
   };
 
   const frame = (now: number) => {
-    const turn = play.advance(now, act);
-    if (turn) {
-      const { session } = turn;
-      if (turn.moved) syncAddress(session.position);
-      view.turned(turn);
+    const ticks = play.advance(now, act);
+    if (ticks) {
+      const { session } = ticks;
+      if (ticks.moved) syncAddress(session.position);
+      view.ticked(ticks);
       chunks.prefetch(session.layer, session.position, view.reach());
     }
     view.draw(now);

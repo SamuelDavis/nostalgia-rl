@@ -43,6 +43,6 @@ export const createDirectionInput = (repeatDelayMs: number): DirectionInput => {
 };
 
 export const actionFor = ({ direction, isRepeat }: Press, facing: Direction, tapTurnsFirst: boolean): Action => ({
-  kind: tapTurnsFirst && !isRepeat && direction !== facing ? "face" : "step",
+  kind: isRepeat ? "push" : tapTurnsFirst && direction !== facing ? "face" : "step",
   direction,
 });

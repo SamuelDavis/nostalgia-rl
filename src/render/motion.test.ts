@@ -1,58 +1,39 @@
 import { describe, expect, it } from "vitest";
 import { Direction } from "../game/movement";
-import { startSession } from "../game/session";
-import type { Terrain } from "../game/terrain";
+import { type Session, startSession } from "../game/session";
+import { onlySurface } from "../game/terrain";
 import { GRASS } from "../game/terrain.fixtures";
-import { approach, createGlide, createMotion, facingAngle, turnToward } from "./motion";
+import { SURFACE } from "../worldgen";
+import { approach, createMotion, facingAngle, shownOf, turnToward } from "./motion";
 
-const DURATION = 100;
+const TICKS = 10;
+const TICK_MS = 10;
 
-describe("createGlide", () => {
+describe("shownOf", () => {
+  const striding = (spent: number, to = { x: 1, y: 0 }): Session => ({
+    ...startSession({ x: 0, y: 0 }),
+    stride: { to, layer: SURFACE, spent, ticks: TICKS },
+  });
+
   it("shows a still subject where it stands", () => {
-    const glide = createGlide(DURATION, { x: 3, y: 4 });
-    expect(glide.shownAt(0)).toEqual({ x: 3, y: 4 });
+    expect(shownOf(startSession({ x: 3, y: 4 }))).toEqual({ x: 3, y: 4 });
   });
 
-  it("glides to a new tile over the duration from when the move was scheduled", () => {
-    const glide = createGlide(DURATION, { x: 0, y: 0 });
-    glide.moveTo({ x: 1, y: 0 }, 1000);
-    expect(glide.shownAt(1000)).toEqual({ x: 0, y: 0 });
-    expect(glide.shownAt(1050)).toEqual({ x: 0.5, y: 0 });
-    expect(glide.shownAt(1100)).toEqual({ x: 1, y: 0 });
-    expect(glide.shownAt(2000)).toEqual({ x: 1, y: 0 });
+  it("shows a stride as far along as its progress", () => {
+    expect(shownOf(striding(0))).toEqual({ x: 0, y: 0 });
+    expect(shownOf(striding(TICKS / 2)).x).toBeCloseTo(0.5);
   });
 
-  it("keeps a steady pace across back-to-back moves processed late", () => {
-    const glide = createGlide(DURATION, { x: 0, y: 0 });
-    glide.moveTo({ x: 1, y: 0 }, 0);
-    glide.moveTo({ x: 2, y: 0 }, 100);
-    expect(glide.shownAt(150)).toEqual({ x: 1.5, y: 0 });
+  it("slows at the start and end of each stride, like footsteps", () => {
+    const covered = (from: number, to: number) => shownOf(striding(to)).x - shownOf(striding(from)).x;
+    expect(covered(0, 1)).toBeLessThan(covered(4.5, 5.5) / 2);
+    expect(covered(9, 10)).toBeLessThan(covered(4.5, 5.5) / 2);
+    expect(covered(0, 1)).toBeGreaterThan(0);
   });
 
-  it("slows at the start and end of each step, like footsteps", () => {
-    const glide = createGlide(DURATION, { x: 0, y: 0 });
-    glide.moveTo({ x: 1, y: 0 }, 0);
-    const covered = (from: number, to: number) => glide.shownAt(to).x - glide.shownAt(from).x;
-    expect(covered(0, 10)).toBeLessThan(covered(45, 55) / 2);
-    expect(covered(90, 100)).toBeLessThan(covered(45, 55) / 2);
-    expect(covered(0, 10)).toBeGreaterThan(0);
-  });
-
-  it("varies a little from step to step", () => {
-    const glide = createGlide(DURATION, { x: 0, y: 0 });
-    const starts = [1, 2, 3, 4].map((x) => {
-      glide.moveTo({ x, y: 0 }, x * DURATION);
-      return (glide.shownAt(x * DURATION + 10).x - (x - 1)).toFixed(6);
-    });
+  it("varies a little from stride to stride", () => {
+    const starts = [1, 2, 3, 4].map((x) => shownOf(striding(1, { x, y: 0 })).x.toFixed(6));
     expect(new Set(starts).size).toBeGreaterThan(1);
-  });
-
-  it("turns mid-glide from where it is shown, without jumping", () => {
-    const glide = createGlide(DURATION, { x: 0, y: 0 });
-    glide.moveTo({ x: 1, y: 0 }, 0);
-    glide.moveTo({ x: 1, y: 1 }, 50);
-    expect(glide.shownAt(50)).toEqual({ x: 0.5, y: 0 });
-    expect(glide.shownAt(150)).toEqual({ x: 1, y: 1 });
   });
 });
 
@@ -86,34 +67,41 @@ describe("approach", () => {
   });
 });
 
-const risingEast: Terrain = (x) => ({ ...GRASS, height: GRASS.height + x });
+const risingEast = onlySurface((x) => ({ ...GRASS, height: GRASS.height + x }));
 
 describe("createMotion", () => {
   const start = startSession({ x: 0, y: 0 });
+  const halfway: Session = {
+    ...start,
+    tick: 1,
+    facing: Direction.East,
+    stride: { to: { x: 1, y: 0 }, layer: SURFACE, spent: TICKS / 2, ticks: TICKS },
+  };
+  const arrived: Session = { ...halfway, tick: 2, position: { x: 1, y: 0 }, stride: undefined };
 
   it("poses a still player where it stands, at its eye level, facing its way", () => {
-    const motion = createMotion(DURATION, start, risingEast, 0);
-    expect(motion.poseAt(0, start, risingEast)).toEqual({
+    const motion = createMotion(TICK_MS, start, risingEast, 0);
+    expect(motion.poseAt(0)).toEqual({
       shown: { x: 0, y: 0 },
       angle: facingAngle(start.facing),
       eyeLevel: GRASS.height,
     });
   });
 
-  it("glides to a move from when its turn was scheduled", () => {
-    const motion = createMotion(DURATION, start, risingEast, 0);
-    const moved = { ...start, turn: 1, position: { x: 1, y: 0 }, facing: Direction.East };
-    motion.turned({ session: moved, scheduled: 1000, moved: true, acted: true });
-    expect(motion.poseAt(1050, moved, risingEast).shown).toEqual({ x: 0.5, y: 0 });
+  it("moves from the tick before toward the latest over one tick from its scheduled moment", () => {
+    const motion = createMotion(TICK_MS, start, risingEast, 0);
+    motion.ticked({ prior: halfway, session: arrived, scheduled: 1000, moved: true, acted: true });
+    expect(motion.poseAt(1000).shown.x).toBeCloseTo(0.5);
+    expect(motion.poseAt(1000 + TICK_MS / 2).shown.x).toBeCloseTo(0.75);
+    expect(motion.poseAt(1000 + 5 * TICK_MS).shown).toEqual({ x: 1, y: 0 });
   });
 
-  it("eases the eye level and facing toward the new tile and direction", () => {
-    const motion = createMotion(DURATION, start, risingEast, 0);
-    const moved = { ...start, turn: 1, position: { x: 1, y: 0 }, facing: Direction.East };
-    motion.turned({ session: moved, scheduled: 0, moved: true, acted: true });
-    const { eyeLevel, angle } = motion.poseAt(30, moved, risingEast);
+  it("eases the eye level and facing toward the stride's tile and direction", () => {
+    const motion = createMotion(TICK_MS, start, risingEast, 0);
+    motion.ticked({ prior: halfway, session: halfway, scheduled: 0, moved: false, acted: true });
+    const { eyeLevel, angle } = motion.poseAt(30);
     expect(eyeLevel).toBeGreaterThan(GRASS.height);
-    expect(eyeLevel).toBeLessThan(GRASS.height + 1);
+    expect(eyeLevel).toBeLessThan(GRASS.height + 0.5);
     expect(angle).toBeLessThan(facingAngle(Direction.South));
     expect(angle).toBeGreaterThan(facingAngle(Direction.East));
   });

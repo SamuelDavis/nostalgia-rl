@@ -1,6 +1,6 @@
 import type { Vec2 } from "procgen";
 import { stepToward } from "../../game/movement";
-import type { Turn } from "../../game/play";
+import type { Ticks } from "../../game/play";
 import type { Session } from "../../game/session";
 import type { Terrain } from "../../game/terrain";
 import {
@@ -30,20 +30,18 @@ export const createFraming = (session: Session, terrain: Terrain, now: number) =
   let open = opennessOn(terrain, session.position);
   let heading: Vec2 = { x: 0, y: 0 };
   let natural = naturalSpan(open, heading);
-  let practical = practicalSpan(open, heading);
+  let facing = session.facing;
   let sight = sightAhead(terrain, session.position, session.facing);
   let zoomModifier = 0;
   let lastActionAt = now;
   let lastFrame = now;
 
   return {
-    turned: ({ session, scheduled, moved, acted }: Turn, terrain: Terrain) => {
+    ticked: ({ session, scheduled, moved, acted }: Ticks, terrain: Terrain) => {
       if (acted) lastActionAt = scheduled;
       if (moved) open = opennessOn(terrain, session.position);
-      heading = steer(heading, stepToward({ x: 0, y: 0 }, session.facing));
-      natural = naturalSpan(open, heading);
-      practical = practicalSpan(open, heading);
-      sight = sightAhead(terrain, session.position, session.facing);
+      if (moved || session.facing !== facing) sight = sightAhead(terrain, session.position, session.facing);
+      facing = session.facing;
     },
     zoomBy: (delta: number) => {
       zoomModifier = modifierWithin(natural, zoomModifier + delta);
@@ -52,6 +50,9 @@ export const createFraming = (session: Session, terrain: Terrain, now: number) =
     frame: (now: number, shown: Vec2, screen: Extent) => {
       const elapsed = now - lastFrame;
       lastFrame = now;
+      heading = steer(heading, stepToward({ x: 0, y: 0 }, facing), elapsed);
+      natural = naturalSpan(open, heading);
+      const practical = practicalSpan(open, heading);
       const span = attentiveSpan({ natural, practical, sight: sight.distance }, now - lastActionAt);
       const view = camera(
         { position: shown, look: lookOffset(open, sight.lead), span: spanOf(span, zoomModifier) },

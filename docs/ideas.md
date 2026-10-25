@@ -22,10 +22,6 @@ On level-up, players choose abilities from a pool (for example, warrior, wizard,
 
 Close the view in dense trees, as the camera already closes when looking uphill. Probably better as field of view: line of sight with shadows cast by trees and rising ground, the tutorial's next step after movement.
 
-## Action costs in ticks
-
-Keep the turn clock short and give each action a cost in ticks, so speed varies per action and entity: slower up steep inclines, faster on a horse. Decouples responsiveness and network budget (the tick) from pace (the cost).
-
 ## Mining camp on its own flat
 
 A big mine's bunkhouse and campfire on a small flat of their own beside the yard, joined by a short path, instead of on the yard's terrace: miners sleep away from the work, and from afar a big mine shows two flats. The user chose one terrace for now.

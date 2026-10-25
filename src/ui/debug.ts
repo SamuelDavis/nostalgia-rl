@@ -33,8 +33,8 @@ export const describePurpose = ({ role, occupants, produces, relation }: Purpose
     ...(relation ? [`${relation.kind} ${relation.target.x}, ${relation.target.y}`] : []),
   ].join(", ");
 
-export const sessionRows = (world: Worldgen, session: Session, tile: Tile, turnMs: number): Row[] => {
-  const { turn, facing, blocked } = session;
+export const sessionRows = (world: Worldgen, session: Session, tile: Tile, tickMs: number): Row[] => {
+  const { tick, facing, stride, blocked } = session;
   const { x, y } = session.position;
   const { elevation, temperature, moisture, drainage, landform } = world.fields;
   const form = landform(x + 0.5, y + 0.5);
@@ -43,7 +43,7 @@ export const sessionRows = (world: Worldgen, session: Session, tile: Tile, turnM
   const place = world.placeAt(session.position);
   return [
     ["seed", String(world.seed)],
-    ["turn", `${turn} @ ${turnMs} ms`],
+    ["tick", `${tick} @ ${tickMs} ms`],
     ["position", `${x}, ${y}`],
     ["chunk", `${floorDiv(x, CHUNK_SIZE)}, ${floorDiv(y, CHUNK_SIZE)}`],
     ["region", `${region.col}, ${region.row}`],
@@ -59,7 +59,8 @@ export const sessionRows = (world: Worldgen, session: Session, tile: Tile, turnM
     ["place", place ? `${place.name}: ${describePurpose(place.purpose)}` : "—"],
     ["building", building ? `${building.plan.kind}, door at ${building.door.x}, ${building.door.y}` : "—"],
     ["facing", nameOf(Direction, facing)],
-    ["blocked", !blocked ? "—" : blocked.blocker === "obstacle" ? `by ${nameOf(Prop, blocked.prop)}` : blocked.blocker],
+    ["stride", stride ? `${stride.spent} of ${stride.ticks} ticks to ${stride.to.x}, ${stride.to.y}` : "—"],
+    ["blocked", blocked === undefined ? "—" : `by ${nameOf(Prop, blocked)}`],
     ["swimming", isSwimming(tile) ? "yes" : "no"],
     ["height", `${tile.height} (${(tile.height - SEA_LEVEL) * METRES_PER_LEVEL} m above sea)`],
     ["elevation", fixed(elevation(x + 0.5, y + 0.5))],
