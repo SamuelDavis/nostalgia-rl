@@ -4,7 +4,7 @@ import { type Session, startSession } from "../game/session";
 import { onlySurface } from "../game/terrain";
 import { GRASS } from "../game/terrain.fixtures";
 import { SURFACE } from "../worldgen";
-import { approach, createMotion, facingAngle, footstep, gait, shownOf, turnToward } from "./motion";
+import { approach, createMotion, facingAngle, footstep, gait, shownOf, STEP_LENGTH, turnToward } from "./motion";
 
 const TICK_MS = 10;
 
@@ -35,13 +35,13 @@ describe("gait", () => {
   });
 
   it("sways to alternate sides on alternate footfalls", () => {
-    expect(gait(0, 0.5).across).toBeCloseTo(-gait(1, 0.5).across);
+    expect(gait(0, 0.5).across).toBeCloseTo(-gait(STEP_LENGTH, 0.5).across);
     expect(Math.abs(gait(0, 0.5).across)).toBeGreaterThan(0);
   });
 
   it("sways less than it surges", () => {
     const most = (axis: "along" | "across") =>
-      Math.max(...Array.from({ length: 100 }, (_, i) => Math.abs(gait(i / 50, 0.5)[axis])));
+      Math.max(...Array.from({ length: 100 }, (_, i) => Math.abs(gait((i / 50) * STEP_LENGTH, 0.5)[axis])));
     expect(most("across")).toBeLessThan(most("along"));
   });
 });
@@ -93,9 +93,15 @@ describe("createMotion", () => {
 
   it("moves from the tick before toward the latest over one tick from its scheduled moment", () => {
     const motion = createMotion(TICK_MS, start, risingEast, 0);
-    motion.ticked({ prior: eastward(0), session: eastward(500), scheduled: 1000, moved: false, acted: true });
+    motion.ticked({
+      prior: eastward(0),
+      session: eastward(STEP_LENGTH * 1000),
+      scheduled: 1000,
+      moved: false,
+      acted: true,
+    });
     expect(motion.poseAt(1000).shown.x).toBeCloseTo(0);
-    expect(motion.poseAt(1000 + 5 * TICK_MS).shown.x).toBeCloseTo(0.5);
+    expect(motion.poseAt(1000 + 5 * TICK_MS).shown.x).toBeCloseTo(STEP_LENGTH);
   });
 
   it("staggers along a diagonal and sways across it, not round in a circle", () => {

@@ -11,16 +11,20 @@ const SWAY_EASING_MS = 80;
 const STRIDE = 0.5;
 const STRIDE_VARIANCE = 0.2;
 const SIDESTEP = 0.03;
+export const STEP_LENGTH = 2;
 
 const strideOn = ({ x, y }: Vec2) => STRIDE + STRIDE_VARIANCE * (2 * unit(hash(x, y)) - 1);
 
 export const footstep = (coordinate: number, stride: number): number =>
   coordinate - (stride * Math.sin(2 * Math.PI * coordinate)) / (2 * Math.PI);
 
-export const gait = (walked: number, stride: number) => ({
-  along: footstep(walked, stride) - walked,
-  across: SIDESTEP * Math.cos(Math.PI * walked),
-});
+export const gait = (walked: number, stride: number) => {
+  const steps = walked / STEP_LENGTH;
+  return {
+    along: STEP_LENGTH * (footstep(steps, stride) - steps),
+    across: SIDESTEP * Math.cos(Math.PI * steps),
+  };
+};
 
 const between = (from: Vec2, to: Vec2, t: number): Vec2 => ({ x: lerp(from.x, to.x, t), y: lerp(from.y, to.y, t) });
 
