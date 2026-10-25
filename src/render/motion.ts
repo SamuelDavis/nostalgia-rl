@@ -10,11 +10,17 @@ const TURN_EASING_MS = 60;
 const SWAY_EASING_MS = 80;
 const STRIDE = 0.5;
 const STRIDE_VARIANCE = 0.2;
+const SIDESTEP = 0.03;
 
 const strideOn = ({ x, y }: Vec2) => STRIDE + STRIDE_VARIANCE * (2 * unit(hash(x, y)) - 1);
 
 export const footstep = (coordinate: number, stride: number): number =>
   coordinate - (stride * Math.sin(2 * Math.PI * coordinate)) / (2 * Math.PI);
+
+export const gait = (walked: number, stride: number) => ({
+  along: footstep(walked, stride) - walked,
+  across: SIDESTEP * Math.cos(Math.PI * walked),
+});
 
 const between = (from: Vec2, to: Vec2, t: number): Vec2 => ({ x: lerp(from.x, to.x, t), y: lerp(from.y, to.y, t) });
 
@@ -50,7 +56,10 @@ export const createMotion = (tickMs: number, start: Session, layers: Layers, now
   let latest: Pick<Ticks, "prior" | "session" | "scheduled"> = { prior: start, session: start, scheduled: now };
   let angle = facingAngle(start.facing);
   let eyeLevel = levelOf(start, layers);
-  let sway: Vec2 = { x: 0, y: 0 };
+  let sway = 0;
+  let walked = 0;
+  let lastAt = shownOf(start);
+  let way: Vec2 = { x: 1, y: 0 };
   let lastFrame = now;
   return {
     ticked: (ticks: Ticks) => {
@@ -65,12 +74,17 @@ export const createMotion = (tickMs: number, start: Session, layers: Layers, now
       eyeLevel = approach(eyeLevel, lerp(levelOf(prior, layers), levelOf(session, layers), t), elapsed, EYE_EASING_MS);
       const [from, to] = [shownOf(prior), shownOf(session)];
       const at = between(from, to, t);
-      const swayOn = (axis: "x" | "y") =>
-        approach(sway[axis], from[axis] === to[axis] ? 0 : 1, elapsed, SWAY_EASING_MS);
-      sway = { x: swayOn("x"), y: swayOn("y") };
-      const stride = strideOn(session.position);
-      const stepped = (axis: "x" | "y") => lerp(at[axis], footstep(at[axis], stride), sway[axis]);
-      return { shown: { x: stepped("x"), y: stepped("y") }, angle, eyeLevel };
+      const travel = Math.hypot(to.x - from.x, to.y - from.y);
+      if (travel > 0) way = { x: (to.x - from.x) / travel, y: (to.y - from.y) / travel };
+      walked += Math.hypot(at.x - lastAt.x, at.y - lastAt.y);
+      lastAt = at;
+      sway = approach(sway, travel > 0 ? 1 : 0, elapsed, SWAY_EASING_MS);
+      const { along, across } = gait(walked, strideOn(session.position));
+      const shown = {
+        x: at.x + sway * (way.x * along - way.y * across),
+        y: at.y + sway * (way.y * along + way.x * across),
+      };
+      return { shown, angle, eyeLevel };
     },
   };
 };

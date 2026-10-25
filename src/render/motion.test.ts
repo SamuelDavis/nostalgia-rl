@@ -4,7 +4,7 @@ import { type Session, startSession } from "../game/session";
 import { onlySurface } from "../game/terrain";
 import { GRASS } from "../game/terrain.fixtures";
 import { SURFACE } from "../worldgen";
-import { approach, createMotion, facingAngle, footstep, shownOf, turnToward } from "./motion";
+import { approach, createMotion, facingAngle, footstep, gait, shownOf, turnToward } from "./motion";
 
 const TICK_MS = 10;
 
@@ -25,6 +25,24 @@ describe("footstep", () => {
     expect(covered(0, 0.1)).toBeLessThan(covered(0.45, 0.55) / 2);
     expect(covered(0.9, 1)).toBeLessThan(covered(0.45, 0.55) / 2);
     expect(covered(0, 0.1)).toBeGreaterThan(0);
+  });
+});
+
+describe("gait", () => {
+  it("rests on the way at each footfall", () => {
+    for (const walked of [0, 1, 2])
+      expect(gait(walked, 0.5)).toEqual({ along: expect.closeTo(0), across: expect.any(Number) });
+  });
+
+  it("sways to alternate sides on alternate footfalls", () => {
+    expect(gait(0, 0.5).across).toBeCloseTo(-gait(1, 0.5).across);
+    expect(Math.abs(gait(0, 0.5).across)).toBeGreaterThan(0);
+  });
+
+  it("sways less than it surges", () => {
+    const most = (axis: "along" | "across") =>
+      Math.max(...Array.from({ length: 100 }, (_, i) => Math.abs(gait(i / 50, 0.5)[axis])));
+    expect(most("across")).toBeLessThan(most("along"));
   });
 });
 
@@ -78,6 +96,29 @@ describe("createMotion", () => {
     motion.ticked({ prior: eastward(0), session: eastward(500), scheduled: 1000, moved: false, acted: true });
     expect(motion.poseAt(1000).shown.x).toBeCloseTo(0);
     expect(motion.poseAt(1000 + 5 * TICK_MS).shown.x).toBeCloseTo(0.5);
+  });
+
+  it("staggers along a diagonal and sways across it, not round in a circle", () => {
+    const motion = createMotion(TICK_MS, start, risingEast, 0);
+    const southeast = (along: number): Session => ({
+      ...start,
+      facing: Heading.SouthEast,
+      offset: { x: 300 + along, y: along },
+    });
+    for (let tick = 0; tick < 40; tick++) {
+      motion.ticked({
+        prior: southeast(tick * 50),
+        session: southeast((tick + 1) * 50),
+        scheduled: tick * TICK_MS,
+        moved: false,
+        acted: true,
+      });
+      const { shown } = motion.poseAt(tick * TICK_MS + TICK_MS / 2);
+      const straight = shownOf(southeast(tick * 50 + 25));
+      const [dx, dy] = [shown.x - straight.x, shown.y - straight.y];
+      const across = Math.abs(dx - dy) / Math.SQRT2;
+      expect(across).toBeLessThan(0.04);
+    }
   });
 
   it("rises with a climb's progress", () => {
