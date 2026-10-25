@@ -45,8 +45,11 @@ The game depends on [procgen](../procgen), a portable procedural generation libr
 | Path           | Contents                                                                                 |
 | -------------- | ---------------------------------------------------------------------------------------- |
 | `src/worldgen` | World generation ([docs/worldgen.md](docs/worldgen.md)); `features/` holds feature types |
-| `src/game`     | Game state and rules, independent of presentation                                        |
-| `src/view`     | Canvas viewport, HTML HUD and map, palette shared with `tooling`                         |
+| `src/game`     | Game state, rules and the turn loop; no DOM                                              |
+| `src/input`    | Devices (keys, taps, wheel) to actions and commands                                      |
+| `src/render`   | Renderers behind one contract; `top-down/`, `map/`; palette shared with `tooling`        |
+| `src/ui`       | DOM overlays: HUD, debug readout, map overlay                                            |
+| `src/app`      | Composition root (`startGame`) and the URL address                                       |
 | `tooling`      | Node scripts for development, e.g. the offline map renderer                              |
 | `docs/phases`  | One doc per phase: goal, decisions, playtest log                                         |
 
@@ -70,4 +73,5 @@ The game depends on [procgen](../procgen), a portable procedural generation libr
 - **Determinism:** anything a peer must reproduce independently is a pure function of seed and coordinates. The rules are in [docs/worldgen.md](docs/worldgen.md#determinism).
 - **Single source of truth:** docs reference code rather than restating it. Keep this README short; add topical docs under `docs/` and link them here.
 - **Data-authoritative:** game state is plain data advanced by pure functions (`playTurn` in `src/game/session.ts`); it never depends on rendering, and the view only communicates it, so the UI is swappable (GUI, CLI, test harness). This is what deterministic multiplayer needs. Don't let it override phase goals.
+- **Presentation seams:** rendering, input, UI and debug are separate concerns composed only in `src/app/start.ts`, so renderers can be prototyped and the shell ported to SolidJS ([ADR 0009](docs/adr/0009-presentation-seams.md)).
 - **Git:** solo project. Use short-lived branches merged into the main branch once green, with conventional commit messages.

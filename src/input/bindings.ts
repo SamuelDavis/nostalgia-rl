@@ -1,7 +1,15 @@
-import type { DirectionInput } from "../game/input";
+import type { Command } from "../command";
+import type { DirectionInput } from "./directions";
 import { Direction } from "../game/movement";
-import type { Control } from "./hud";
 import { directionAt } from "./tap";
+
+export interface Shortcut {
+  readonly keys: readonly string[];
+  readonly hint: string;
+  readonly command: Command;
+}
+
+export const MOVE_HINT = "WASD or tap move · wheel zoom";
 
 const KEY_DIRECTIONS: Record<string, Direction> = {
   KeyW: Direction.North,
@@ -10,11 +18,11 @@ const KEY_DIRECTIONS: Record<string, Direction> = {
   KeyA: Direction.West,
 };
 
-export const bindKeys = (input: DirectionInput, controls: readonly Control[]) => {
+export const bindKeys = (input: DirectionInput, shortcuts: readonly Shortcut[]) => {
   addEventListener("keydown", (event) => {
     const direction = KEY_DIRECTIONS[event.code];
     if (direction !== undefined && !event.repeat) input.press(direction, performance.now());
-    for (const control of controls) if (control.keys.includes(event.code)) control.run();
+    for (const { keys, command } of shortcuts) if (keys.includes(event.code)) command.run();
   });
   addEventListener("keyup", (event) => {
     const direction = KEY_DIRECTIONS[event.code];
@@ -50,3 +58,6 @@ export const bindTaps = (canvas: HTMLCanvasElement, input: DirectionInput) => {
   canvas.addEventListener("pointercancel", untap);
   addEventListener("blur", untap);
 };
+
+export const bindWheel = (scroll: (sign: number) => void) =>
+  addEventListener("wheel", (event) => scroll(Math.sign(event.deltaY)));

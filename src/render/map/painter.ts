@@ -1,8 +1,8 @@
 import { type Vec2, floorDiv } from "procgen";
-import { createTerrain } from "../game/terrain";
-import { CHUNK_SIZE, type Chunk, type Layer, type Worldgen, heightLevel } from "../worldgen";
+import { createTerrain } from "../../game/terrain";
+import { CHUNK_SIZE, type Chunk, type Layer, type Worldgen, heightLevel } from "../../worldgen";
 import { createOverviewTint, fieldColor, overviewMarks } from "./overview";
-import { type HeightMode, css, hillshade, mapColorOf } from "./palette";
+import { type HeightMode, css, hillshade, mapColorOf } from "../palette";
 
 const MAP_PX = 256;
 const TILES_PER_PX = 4;
@@ -12,28 +12,20 @@ const PLAYER_MARK = "#ff3030";
 const LOCAL_RADIUS = MAP_PX / 2;
 const LOCAL_REACH = LOCAL_RADIUS * Math.SQRT2 + 2 * CHUNK_SIZE;
 
-const MAP_VIEWS = ["closed", "overview", "local"] as const;
-type MapView = (typeof MAP_VIEWS)[number];
-
-interface HeldChunks {
+export interface HeldChunks {
   readonly peek: (layer: Layer, cx: number, cy: number) => Chunk | undefined;
   readonly prefetch: (layer: Layer, p: Vec2, reach: number) => void;
 }
 
-interface Whereabouts {
+export interface Whereabouts {
   readonly layer: Layer;
   readonly position: Vec2;
 }
 
-export const createMap = (parent: HTMLElement, world: Worldgen, chunks: HeldChunks) => {
-  const canvas = document.createElement("canvas");
-  canvas.className = "map";
+export const createMapPainter = (canvas: HTMLCanvasElement, world: Worldgen, chunks: HeldChunks) => {
   canvas.width = canvas.height = MAP_PX;
-  canvas.hidden = true;
-  parent.append(canvas);
   const ctx = canvas.getContext("2d")!;
   let render = 0;
-  let view: MapView = "closed";
 
   const toPixel = (center: Vec2, p: Vec2) => ({
     px: Math.round((p.x - center.x) / TILES_PER_PX + MAP_PX / 2),
@@ -55,7 +47,7 @@ export const createMap = (parent: HTMLElement, world: Worldgen, chunks: HeldChun
     ctx.fillRect(MAP_PX / 2 - 1, MAP_PX / 2 - 3, 3, 7);
   };
 
-  const draw = (center: Vec2, mode: HeightMode) => {
+  const paintOverview = (center: Vec2, mode: HeightMode) => {
     const id = ++render;
     const tint = createOverviewTint(world, center, MAP_RADIUS, TILES_PER_PX);
     const image = ctx.createImageData(MAP_PX, MAP_PX);
@@ -92,7 +84,7 @@ export const createMap = (parent: HTMLElement, world: Worldgen, chunks: HeldChun
     step();
   };
 
-  const drawLocal = ({ layer, position }: Whereabouts, mode: HeightMode) => {
+  const paintLocal = ({ layer, position }: Whereabouts, mode: HeightMode) => {
     const id = ++render;
     chunks.prefetch(layer, position, LOCAL_REACH);
     const [left, top] = [position.x - LOCAL_RADIUS, position.y - LOCAL_RADIUS];
@@ -127,13 +119,9 @@ export const createMap = (parent: HTMLElement, world: Worldgen, chunks: HeldChun
     step();
   };
 
-  const cycle = (whereabouts: Whereabouts, mode: HeightMode) => {
-    view = MAP_VIEWS[(MAP_VIEWS.indexOf(view) + 1) % MAP_VIEWS.length]!;
-    canvas.hidden = view === "closed";
-    if (view === "closed") render++;
-    if (view === "overview") draw(whereabouts.position, mode);
-    if (view === "local") drawLocal(whereabouts, mode);
+  const stop = () => {
+    render++;
   };
 
-  return { cycle };
+  return { paintOverview, paintLocal, stop };
 };

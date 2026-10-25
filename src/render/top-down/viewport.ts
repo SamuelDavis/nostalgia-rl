@@ -1,8 +1,9 @@
 import { type Vec2, hash, hashString, unit } from "procgen";
 import type { View } from "./camera";
-import { isCliff, isStairs, isTrail } from "../game/movement";
-import type { Terrain, Tile } from "../game/terrain";
-import { Cover, type Layer, Prop, Water, Way, layerKey } from "../worldgen";
+import { type Interior, interiorOf, isForestGate } from "../../game/cover";
+import { NEIGHBOURS, isCliff, isStairway } from "../../game/movement";
+import type { Terrain, Tile } from "../../game/terrain";
+import { Cover, type Layer, Prop, Water, Way, layerKey } from "../../worldgen";
 import {
   PLAYER_GLYPH,
   STAIRS_GLYPH,
@@ -30,7 +31,7 @@ import {
   surfaceColor,
   waterColor,
   wayColor,
-} from "./palette";
+} from "../palette";
 
 const CLIFF_COLOR = "rgb(20 15 10 / 0.85)";
 const CLIFF_WIDTH = 3;
@@ -54,22 +55,7 @@ interface Look {
   readonly color: Rgb;
 }
 
-const NEIGHBOURS: readonly Vec2[] = [
-  { x: 1, y: 0 },
-  { x: -1, y: 0 },
-  { x: 0, y: 1 },
-  { x: 0, y: -1 },
-];
-
-const THRESHOLD: Look = { background: [55, 38, 20], glyph: FOREST_GATE_GLYPH, color: [255, 215, 130] };
-
-const isThreshold = (terrain: Terrain, x: number, y: number, tile: Tile): boolean =>
-  isTrail(tile) &&
-  tile.cover === Cover.None &&
-  NEIGHBOURS.some((o) => {
-    const next = terrain(x + o.x, y + o.y);
-    return isTrail(next) && next.cover !== Cover.None;
-  });
+const FOREST_GATE: Look = { background: [55, 38, 20], glyph: FOREST_GATE_GLYPH, color: [255, 215, 130] };
 
 const CLIFF_FACE: Look = { background: [72, 64, 60], glyph: "", color: [0, 0, 0] };
 const FACE_MIN_CLIFF_SIDES = 3;
@@ -80,9 +66,6 @@ const FILLED: ReadonlySet<Prop> = new Set([Prop.Rock, Prop.Wall]);
 const isCliffFace = (terrain: Terrain, x: number, y: number, tile: Tile): boolean =>
   !ENTRANCES.has(tile.prop) &&
   NEIGHBOURS.filter((o) => isCliff(tile, terrain(x + o.x, y + o.y))).length >= FACE_MIN_CLIFF_SIDES;
-
-const hasStairs = (terrain: Terrain, x: number, y: number, tile: Tile): boolean =>
-  isTrail(tile) && NEIGHBOURS.some((o) => isStairs(tile, terrain(x + o.x, y + o.y)));
 
 const isPathShown = (x: number, y: number) => unit(hash(PATH_SALT, x, y)) < PATH_VISIBILITY;
 
@@ -232,7 +215,7 @@ const drawTiles = (
       const look = coverLook(tile.cover as Exclude<Cover, typeof Cover.None>, lightAt(x, y), x, y);
       return isEave(terrain, x, y, tile) ? eaveOf(look) : look;
     }
-    if (isThreshold(terrain, x, y, tile)) return THRESHOLD;
+    if (isForestGate(terrain, x, y)) return FOREST_GATE;
     const look = isCliffFace(terrain, x, y, tile) ? CLIFF_FACE : lookOf(tile, mode, lightAt(x, y), UNSHADED, x, y);
     return tile.cover === Cover.None ? look : underCover(look);
   };
@@ -246,7 +229,7 @@ const drawTiles = (
         isHidden(x, y, tile) || tile.water !== Water.None ? Number.NaN : tile.height;
       ctx.fillStyle = css(look.background);
       ctx.fillRect(px, py, cellPx, cellPx);
-      const stairs = !isHidden(x, y, tile) && hasStairs(terrain, x, y, tile);
+      const stairs = !isHidden(x, y, tile) && isStairway(terrain, x, y);
       ctx.fillStyle = css(look.color);
       ctx.fillText(stairs ? STAIRS_GLYPH : look.glyph, px + cellPx / 2, py + cellPx / 2 + 1);
     }
@@ -304,35 +287,6 @@ const drawTiles = (
     }
   ctx.stroke();
   return reliefLevels;
-};
-
-interface Interior {
-  readonly key: string;
-  readonly contains: (x: number, y: number, tile: Tile) => boolean;
-}
-
-const OUTSIDE: Interior = { key: "outside", contains: () => false };
-const UNDER_CANOPY: Interior = { key: "canopy", contains: (_x, _y, tile) => tile.cover === Cover.Canopy };
-const MAX_ROOFED_TILES = 4096;
-
-const roofedRoom = (terrain: Terrain, from: Vec2, cover: Cover): Interior => {
-  const tiles = new Set<string>();
-  const queue = [from];
-  while (queue.length > 0 && tiles.size < MAX_ROOFED_TILES) {
-    const { x, y } = queue.pop()!;
-    const key = `${x},${y}`;
-    if (tiles.has(key) || terrain(x, y).cover !== cover) continue;
-    tiles.add(key);
-    for (const o of NEIGHBOURS) queue.push({ x: x + o.x, y: y + o.y });
-  }
-  const [first] = [...tiles].sort();
-  return { key: `roof ${first}`, contains: (x, y) => tiles.has(`${x},${y}`) };
-};
-
-const interiorOf = (terrain: Terrain, { x, y }: Vec2): Interior => {
-  const { cover } = terrain(x, y);
-  if (cover === Cover.None) return OUTSIDE;
-  return cover === Cover.Canopy ? UNDER_CANOPY : roofedRoom(terrain, { x, y }, cover);
 };
 
 const LAYER_MARGIN_SHARE = 0.25;

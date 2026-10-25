@@ -10,7 +10,7 @@ import {
   biomeOf,
   heightLevel,
   regions,
-} from "../worldgen";
+} from "../../worldgen";
 import {
   type HeightMode,
   type Rgb,
@@ -21,7 +21,7 @@ import {
   shade,
   surfaceColor,
   waterColor,
-} from "./palette";
+} from "../palette";
 
 export interface Mark {
   readonly point: Vec2;

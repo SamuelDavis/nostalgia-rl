@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { Direction } from "../game/movement";
-import { fieldOf } from "../game/terrain.fixtures";
+import { Direction } from "../../game/movement";
+import { fieldOf } from "../../game/terrain.fixtures";
 import { type Vec2 } from "procgen";
-import { Prop } from "../worldgen";
+import { Prop } from "../../worldgen";
 import {
   SETTLE_MS,
-  approach,
   attentiveSpan,
   SIGHT_REACH,
   createCamera,
@@ -192,16 +191,6 @@ describe("lookOffset", () => {
   it("leans toward open ground, away from rising ground", () => {
     expect(lookOffset(openness(risingEast, ORIGIN), STILL).x).toBeLessThan(0);
     expect(lookOffset(openness(cone, ORIGIN), STILL).x).toBeCloseTo(0);
-  });
-});
-
-describe("approach", () => {
-  it("moves part of the way toward the target, more with more time", () => {
-    const short = approach(0, 10, 50, 250);
-    const long = approach(0, 10, 500, 250);
-    expect(short).toBeGreaterThan(0);
-    expect(long).toBeGreaterThan(short);
-    expect(long).toBeLessThan(10);
   });
 });
 

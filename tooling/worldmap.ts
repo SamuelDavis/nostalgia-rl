@@ -9,8 +9,16 @@ import {
   markPixels,
   overviewFeatureMarks,
   overviewMarks,
-} from "../src/view/overview";
-import { HEIGHT_MODES, type HeightMode, type Rgb, coverColor, hillshade, mapColorOf, shade } from "../src/view/palette";
+} from "../src/render/map/overview";
+import {
+  HEIGHT_MODES,
+  type HeightMode,
+  type Rgb,
+  coverColor,
+  hillshade,
+  mapColorOf,
+  shade,
+} from "../src/render/palette";
 import { writePng } from "./png";
 
 const { values } = parseArgs({

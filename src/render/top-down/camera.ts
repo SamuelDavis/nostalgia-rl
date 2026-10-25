@@ -1,8 +1,9 @@
-import { type Direction, stepToward } from "../game/movement";
-import { clearSight } from "../game/sight";
-import type { Terrain } from "../game/terrain";
+import { type Direction, stepToward } from "../../game/movement";
+import { clearSight } from "../../game/sight";
+import type { Terrain } from "../../game/terrain";
 import { type Vec2, clamp, lerp } from "procgen";
-import { metresToLevels } from "../worldgen";
+import { metresToLevels } from "../../worldgen";
+import { approach } from "../motion";
 
 export interface Extent {
   readonly width: number;
@@ -125,9 +126,6 @@ export const lookOffset = (open: readonly number[], lead: Vec2): Vec2 => {
     y: clamp(lead.y * LEAD + lean("y") * LEAN, -MAX_OFFSET, MAX_OFFSET),
   };
 };
-
-export const approach = (current: number, target: number, elapsedMs: number, easingMs: number): number =>
-  target + (current - target) * Math.exp(-elapsedMs / easingMs);
 
 export const spanOf = (natural: number, modifier: number): number => clamp(natural + modifier, MIN_SPAN, MAX_SPAN);
 

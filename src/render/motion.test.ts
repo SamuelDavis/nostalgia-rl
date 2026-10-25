@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { Direction } from "../game/movement";
-import { createGlide, facingAngle, turnToward } from "./motion";
+import { startSession } from "../game/session";
+import type { Terrain } from "../game/terrain";
+import { GRASS } from "../game/terrain.fixtures";
+import { approach, createGlide, createMotion, facingAngle, turnToward } from "./motion";
 
 const DURATION = 100;
 
@@ -70,5 +73,48 @@ describe("turnToward", () => {
 
   it("arrives given time", () => {
     expect(turnToward(0, Math.PI / 2, 10000, 100)).toBeCloseTo(Math.PI / 2);
+  });
+});
+
+describe("approach", () => {
+  it("moves part of the way toward the target, more with more time", () => {
+    const short = approach(0, 10, 50, 250);
+    const long = approach(0, 10, 500, 250);
+    expect(short).toBeGreaterThan(0);
+    expect(long).toBeGreaterThan(short);
+    expect(long).toBeLessThan(10);
+  });
+});
+
+const risingEast: Terrain = (x) => ({ ...GRASS, height: GRASS.height + x });
+
+describe("createMotion", () => {
+  const start = startSession({ x: 0, y: 0 });
+
+  it("poses a still player where it stands, at its eye level, facing its way", () => {
+    const motion = createMotion(DURATION, start, risingEast, 0);
+    expect(motion.poseAt(0, start, risingEast)).toEqual({
+      shown: { x: 0, y: 0 },
+      angle: facingAngle(start.facing),
+      eyeLevel: GRASS.height,
+    });
+  });
+
+  it("glides to a move from when its turn was scheduled", () => {
+    const motion = createMotion(DURATION, start, risingEast, 0);
+    const moved = { ...start, turn: 1, position: { x: 1, y: 0 }, facing: Direction.East };
+    motion.turned({ session: moved, scheduled: 1000, moved: true, acted: true });
+    expect(motion.poseAt(1050, moved, risingEast).shown).toEqual({ x: 0.5, y: 0 });
+  });
+
+  it("eases the eye level and facing toward the new tile and direction", () => {
+    const motion = createMotion(DURATION, start, risingEast, 0);
+    const moved = { ...start, turn: 1, position: { x: 1, y: 0 }, facing: Direction.East };
+    motion.turned({ session: moved, scheduled: 0, moved: true, acted: true });
+    const { eyeLevel, angle } = motion.poseAt(30, moved, risingEast);
+    expect(eyeLevel).toBeGreaterThan(GRASS.height);
+    expect(eyeLevel).toBeLessThan(GRASS.height + 1);
+    expect(angle).toBeLessThan(facingAngle(Direction.South));
+    expect(angle).toBeGreaterThan(facingAngle(Direction.East));
   });
 });

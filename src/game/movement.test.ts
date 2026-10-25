@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Prop, MAX_CLIMB, Water, Way } from "../worldgen";
-import { Direction, blockerBetween, isSwimming, stepToward } from "./movement";
+import { GRASS } from "./terrain.fixtures";
+import { Direction, blockerBetween, isStairway, isSwimming, stepToward } from "./movement";
 
 const land = (height: number) => ({ height, way: Way.None, water: Water.None, prop: Prop.None });
 const path = (height: number) => ({ ...land(height), way: Way.Path });
@@ -53,5 +54,20 @@ describe("isSwimming", () => {
     expect(isSwimming({ ...land(63), water: Water.Deep })).toBe(true);
     expect(isSwimming({ ...land(63), water: Water.Deep, prop: Prop.Bridge })).toBe(false);
     expect(isSwimming({ ...land(63), water: Water.Shallow })).toBe(false);
+  });
+});
+
+describe("isStairway", () => {
+  const ledgeEast = (x: number, y: number) => ({
+    ...GRASS,
+    height: x > 0 ? GRASS.height + MAX_CLIMB + 1 : GRASS.height,
+    way: y === 0 ? Way.Path : Way.None,
+  });
+
+  it("is a trail tile with a step too high to climb onto another trail", () => {
+    expect(isStairway(ledgeEast, 0, 0)).toBe(true);
+    expect(isStairway(ledgeEast, 1, 0)).toBe(true);
+    expect(isStairway(ledgeEast, 0, 1)).toBe(false);
+    expect(isStairway(ledgeEast, -1, 0)).toBe(false);
   });
 });

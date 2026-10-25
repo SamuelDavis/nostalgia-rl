@@ -1,5 +1,5 @@
-import type { Direction } from "./movement";
-import type { Action } from "./session";
+import type { Direction } from "../game/movement";
+import type { Action } from "../game/session";
 
 export interface Press {
   readonly direction: Direction;

@@ -1,6 +1,11 @@
 import { Direction } from "../game/movement";
+import type { Turn } from "../game/play";
+import type { Session } from "../game/session";
+import type { Terrain } from "../game/terrain";
 import { type Vec2, clamp, hash, lerp, mod, unit } from "procgen";
 
+const EYE_EASING_MS = 300;
+const TURN_EASING_MS = 60;
 const STRIDE = 0.5;
 const STRIDE_VARIANCE = 0.2;
 
@@ -39,4 +44,34 @@ export const facingAngle = (facing: Direction): number => (QUARTER_TURNS_FROM_EA
 export const turnToward = (angle: number, target: number, elapsedMs: number, easingMs: number): number => {
   const shortest = mod(target - angle + Math.PI, 2 * Math.PI) - Math.PI;
   return angle + shortest * (1 - Math.exp(-elapsedMs / easingMs));
+};
+
+export const approach = (current: number, target: number, elapsedMs: number, easingMs: number): number =>
+  target + (current - target) * Math.exp(-elapsedMs / easingMs);
+
+export interface Pose {
+  readonly shown: Vec2;
+  readonly angle: number;
+  readonly eyeLevel: number;
+}
+
+const levelUnder = (session: Session, terrain: Terrain) => terrain(session.position.x, session.position.y).height;
+
+export const createMotion = (turnMs: number, start: Session, terrain: Terrain, now: number) => {
+  const glide = createGlide(turnMs, start.position);
+  let angle = facingAngle(start.facing);
+  let eyeLevel = levelUnder(start, terrain);
+  let lastFrame = now;
+  return {
+    turned: ({ session, scheduled, moved }: Turn) => {
+      if (moved) glide.moveTo(session.position, scheduled);
+    },
+    poseAt: (now: number, session: Session, terrain: Terrain): Pose => {
+      const elapsed = now - lastFrame;
+      lastFrame = now;
+      angle = turnToward(angle, facingAngle(session.facing), elapsed, TURN_EASING_MS);
+      eyeLevel = approach(eyeLevel, levelUnder(session, terrain), elapsed, EYE_EASING_MS);
+      return { shown: glide.shownAt(now), angle, eyeLevel };
+    },
+  };
 };

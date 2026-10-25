@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describePurpose } from "./hud";
+import { describePurpose } from "./debug";
 
 describe("describePurpose", () => {
   it("names the role and who occupies it", () => {

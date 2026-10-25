@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { actionFor, createDirectionInput } from "./input";
-import { Direction } from "./movement";
+import { actionFor, createDirectionInput } from "./directions";
+import { Direction } from "../game/movement";
 
 const REPEAT_DELAY = 250;
 

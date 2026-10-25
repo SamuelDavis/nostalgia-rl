@@ -1,5 +1,6 @@
 import type { Vec2 } from "procgen";
 import { MAX_CLIMB, PROPS, Prop, Water, Way } from "../worldgen";
+import type { Terrain } from "./terrain";
 
 export const Direction = { North: 0, East: 1, South: 2, West: 3 } as const;
 export type Direction = (typeof Direction)[keyof typeof Direction];
@@ -16,6 +17,8 @@ export const stepToward = (p: Vec2, direction: Direction): Vec2 => ({
   y: p.y + OFFSETS[direction].y,
 });
 
+export const NEIGHBOURS: readonly Vec2[] = Object.values(OFFSETS);
+
 export type Blocker = "cliff" | "obstacle";
 
 interface Footing {
@@ -29,6 +32,11 @@ export const isTrail = ({ way }: Footing): boolean => way !== Way.None;
 
 export const isStairs = (from: Footing, to: Footing): boolean =>
   Math.abs(to.height - from.height) > MAX_CLIMB && isTrail(from) && isTrail(to);
+
+export const isStairway = (terrain: Terrain, x: number, y: number): boolean => {
+  const tile = terrain(x, y);
+  return isTrail(tile) && NEIGHBOURS.some((o) => isStairs(tile, terrain(x + o.x, y + o.y)));
+};
 
 export const isCliff = (from: Footing, to: Footing): boolean =>
   Math.abs(to.height - from.height) > MAX_CLIMB && !isStairs(from, to);

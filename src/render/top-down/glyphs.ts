@@ -1,4 +1,4 @@
-import { Cover, Prop, Ground, Water, Way, footprintOf } from "../worldgen";
+import { Cover, Prop, Ground, Water, Way, footprintOf } from "../../worldgen";
 
 export const PLAYER_GLYPH = "@";
 export const STAIRS_GLYPH = "≡";

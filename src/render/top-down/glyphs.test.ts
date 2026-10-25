@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Prop, footprintOf } from "../worldgen";
+import { Prop, footprintOf } from "../../worldgen";
 import { propGlyph } from "./glyphs";
 
 describe("prop glyphs", () => {
