@@ -1,4 +1,4 @@
-import { Direction, TILE_UNITS, standingHeight } from "../game/movement";
+import { Heading, TILE_UNITS, standingHeight } from "../game/movement";
 import type { Ticks } from "../game/play";
 import type { Session } from "../game/session";
 import type { Layers } from "../game/terrain";
@@ -23,14 +23,7 @@ export const shownOf = ({ position, offset }: Session): Vec2 => ({
   y: position.y + offset.y / TILE_UNITS,
 });
 
-const QUARTER_TURNS_FROM_EAST: Record<Direction, number> = {
-  [Direction.East]: 0,
-  [Direction.South]: 1,
-  [Direction.West]: 2,
-  [Direction.North]: 3,
-};
-
-export const facingAngle = (facing: Direction): number => (QUARTER_TURNS_FROM_EAST[facing] * Math.PI) / 2;
+export const facingAngle = (facing: Heading): number => (mod(facing - Heading.East, 8) * Math.PI) / 4;
 
 export const turnToward = (angle: number, target: number, elapsedMs: number, easingMs: number): number => {
   const shortest = mod(target - angle + Math.PI, 2 * Math.PI) - Math.PI;

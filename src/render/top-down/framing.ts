@@ -1,5 +1,4 @@
 import type { Vec2 } from "procgen";
-import { stepToward } from "../../game/movement";
 import type { Ticks } from "../../game/play";
 import type { Session } from "../../game/session";
 import type { Terrain } from "../../game/terrain";
@@ -15,6 +14,7 @@ import {
   sightAhead,
   spanOf,
   steer,
+  unitToward,
 } from "./camera";
 
 const opennessOn = (terrain: Terrain, p: Vec2) => openness((x, y) => terrain(x, y).height, p);
@@ -50,7 +50,7 @@ export const createFraming = (session: Session, terrain: Terrain, now: number) =
     frame: (now: number, shown: Vec2, screen: Extent) => {
       const elapsed = now - lastFrame;
       lastFrame = now;
-      heading = steer(heading, stepToward({ x: 0, y: 0 }, facing), elapsed);
+      heading = steer(heading, unitToward(facing), elapsed);
       natural = naturalSpan(open, heading);
       const practical = practicalSpan(open, heading);
       const span = attentiveSpan({ natural, practical, sight: sight.distance }, now - lastActionAt);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Direction } from "../game/movement";
+import { Heading } from "../game/movement";
 import { type Session, startSession } from "../game/session";
 import { onlySurface } from "../game/terrain";
 import { GRASS } from "../game/terrain.fixtures";
@@ -30,15 +30,15 @@ describe("footstep", () => {
 
 describe("facingAngle", () => {
   it("rotates clockwise from the glyph's natural eastward facing", () => {
-    expect(facingAngle(Direction.East)).toBe(0);
-    expect(facingAngle(Direction.South)).toBe(Math.PI / 2);
-    expect(facingAngle(Direction.West)).toBe(Math.PI);
+    expect(facingAngle(Heading.East)).toBe(0);
+    expect(facingAngle(Heading.South)).toBe(Math.PI / 2);
+    expect(facingAngle(Heading.West)).toBe(Math.PI);
   });
 });
 
 describe("turnToward", () => {
   it("turns part of the way, the short way round", () => {
-    const turned = turnToward(0, facingAngle(Direction.North), 30, 100);
+    const turned = turnToward(0, facingAngle(Heading.North), 30, 100);
     expect(turned).toBeLessThan(0);
     expect(turned).toBeGreaterThan(-Math.PI / 2);
   });
@@ -62,7 +62,7 @@ const risingEast = onlySurface((x) => ({ ...GRASS, height: GRASS.height + x }));
 
 describe("createMotion", () => {
   const start = startSession({ x: 0, y: 0 });
-  const eastward = (x: number): Session => ({ ...start, facing: Direction.East, offset: { x, y: 0 } });
+  const eastward = (x: number): Session => ({ ...start, facing: Heading.East, offset: { x, y: 0 } });
 
   it("poses a still player where it stands, at its eye level, facing its way", () => {
     const motion = createMotion(TICK_MS, start, risingEast, 0);
@@ -89,12 +89,12 @@ describe("createMotion", () => {
 
   it("eases the eye level and facing toward the new tile and direction", () => {
     const motion = createMotion(TICK_MS, start, risingEast, 0);
-    const arrived: Session = { ...start, position: { x: 1, y: 0 }, facing: Direction.East };
+    const arrived: Session = { ...start, position: { x: 1, y: 0 }, facing: Heading.East };
     motion.ticked({ prior: arrived, session: arrived, scheduled: 0, moved: true, acted: true });
     const { eyeLevel, angle } = motion.poseAt(30);
     expect(eyeLevel).toBeGreaterThan(GRASS.height);
     expect(eyeLevel).toBeLessThan(GRASS.height + 1);
-    expect(angle).toBeLessThan(facingAngle(Direction.South));
-    expect(angle).toBeGreaterThan(facingAngle(Direction.East));
+    expect(angle).toBeLessThan(facingAngle(Heading.South));
+    expect(angle).toBeGreaterThan(facingAngle(Heading.East));
   });
 });

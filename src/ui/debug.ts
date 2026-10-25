@@ -1,5 +1,5 @@
 import { floorDiv } from "procgen";
-import { Direction, TILE_UNITS, isSwimming } from "../game/movement";
+import { Heading, TILE_UNITS, isSwimming } from "../game/movement";
 import type { Session } from "../game/session";
 import type { Tile } from "../game/terrain";
 import type { HeightMode } from "../render/palette";
@@ -58,7 +58,7 @@ export const sessionRows = (world: Worldgen, session: Session, tile: Tile, tickM
     ["province", world.provinceAt(session.position).identity],
     ["place", place ? `${place.name}: ${describePurpose(place.purpose)}` : "—"],
     ["building", building ? `${building.plan.kind}, door at ${building.door.x}, ${building.door.y}` : "—"],
-    ["facing", nameOf(Direction, facing)],
+    ["facing", nameOf(Heading, facing)],
     ["offset", `${offset.x}, ${offset.y} of ${TILE_UNITS}`],
     ["climb", climb ? `${climb.spent} of ${climb.ticks} ticks to ${climb.to.x}, ${climb.to.y}` : "—"],
     ["blocked", blocked === undefined ? "—" : `by ${nameOf(Prop, blocked)}`],

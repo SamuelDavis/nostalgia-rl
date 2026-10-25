@@ -1,4 +1,4 @@
-import { type Direction, stepToward } from "../../game/movement";
+import { type Heading, lengthOf, vectorOf } from "../../game/movement";
 import { clearSight } from "../../game/sight";
 import type { Terrain } from "../../game/terrain";
 import { type Vec2, clamp, lerp } from "procgen";
@@ -95,8 +95,13 @@ export interface Sight {
   readonly lead: Vec2;
 }
 
-export const sightAhead = (terrain: Terrain, from: Vec2, facing: Direction): Sight => {
-  const ahead = stepToward({ x: 0, y: 0 }, facing);
+export const unitToward = (heading: Heading): Vec2 => {
+  const { x, y } = vectorOf(heading);
+  return { x: x / lengthOf(heading), y: y / lengthOf(heading) };
+};
+
+export const sightAhead = (terrain: Terrain, from: Vec2, facing: Heading): Sight => {
+  const ahead = unitToward(facing);
   const lines = SIGHT_RAYS.map((angle) => {
     const direction = rotate(ahead, angle);
     return { direction, clear: clearSight(terrain, from, direction, SIGHT_REACH), weight: Math.cos(2 * angle) };

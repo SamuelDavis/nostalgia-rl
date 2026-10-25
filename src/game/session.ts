@@ -3,10 +3,13 @@ import { type Layer, type Prop, SURFACE } from "../worldgen";
 import {
   BODY_RADIUS,
   Direction,
+  Heading,
   STEP_TICKS,
   TILE_UNITS,
   edgeBetween,
   isImpassable,
+  axesOf,
+  lengthOf,
   stepToward,
   unitsPerTick,
 } from "./movement";
@@ -26,15 +29,16 @@ export interface Session {
   readonly position: Vec2;
   readonly offset: Vec2;
   readonly layer: Layer;
-  readonly facing: Direction;
+  readonly facing: Heading;
   readonly drive: number;
+  readonly goal: Vec2 | undefined;
   readonly climb: Climb | undefined;
   readonly blocked: Prop | undefined;
 }
 
 export interface Action {
   readonly kind: "face" | "step" | "push";
-  readonly direction: Direction;
+  readonly heading: Heading;
 }
 
 export const startSession = (position: Vec2): Session => ({
@@ -42,8 +46,9 @@ export const startSession = (position: Vec2): Session => ({
   position,
   offset: { x: 0, y: 0 },
   layer: SURFACE,
-  facing: Direction.South,
+  facing: Heading.South,
   drive: 0,
+  goal: undefined,
   climb: undefined,
   blocked: undefined,
 });
@@ -99,51 +104,69 @@ const collide = (
   return { offset: { x: clamp(p.x, -HALF, HALF), y: clamp(p.y, -HALF, HALF) }, blocked };
 };
 
-const direct = (session: Session, { kind, direction }: Action): Session => {
-  const turned = direction !== session.facing;
-  const climb = turned ? undefined : session.climb;
-  if (kind === "face") return { ...session, facing: direction, drive: 0, climb, blocked: undefined };
-  const drive = kind === "step" ? STEP_TICKS : Math.max(session.drive, 1);
-  return { ...session, facing: direction, drive, climb, blocked: undefined };
+const nextCentres = ({ position, offset }: Session, heading: Heading): Vec2 =>
+  axesOf(heading).reduce((goal, direction) => {
+    const { axis, sign } = axisOf(direction);
+    return { ...goal, [axis]: position[axis] + (offset[axis] * sign < 0 ? 0 : sign) };
+  }, position);
+
+const direct = (session: Session, { kind, heading }: Action): Session => {
+  const climb = heading === session.facing ? session.climb : undefined;
+  const turned = { ...session, facing: heading, climb, blocked: undefined };
+  if (kind === "face") return { ...turned, drive: 0, goal: undefined };
+  if (kind === "push") return { ...turned, drive: 1, goal: undefined };
+  return { ...turned, drive: Math.ceil(STEP_TICKS * lengthOf(heading)), goal: nextCentres(session, heading) };
 };
 
-const exert = (session: Session, layers: Layers, coasting: boolean): Session => {
-  const { position, offset, layer, facing, drive, climb } = session;
-  if (drive === 0) return session;
-  const { axis, sign } = axisOf(facing);
+const stepAlong = (
+  session: Session,
+  layers: Layers,
+  direction: Direction,
+  share: number,
+  mayClimb: boolean,
+): Session => {
+  const { position, offset, layer, climb, goal } = session;
+  const { axis, sign } = axisOf(direction);
   const along = offset[axis] * sign;
+  const toGoal = goal ? (goal[axis] - position[axis]) * sign * TILE_UNITS - along : Infinity;
+  if (toGoal <= 0) return session;
   const withAlong = (value: number): Vec2 => ({ ...offset, [axis]: value * sign + 0 });
   const here = layers.terrainOn(layer)(position.x, position.y);
-  const ahead = neighbourOf(session, layers, facing);
+  const ahead = neighbourOf(session, layers, direction);
   const edgeAhead = edgeBetween(here, ahead.tile);
 
   if (edgeAhead.climb && along === HALF) {
+    if (!mayClimb) return session;
     const spent = (climb?.spent ?? 0) + 1;
     return spent < edgeAhead.ticks
-      ? { ...session, drive: drive - 1, climb: { to: ahead.at, layer: ahead.layer, spent, ticks: edgeAhead.ticks } }
-      : {
-          ...session,
-          drive: drive - 1,
-          position: ahead.at,
-          layer: ahead.layer,
-          offset: withAlong(-HALF),
-          climb: undefined,
-        };
+      ? { ...session, climb: { to: ahead.at, layer: ahead.layer, spent, ticks: edgeAhead.ticks } }
+      : { ...session, position: ahead.at, layer: ahead.layer, offset: withAlong(-HALF), climb: undefined };
   }
 
-  const nearEdge = along < 0 ? edgeBetween(neighbourOf(session, layers, OPPOSITE[facing]).tile, here) : edgeAhead;
-  const speed = unitsPerTick(here, nearEdge.climb ? 1 : nearEdge.pace);
-  const toCentre = along < 0 ? -along : TILE_UNITS - along;
-  const reach = Math.min(speed, edgeAhead.climb ? HALF - along : Infinity);
-  const arrives = coasting && reach >= toCentre;
-  const moved = along + (arrives ? toCentre : reach);
-  const crossed = moved > HALF;
-  const stepped: Session = crossed
-    ? { ...session, position: ahead.at, layer: ahead.layer, offset: withAlong(moved - TILE_UNITS) }
-    : { ...session, offset: withAlong(moved) };
-  const { offset: settled, blocked } = collide(stepped, layers, stepped.offset);
-  return { ...stepped, offset: settled, blocked, drive: arrives ? 0 : drive - 1, climb: undefined };
+  const nearEdge = along < 0 ? edgeBetween(neighbourOf(session, layers, OPPOSITE[direction]).tile, here) : edgeAhead;
+  const speed = Math.round(unitsPerTick(here, nearEdge.climb ? 1 : nearEdge.pace) * share);
+  const moved = along + Math.min(speed, edgeAhead.climb ? HALF - along : Infinity, toGoal);
+  return moved > HALF
+    ? { ...session, position: ahead.at, layer: ahead.layer, offset: withAlong(moved - TILE_UNITS), climb: undefined }
+    : { ...session, offset: withAlong(moved), climb: undefined };
+};
+
+const exert = (session: Session, layers: Layers): Session => {
+  if (session.drive === 0) return session;
+  const axes = axesOf(session.facing);
+  const share = 1 / lengthOf(session.facing);
+  const stepped = axes.reduce((s, direction) => stepAlong(s, layers, direction, share, axes.length === 1), session);
+  const { offset, blocked } = collide(stepped, layers, stepped.offset);
+  const { position, goal } = stepped;
+  const arrived =
+    goal !== undefined &&
+    axes.every((direction) => {
+      const { axis } = axisOf(direction);
+      return position[axis] === goal[axis] && offset[axis] === 0;
+    });
+  const drive = arrived ? 0 : session.drive - 1;
+  return { ...stepped, offset, blocked, drive, goal: drive === 0 ? undefined : goal };
 };
 
 export const playTick = (session: Session, layers: Layers, action: Action | undefined): Session =>
-  exert({ ...(action ? direct(session, action) : session), tick: session.tick + 1 }, layers, action?.kind !== "push");
+  exert({ ...(action ? direct(session, action) : session), tick: session.tick + 1 }, layers);

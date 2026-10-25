@@ -40,6 +40,9 @@ A province's character, taken from the land at its seat: farmland, woodland, hig
 **Tick**:
 The world clock's unit, 10 ms. Every action costs ticks.
 
+**Heading**:
+One of eight directions an entity faces and moves in. Tiles and their edges are only ever crossed along the four cardinal directions.
+
 **Body**:
 The circle, 0.6 m across, that an entity collides with impassable things by. Its centre decides which tile the entity is in.
 

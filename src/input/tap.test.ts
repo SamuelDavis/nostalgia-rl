@@ -1,19 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { Direction } from "../game/movement";
-import { directionAt } from "./tap";
+import { Heading } from "../game/movement";
+import { headingAt } from "./tap";
 
 const SCREEN = { width: 400, height: 200 };
 
-describe("directionAt", () => {
-  it("splits the screen into triangles along its diagonals", () => {
-    expect(directionAt({ x: 200, y: 10 }, SCREEN)).toBe(Direction.North);
-    expect(directionAt({ x: 390, y: 100 }, SCREEN)).toBe(Direction.East);
-    expect(directionAt({ x: 200, y: 190 }, SCREEN)).toBe(Direction.South);
-    expect(directionAt({ x: 10, y: 100 }, SCREEN)).toBe(Direction.West);
+describe("headingAt", () => {
+  it("heads toward the edge pressed", () => {
+    expect(headingAt({ x: 200, y: 10 }, SCREEN)).toBe(Heading.North);
+    expect(headingAt({ x: 390, y: 100 }, SCREEN)).toBe(Heading.East);
+    expect(headingAt({ x: 200, y: 190 }, SCREEN)).toBe(Heading.South);
+    expect(headingAt({ x: 10, y: 100 }, SCREEN)).toBe(Heading.West);
   });
 
-  it("follows the diagonals of a wide screen, not 45°", () => {
-    expect(directionAt({ x: 340, y: 20 }, SCREEN)).toBe(Direction.North);
-    expect(directionAt({ x: 380, y: 20 }, SCREEN)).toBe(Direction.East);
+  it("heads diagonally toward the corner pressed, along the screen's own diagonals", () => {
+    expect(headingAt({ x: 390, y: 10 }, SCREEN)).toBe(Heading.NorthEast);
+    expect(headingAt({ x: 10, y: 190 }, SCREEN)).toBe(Heading.SouthWest);
+    expect(headingAt({ x: 300, y: 50 }, SCREEN)).toBe(Heading.NorthEast);
   });
 });

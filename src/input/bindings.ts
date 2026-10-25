@@ -1,7 +1,7 @@
 import type { Command } from "../command";
 import type { DirectionInput } from "./directions";
-import { Direction } from "../game/movement";
-import { directionAt } from "./tap";
+import { Heading } from "../game/movement";
+import { headingAt } from "./tap";
 
 export interface Shortcut {
   readonly keys: readonly string[];
@@ -11,37 +11,37 @@ export interface Shortcut {
 
 export const MOVE_HINT = "WASD or tap move · wheel zoom";
 
-const KEY_DIRECTIONS: Record<string, Direction> = {
-  KeyW: Direction.North,
-  KeyD: Direction.East,
-  KeyS: Direction.South,
-  KeyA: Direction.West,
+const KEY_HEADINGS: Record<string, Heading> = {
+  KeyW: Heading.North,
+  KeyD: Heading.East,
+  KeyS: Heading.South,
+  KeyA: Heading.West,
 };
 
 export const bindKeys = (input: DirectionInput, shortcuts: readonly Shortcut[]) => {
   addEventListener("keydown", (event) => {
-    const direction = KEY_DIRECTIONS[event.code];
-    if (direction !== undefined && !event.repeat) input.press(direction, performance.now());
+    const heading = KEY_HEADINGS[event.code];
+    if (heading !== undefined && !event.repeat) input.press(heading, performance.now());
     for (const { keys, command } of shortcuts) if (keys.includes(event.code)) command.run();
   });
   addEventListener("keyup", (event) => {
-    const direction = KEY_DIRECTIONS[event.code];
-    if (direction !== undefined) input.release(direction);
+    const heading = KEY_HEADINGS[event.code];
+    if (heading !== undefined) input.release(heading);
   });
-  addEventListener("blur", () => Object.values(Direction).forEach(input.release));
+  addEventListener("blur", () => Object.values(Heading).forEach(input.release));
 };
 
 export const bindTaps = (canvas: HTMLCanvasElement, input: DirectionInput) => {
-  let tapped: Direction | undefined;
+  let tapped: Heading | undefined;
   const tapAt = (event: PointerEvent) => {
-    const direction = directionAt(
+    const heading = headingAt(
       { x: event.offsetX, y: event.offsetY },
       { width: canvas.clientWidth, height: canvas.clientHeight },
     );
-    if (direction === tapped) return;
+    if (heading === tapped) return;
     if (tapped !== undefined) input.release(tapped);
-    tapped = direction;
-    input.press(direction, performance.now());
+    tapped = heading;
+    input.press(heading, performance.now());
   };
   const untap = () => {
     if (tapped !== undefined) input.release(tapped);

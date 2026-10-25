@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Direction, STEP_TICKS } from "./movement";
+import { Heading, STEP_TICKS } from "./movement";
 import { createPlay } from "./play";
 import { type Action, startSession } from "./session";
 import { onlySurface } from "./terrain";
@@ -8,7 +8,7 @@ import { GRASS } from "./terrain.fixtures";
 const TICK_MS = 10;
 const flat = onlySurface(() => GRASS);
 const idle = () => undefined;
-const pushEast = (): Action => ({ kind: "push", direction: Direction.East });
+const pushEast = (): Action => ({ kind: "push", heading: Heading.East });
 
 describe("createPlay", () => {
   it("plays no tick before one is due", () => {

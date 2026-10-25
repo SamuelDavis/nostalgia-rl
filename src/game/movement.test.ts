@@ -4,6 +4,10 @@ import type { Tile } from "./terrain";
 import { GRASS } from "./terrain.fixtures";
 import {
   Direction,
+  Heading,
+  axesOf,
+  headingOf,
+  vectorOf,
   STEP_TICKS,
   blockerBetween,
   edgeBetween,
@@ -169,5 +173,17 @@ describe("isImpassable", () => {
       expect(isImpassable({ ...land(100), prop })).toBe(true);
     for (const prop of [Prop.None, Prop.Oak, Prop.Boulder, Prop.Bush])
       expect(isImpassable({ ...land(100), prop })).toBe(false);
+  });
+});
+
+describe("headings", () => {
+  it("round-trip through their vectors", () => {
+    for (const heading of Object.values(Heading)) expect(headingOf(vectorOf(heading))).toBe(heading);
+    expect(headingOf({ x: 0, y: 0 })).toBeUndefined();
+  });
+
+  it("split into their cardinal axes, east or west first", () => {
+    expect(axesOf(Heading.North)).toEqual([Direction.North]);
+    expect(axesOf(Heading.SouthWest)).toEqual([Direction.West, Direction.South]);
   });
 });

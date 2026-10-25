@@ -19,6 +19,46 @@ export const stepToward = (p: Vec2, direction: Direction): Vec2 => ({
 
 export const NEIGHBOURS: readonly Vec2[] = Object.values(OFFSETS);
 
+export const Heading = {
+  North: 0,
+  NorthEast: 1,
+  East: 2,
+  SouthEast: 3,
+  South: 4,
+  SouthWest: 5,
+  West: 6,
+  NorthWest: 7,
+} as const;
+export type Heading = (typeof Heading)[keyof typeof Heading];
+
+const HEADING_VECTORS: readonly Vec2[] = [
+  { x: 0, y: -1 },
+  { x: 1, y: -1 },
+  { x: 1, y: 0 },
+  { x: 1, y: 1 },
+  { x: 0, y: 1 },
+  { x: -1, y: 1 },
+  { x: -1, y: 0 },
+  { x: -1, y: -1 },
+];
+
+export const vectorOf = (heading: Heading): Vec2 => HEADING_VECTORS[heading]!;
+
+export const headingOf = ({ x, y }: Vec2): Heading | undefined => {
+  const i = HEADING_VECTORS.findIndex((v) => v.x === Math.sign(x) && v.y === Math.sign(y));
+  return i < 0 ? undefined : (i as Heading);
+};
+
+export const lengthOf = (heading: Heading): number => (axesOf(heading).length > 1 ? Math.SQRT2 : 1);
+
+export const axesOf = (heading: Heading): Direction[] => {
+  const { x, y } = vectorOf(heading);
+  return [
+    ...(x === 0 ? [] : [x > 0 ? Direction.East : Direction.West]),
+    ...(y === 0 ? [] : [y > 0 ? Direction.South : Direction.North]),
+  ];
+};
+
 export type Blocker = "cliff" | "obstacle";
 
 interface Footing {
