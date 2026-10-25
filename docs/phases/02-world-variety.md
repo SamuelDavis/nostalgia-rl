@@ -14,13 +14,19 @@ Decided in an interview with the user (2026-10-24).
 - **Politics:** none yet. Rulers and factions come with NPC behaviour.
 - **Purpose:** every feature declares its role, occupants, what it produces and what it relates to (a farm supplies its settlement, bandits prey on a road), for future NPC intent and radiant quests.
 - **Movement costs** (user's request, 2026-10-25): the "action costs in ticks" idea. The clock ticks every 10 ms; a step on level grass costs 10 ticks (`STEP_TICKS`), so pace is unchanged. Paths and roads are faster; snow and forest a little slower; wading slower, swimming slower still; pushing through trees ×3; slope slows more as it steepens, uphill more than down; cliffs and low obstacles are climbed at a rate per metre, faster down than up. Walls, rock, buildings, tents and wells stay impassable (`Crossing` in `src/worldgen/props.ts`). Rates are first guesses in `src/game/movement.ts`, for playtest.
-- **Strides:** progress toward the next tile is whole ticks in the session (`Stride`), not a float position, so it stays deterministic and other peers can see a climber partway up. Progress survives stopping and is abandoned on turning away. A press drives at least one grass step's worth of the stride (exactly one tile on cheap ground), and holding pushes every tick. The renderer interpolates between the last two ticks. The repeat delay went from 50 to 150 ms so a quick tap stops on a tile rather than partway into the next.
+- **Continuous movement** (replaced tick-counted strides, which snapped back when you turned partway into a tree): the player's centre has a fixed-point offset in thousandths of a tile (`TILE_UNITS`) within its tile, so it stays deterministic. The tile under the centre is the tile you are in, for pace, layer and links; you enter a tile when your centre crosses its edge. Impassable tiles collide with the body, a 0.6 m circle (`BODY_RADIUS`), which slides round corners it catches (door frames). The circle is smaller than a tile so a one-tile gap has slack. Slope pace is spread across the half-tiles either side of an edge; a cliff, or an obstacle you climb onto (`standingHeight`), is climbed in place at its edge, and that progress survives stopping and is abandoned on turning away. Moving sideways keeps the offset on the other axis; there is no drift back to a column's centre (the user's choice, to revisit if clipping or ambiguity shows in playtest). A tap moves to the next tile centre ahead, or as far as a step's ticks reach; holding pushes every tick, and you stop wherever you let go. The renderer interpolates between the last two ticks, and the footstep sway eases out when you stop. The repeat delay went from 50 to 150 ms so a quick tap is one tile.
 - **Sight is not passability:** trees and cliffs still stop sight lines (`blockerBetween`) though they can be crossed, so forests still close the view. The camera's heading and settling run on elapsed time, not turns.
 - **First increment:** provinces; a minor-feature layer with bandit camps, woodcutters' huts, dens, small caves, and standing stones for uncanny provinces; farms around settlements. Castles, keeps and watchtowers follow.
 
 ## Playtest log
 
 _Record user feedback verbatim, newest first, with the commit it refers to._
+
+### d1e1388: movement costs ticks
+
+> If you start to move partway through a tree, stop, then tap left/right, you snap backward and then move left/right. This is an argument in favor of true, floating point movement
+
+Then, in discussion: the player's centre decides which tile they are in, and collision with impassable things is checked at the body's bounds, a circle, "more towards GBA Zelda or other sprite based RPGs". Built as continuous movement (see Decisions).
 
 ### 7aa6468: provinces, minor features, farms
 

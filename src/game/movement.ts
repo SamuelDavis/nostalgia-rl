@@ -54,6 +54,8 @@ export const blockerBetween = (from: Footing, to: Footing): Blocker | undefined 
   return undefined;
 };
 
+export const TILE_UNITS = 1000;
+export const BODY_RADIUS = 300;
 export const STEP_TICKS = 10;
 const WAY_PACE: Record<Way, number> = { [Way.None]: 1, [Way.Path]: 0.85, [Way.Road]: 0.7 };
 const ROUGH_PACE = 1.2;
@@ -65,25 +67,32 @@ const DOWNHILL_PACE_PER_METRE = 0.2;
 const CLIMB_UP_TICKS_PER_METRE = 100;
 const CLIMB_DOWN_TICKS_PER_METRE = 40;
 
-const paceOn = (to: Going): number => {
-  if (isSwimming(to)) return SWIMMING_PACE;
-  if (to.water === Water.Shallow) return WADING_PACE;
-  if (isTrail(to)) return WAY_PACE[to.way];
-  return to.ground === Ground.Snow || to.biome === Biome.Forest ? ROUGH_PACE : 1;
+export const isImpassable = ({ prop }: Footing): boolean => PROPS[prop].crossing === "never";
+
+export const standingHeight = ({ height, prop }: Footing): number =>
+  height + (PROPS[prop].crossing === "climb" ? PROPS[prop].height : 0);
+
+const groundPace = (on: Going): number => {
+  if (isSwimming(on)) return SWIMMING_PACE;
+  if (on.water === Water.Shallow) return WADING_PACE;
+  if (isTrail(on)) return WAY_PACE[on.way];
+  return on.ground === Ground.Snow || on.biome === Biome.Forest ? ROUGH_PACE : 1;
 };
 
-const slopePace = (rise: number): number =>
-  1 + Math.abs(rise) * (rise > 0 ? UPHILL_PACE_PER_METRE : DOWNHILL_PACE_PER_METRE);
+export const paceOn = (on: Going): number => groundPace(on) * (PROPS[on.prop].crossing === "push" ? PUSHING_PACE : 1);
 
-const climbTicks = (rise: number): number =>
-  Math.abs(rise) * (rise > 0 ? CLIMB_UP_TICKS_PER_METRE : CLIMB_DOWN_TICKS_PER_METRE);
+export type Edge = { readonly climb: false; readonly pace: number } | { readonly climb: true; readonly ticks: number };
 
-export const strideTicks = (from: Going, to: Going): number | undefined => {
-  const { crossing, height } = PROPS[to.prop];
-  if (crossing === "never") return undefined;
-  const rise = (to.height - from.height) * METRES_PER_LEVEL;
-  const cliff = isCliff(from, to);
-  const pace = paceOn(to) * (crossing === "push" ? PUSHING_PACE : 1) * (cliff ? 1 : slopePace(rise));
-  const climb = (cliff ? climbTicks(rise) : 0) + (crossing === "climb" ? climbTicks(height * METRES_PER_LEVEL) : 0);
-  return Math.round(STEP_TICKS * pace + climb);
+export const edgeBetween = (from: Footing, to: Footing): Edge => {
+  const levels = standingHeight(to) - standingHeight(from);
+  const rise = levels * METRES_PER_LEVEL;
+  if (Math.abs(levels) > MAX_CLIMB && !(isTrail(from) && isTrail(to)))
+    return {
+      climb: true,
+      ticks: Math.round(Math.abs(rise) * (rise > 0 ? CLIMB_UP_TICKS_PER_METRE : CLIMB_DOWN_TICKS_PER_METRE)),
+    };
+  return { climb: false, pace: 1 + Math.abs(rise) * (rise > 0 ? UPHILL_PACE_PER_METRE : DOWNHILL_PACE_PER_METRE) };
 };
+
+export const unitsPerTick = (on: Going, slopePace: number): number =>
+  Math.round(TILE_UNITS / (STEP_TICKS * paceOn(on) * slopePace));

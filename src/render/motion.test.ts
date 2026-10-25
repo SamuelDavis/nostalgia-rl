@@ -4,36 +4,27 @@ import { type Session, startSession } from "../game/session";
 import { onlySurface } from "../game/terrain";
 import { GRASS } from "../game/terrain.fixtures";
 import { SURFACE } from "../worldgen";
-import { approach, createMotion, facingAngle, shownOf, turnToward } from "./motion";
+import { approach, createMotion, facingAngle, footstep, shownOf, turnToward } from "./motion";
 
-const TICKS = 10;
 const TICK_MS = 10;
 
 describe("shownOf", () => {
-  const striding = (spent: number, to = { x: 1, y: 0 }): Session => ({
-    ...startSession({ x: 0, y: 0 }),
-    stride: { to, layer: SURFACE, spent, ticks: TICKS },
-  });
-
-  it("shows a still subject where it stands", () => {
+  it("shows a subject at its tile, shifted by its offset", () => {
     expect(shownOf(startSession({ x: 3, y: 4 }))).toEqual({ x: 3, y: 4 });
+    expect(shownOf({ ...startSession({ x: 3, y: 4 }), offset: { x: 250, y: -500 } })).toEqual({ x: 3.25, y: 3.5 });
+  });
+});
+
+describe("footstep", () => {
+  it("leaves tile centres and edges where they are", () => {
+    for (const at of [0, 0.5, 1, -2]) expect(footstep(at, 0.5)).toBeCloseTo(at);
   });
 
-  it("shows a stride as far along as its progress", () => {
-    expect(shownOf(striding(0))).toEqual({ x: 0, y: 0 });
-    expect(shownOf(striding(TICKS / 2)).x).toBeCloseTo(0.5);
-  });
-
-  it("slows at the start and end of each stride, like footsteps", () => {
-    const covered = (from: number, to: number) => shownOf(striding(to)).x - shownOf(striding(from)).x;
-    expect(covered(0, 1)).toBeLessThan(covered(4.5, 5.5) / 2);
-    expect(covered(9, 10)).toBeLessThan(covered(4.5, 5.5) / 2);
-    expect(covered(0, 1)).toBeGreaterThan(0);
-  });
-
-  it("varies a little from stride to stride", () => {
-    const starts = [1, 2, 3, 4].map((x) => shownOf(striding(1, { x, y: 0 })).x.toFixed(6));
-    expect(new Set(starts).size).toBeGreaterThan(1);
+  it("slows near each tile centre, like footsteps", () => {
+    const covered = (from: number, to: number) => footstep(to, 0.5) - footstep(from, 0.5);
+    expect(covered(0, 0.1)).toBeLessThan(covered(0.45, 0.55) / 2);
+    expect(covered(0.9, 1)).toBeLessThan(covered(0.45, 0.55) / 2);
+    expect(covered(0, 0.1)).toBeGreaterThan(0);
   });
 });
 
@@ -71,13 +62,7 @@ const risingEast = onlySurface((x) => ({ ...GRASS, height: GRASS.height + x }));
 
 describe("createMotion", () => {
   const start = startSession({ x: 0, y: 0 });
-  const halfway: Session = {
-    ...start,
-    tick: 1,
-    facing: Direction.East,
-    stride: { to: { x: 1, y: 0 }, layer: SURFACE, spent: TICKS / 2, ticks: TICKS },
-  };
-  const arrived: Session = { ...halfway, tick: 2, position: { x: 1, y: 0 }, stride: undefined };
+  const eastward = (x: number): Session => ({ ...start, facing: Direction.East, offset: { x, y: 0 } });
 
   it("poses a still player where it stands, at its eye level, facing its way", () => {
     const motion = createMotion(TICK_MS, start, risingEast, 0);
@@ -90,18 +75,25 @@ describe("createMotion", () => {
 
   it("moves from the tick before toward the latest over one tick from its scheduled moment", () => {
     const motion = createMotion(TICK_MS, start, risingEast, 0);
-    motion.ticked({ prior: halfway, session: arrived, scheduled: 1000, moved: true, acted: true });
-    expect(motion.poseAt(1000).shown.x).toBeCloseTo(0.5);
-    expect(motion.poseAt(1000 + TICK_MS / 2).shown.x).toBeCloseTo(0.75);
-    expect(motion.poseAt(1000 + 5 * TICK_MS).shown).toEqual({ x: 1, y: 0 });
+    motion.ticked({ prior: eastward(0), session: eastward(500), scheduled: 1000, moved: false, acted: true });
+    expect(motion.poseAt(1000).shown.x).toBeCloseTo(0);
+    expect(motion.poseAt(1000 + 5 * TICK_MS).shown.x).toBeCloseTo(0.5);
   });
 
-  it("eases the eye level and facing toward the stride's tile and direction", () => {
+  it("rises with a climb's progress", () => {
     const motion = createMotion(TICK_MS, start, risingEast, 0);
-    motion.ticked({ prior: halfway, session: halfway, scheduled: 0, moved: false, acted: true });
+    const climbing: Session = { ...eastward(500), climb: { to: { x: 1, y: 0 }, layer: SURFACE, spent: 9, ticks: 10 } };
+    motion.ticked({ prior: climbing, session: climbing, scheduled: 0, moved: false, acted: true });
+    expect(motion.poseAt(10_000).eyeLevel).toBeCloseTo(GRASS.height + 0.9);
+  });
+
+  it("eases the eye level and facing toward the new tile and direction", () => {
+    const motion = createMotion(TICK_MS, start, risingEast, 0);
+    const arrived: Session = { ...start, position: { x: 1, y: 0 }, facing: Direction.East };
+    motion.ticked({ prior: arrived, session: arrived, scheduled: 0, moved: true, acted: true });
     const { eyeLevel, angle } = motion.poseAt(30);
     expect(eyeLevel).toBeGreaterThan(GRASS.height);
-    expect(eyeLevel).toBeLessThan(GRASS.height + 0.5);
+    expect(eyeLevel).toBeLessThan(GRASS.height + 1);
     expect(angle).toBeLessThan(facingAngle(Direction.South));
     expect(angle).toBeGreaterThan(facingAngle(Direction.East));
   });

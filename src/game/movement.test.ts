@@ -2,7 +2,17 @@ import { describe, expect, it } from "vitest";
 import { Biome, Ground, Prop, MAX_CLIMB, Water, Way, metresToLevels } from "../worldgen";
 import type { Tile } from "./terrain";
 import { GRASS } from "./terrain.fixtures";
-import { Direction, STEP_TICKS, blockerBetween, isStairway, isSwimming, stepToward, strideTicks } from "./movement";
+import {
+  Direction,
+  STEP_TICKS,
+  blockerBetween,
+  edgeBetween,
+  isImpassable,
+  isStairway,
+  isSwimming,
+  paceOn,
+  stepToward,
+} from "./movement";
 
 const land = (height: number): Pick<Tile, "height" | "way" | "water" | "prop" | "ground" | "biome"> => ({
   height,
@@ -80,74 +90,84 @@ describe("isStairway", () => {
   });
 });
 
-describe("strideTicks", () => {
-  const ticksOnto = (to: Partial<ReturnType<typeof land>>, from = land(100)) =>
-    strideTicks(from, { ...land(100), ...to });
-  const grass = ticksOnto({})!;
-  const climbing = (metres: number) => ticksOnto({ height: 100 + metresToLevels(metres) })!;
-  const descending = (metres: number) => ticksOnto({ height: 100 - metresToLevels(metres) })!;
+describe("paceOn", () => {
+  const paceOnto = (on: Partial<ReturnType<typeof land>>) => paceOn({ ...land(100), ...on });
 
-  it("takes a step's ticks on level grass", () => {
-    expect(grass).toBe(STEP_TICKS);
+  it("is the base pace on grass", () => {
+    expect(paceOnto({})).toBe(1);
   });
 
   it("is faster on paths and faster still on roads", () => {
-    const path = ticksOnto({ way: Way.Path })!;
-    const road = ticksOnto({ way: Way.Road })!;
-    expect(path).toBeLessThan(grass);
-    expect(road).toBeLessThan(path);
+    expect(paceOnto({ way: Way.Path })).toBeLessThan(1);
+    expect(paceOnto({ way: Way.Road })).toBeLessThan(paceOnto({ way: Way.Path }));
   });
 
   it("is a little slower in snow or forest", () => {
-    for (const slow of [ticksOnto({ ground: Ground.Snow })!, ticksOnto({ biome: Biome.Forest })!]) {
-      expect(slow).toBeGreaterThan(grass);
-      expect(slow).toBeLessThan(1.5 * grass);
+    for (const slow of [paceOnto({ ground: Ground.Snow }), paceOnto({ biome: Biome.Forest })]) {
+      expect(slow).toBeGreaterThan(1);
+      expect(slow).toBeLessThan(1.5);
     }
   });
 
   it("wades shallow water slower, and swims deep water slower still", () => {
-    const wading = ticksOnto({ water: Water.Shallow })!;
-    const swimming = ticksOnto({ water: Water.Deep })!;
-    expect(wading).toBeGreaterThan(ticksOnto({ ground: Ground.Snow })!);
-    expect(swimming).toBeGreaterThan(wading);
-    expect(ticksOnto({ water: Water.Deep, prop: Prop.Bridge, way: Way.Road })).toBe(ticksOnto({ way: Way.Road }));
+    expect(paceOnto({ water: Water.Shallow })).toBeGreaterThan(paceOnto({ ground: Ground.Snow }));
+    expect(paceOnto({ water: Water.Deep })).toBeGreaterThan(paceOnto({ water: Water.Shallow }));
+    expect(paceOnto({ water: Water.Deep, prop: Prop.Bridge, way: Way.Road })).toBe(paceOnto({ way: Way.Road }));
   });
 
   it("pushes through trees at three times the pace", () => {
-    expect(ticksOnto({ prop: Prop.Oak })).toBe(3 * grass);
-    expect(ticksOnto({ prop: Prop.Pine, biome: Biome.Forest })).toBe(3 * ticksOnto({ biome: Biome.Forest })!);
-  });
-
-  it("slows more the steeper the slope, uphill more than down", () => {
-    const [gentle, steep] = [climbing(0.5), climbing(1)];
-    expect(gentle).toBeGreaterThan(grass);
-    expect(steep).toBeGreaterThan(gentle);
-    expect(descending(1)).toBeLessThan(steep);
-  });
-
-  it("climbs a cliff in time to its height, and climbs down faster", () => {
-    expect(climbing(2)).toBeGreaterThan(2 * climbing(1));
-    expect(climbing(30)).toBeGreaterThan(10 * climbing(2));
-    expect(descending(30)).toBeLessThan(climbing(30));
-    expect(descending(30)).toBeGreaterThan(descending(2));
-  });
-
-  it("takes stairs as a slope, not a climb", () => {
-    expect(strideTicks(path(100), path(116))).toBeLessThan(ticksOnto({ height: 116 }, path(100))!);
-  });
-
-  it("climbs over low obstacles in time to their height", () => {
-    const boulder = ticksOnto({ prop: Prop.Boulder })!;
-    expect(boulder).toBeGreaterThan(grass);
-    expect(ticksOnto({ prop: Prop.StandingStone })).toBeGreaterThan(boulder);
-  });
-
-  it("cannot pass walls, rock or buildings", () => {
-    for (const prop of [Prop.Wall, Prop.Rock, Prop.Tent, Prop.Shed, Prop.CaveMouth])
-      expect(ticksOnto({ prop })).toBeUndefined();
+    expect(paceOnto({ prop: Prop.Oak })).toBe(3);
+    expect(paceOnto({ prop: Prop.Pine, biome: Biome.Forest })).toBeCloseTo(3 * paceOnto({ biome: Biome.Forest }));
   });
 
   it("walks through low plants at the ground's pace", () => {
-    for (const prop of [Prop.Bush, Prop.Flowers, Prop.Tuft]) expect(ticksOnto({ prop })).toBe(grass);
+    for (const prop of [Prop.Bush, Prop.Flowers, Prop.Tuft]) expect(paceOnto({ prop })).toBe(1);
+  });
+});
+
+describe("edgeBetween", () => {
+  const onto = (metres: number, from = land(100)) => edgeBetween(from, land(100 + metresToLevels(metres)));
+  const slope = (metres: number) => {
+    const edge = onto(metres);
+    return edge.climb ? Infinity : edge.pace;
+  };
+  const climb = (metres: number) => {
+    const edge = onto(metres);
+    return edge.climb ? edge.ticks : 0;
+  };
+
+  it("is level ground at the base pace", () => {
+    expect(onto(0)).toEqual({ climb: false, pace: 1 });
+  });
+
+  it("slows more the steeper the slope, uphill more than down", () => {
+    expect(slope(0.5)).toBeGreaterThan(1);
+    expect(slope(1)).toBeGreaterThan(slope(0.5));
+    expect(slope(-1)).toBeLessThan(slope(1));
+  });
+
+  it("climbs a cliff in time to its height, and climbs down faster", () => {
+    expect(climb(2)).toBeGreaterThan(10 * STEP_TICKS);
+    expect(climb(30)).toBeGreaterThan(10 * climb(2));
+    expect(climb(-30)).toBeLessThan(climb(30));
+    expect(climb(-30)).toBeGreaterThan(climb(-2));
+  });
+
+  it("takes stairs as a slope, not a climb", () => {
+    expect(edgeBetween(path(100), path(116)).climb).toBe(false);
+  });
+
+  it("climbs onto obstacles by their height", () => {
+    expect(edgeBetween(land(100), { ...land(100), prop: Prop.StandingStone }).climb).toBe(true);
+    expect(edgeBetween({ ...land(100), prop: Prop.StandingStone }, land(100)).climb).toBe(true);
+  });
+});
+
+describe("isImpassable", () => {
+  it("is true of walls, rock and buildings, and of nothing that can be crossed", () => {
+    for (const prop of [Prop.Wall, Prop.Rock, Prop.Tent, Prop.Shed, Prop.CaveMouth])
+      expect(isImpassable({ ...land(100), prop })).toBe(true);
+    for (const prop of [Prop.None, Prop.Oak, Prop.Boulder, Prop.Bush])
+      expect(isImpassable({ ...land(100), prop })).toBe(false);
   });
 });

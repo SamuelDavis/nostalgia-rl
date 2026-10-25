@@ -40,8 +40,8 @@ A province's character, taken from the land at its seat: farmland, woodland, hig
 **Tick**:
 The world clock's unit, 10 ms. Every action costs ticks.
 
-**Stride**:
-A move toward a neighbouring tile, completed once enough ticks are spent on it; the player stays on the tile they left until then.
+**Body**:
+The circle, 0.6 m across, that an entity collides with impassable things by. Its centre decides which tile the entity is in.
 
 **Crossing**:
 How a prop is passed: walked through, pushed through, climbed over, or never.

@@ -1,5 +1,5 @@
 import { floorDiv } from "procgen";
-import { Direction, isSwimming } from "../game/movement";
+import { Direction, TILE_UNITS, isSwimming } from "../game/movement";
 import type { Session } from "../game/session";
 import type { Tile } from "../game/terrain";
 import type { HeightMode } from "../render/palette";
@@ -34,7 +34,7 @@ export const describePurpose = ({ role, occupants, produces, relation }: Purpose
   ].join(", ");
 
 export const sessionRows = (world: Worldgen, session: Session, tile: Tile, tickMs: number): Row[] => {
-  const { tick, facing, stride, blocked } = session;
+  const { tick, facing, offset, climb, blocked } = session;
   const { x, y } = session.position;
   const { elevation, temperature, moisture, drainage, landform } = world.fields;
   const form = landform(x + 0.5, y + 0.5);
@@ -59,7 +59,8 @@ export const sessionRows = (world: Worldgen, session: Session, tile: Tile, tickM
     ["place", place ? `${place.name}: ${describePurpose(place.purpose)}` : "—"],
     ["building", building ? `${building.plan.kind}, door at ${building.door.x}, ${building.door.y}` : "—"],
     ["facing", nameOf(Direction, facing)],
-    ["stride", stride ? `${stride.spent} of ${stride.ticks} ticks to ${stride.to.x}, ${stride.to.y}` : "—"],
+    ["offset", `${offset.x}, ${offset.y} of ${TILE_UNITS}`],
+    ["climb", climb ? `${climb.spent} of ${climb.ticks} ticks to ${climb.to.x}, ${climb.to.y}` : "—"],
     ["blocked", blocked === undefined ? "—" : `by ${nameOf(Prop, blocked)}`],
     ["swimming", isSwimming(tile) ? "yes" : "no"],
     ["height", `${tile.height} (${(tile.height - SEA_LEVEL) * METRES_PER_LEVEL} m above sea)`],
