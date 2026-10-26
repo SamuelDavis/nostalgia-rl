@@ -1,4 +1,4 @@
-import { type Vec2, contains, distance } from "procgen";
+import { type Vec2, contains } from "procgen";
 import {
   Biome,
   type Conditions,
@@ -22,6 +22,7 @@ import {
   surfaceColor,
   waterColor,
 } from "../palette";
+import { type MapFrame, type Pixels, createPixels, pixelOf, pointAt } from "./frame";
 
 export interface Mark {
   readonly point: Vec2;
@@ -113,20 +114,42 @@ export const overviewMarks = (world: Worldgen, center: Vec2, radius: number): Ma
   ...overviewFeatureMarks(world, center, radius),
 ];
 
-export const createOverviewTint = (world: Worldgen, center: Vec2, radius: number, spacing: number) => {
+const nearestOf = (seats: readonly Vec2[]) => (p: Vec2) => {
+  let nearest = seats[0];
+  let best = Infinity;
+  for (const seat of seats) {
+    const gap = (seat.x - p.x) ** 2 + (seat.y - p.y) ** 2;
+    if (gap < best) [nearest, best] = [seat, gap];
+  }
+  return nearest;
+};
+
+export const overviewImage = (world: Worldgen, mode: HeightMode, frame: MapFrame): Pixels => {
+  const { center, size, scale } = frame;
+  const radius = (size * scale) / 2;
   const forests = regionsWithin(center, radius).flatMap(world.deepForestsIn);
-  const seats = world.provincesAround(center);
-  const provinceOf = (p: Vec2) => seats.reduce((best, seat) => (distance(seat, p) < distance(best, p) ? seat : best));
-  const isBorder = (p: Vec2) => {
-    const here = provinceOf(p);
-    return [
-      { x: p.x - spacing, y: p.y },
-      { x: p.x, y: p.y - spacing },
-    ].some((q) => provinceOf(q) !== here);
-  };
-  return (color: Rgb, p: Vec2): Rgb => {
-    const forested = forests.some(({ bounds, layout }) => contains(bounds, p) && layout.contains(p));
-    const tinted = forested ? mix(color, DEEP_FOREST_AREA, DEEP_FOREST_TINT) : color;
-    return isBorder(p) ? shade(tinted, PROVINCE_BORDER_SHADE) : tinted;
-  };
+  const provinceOf = nearestOf(world.provincesAround(center));
+  const pixels = createPixels(size);
+  let north: { readonly level: number; readonly province: Vec2 | undefined }[] = [];
+  for (let row = 0; row < size; row++) {
+    const here: typeof north = [];
+    for (let col = 0; col < size; col++) {
+      const p = pointAt(frame, col, row);
+      const conditions = world.fields.conditions(p.x, p.y);
+      const own = { level: heightLevel(conditions.elevation), province: provinceOf(p) };
+      const [west, above] = [here[col - 1] ?? own, north[col] ?? own];
+      here.push(own);
+      const color = fieldColor(mode, conditions, { westLevel: west.level, northLevel: above.level, spacing: scale });
+      const forested = forests.some(({ bounds, layout }) => contains(bounds, p) && layout.contains(p));
+      const tinted = forested ? mix(color, DEEP_FOREST_AREA, DEEP_FOREST_TINT) : color;
+      const onBorder = west.province !== own.province || above.province !== own.province;
+      pixels.set(col, row, onBorder ? shade(tinted, PROVINCE_BORDER_SHADE) : tinted);
+    }
+    north = here;
+  }
+  for (const mark of overviewMarks(world, center, radius)) {
+    const { col, row } = pixelOf(frame, mark.point);
+    for (const o of markPixels(mark)) pixels.set(col + o.x, row + o.y, mark.color);
+  }
+  return pixels.data;
 };

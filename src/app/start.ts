@@ -1,5 +1,6 @@
 import type { ChunkRequest } from "../chunk-worker";
 import type { Command } from "../command";
+import type { OverviewRequest } from "../map-worker";
 import { createChunkStore } from "../game/chunk-store";
 import { type Act, createPlay } from "../game/play";
 import { type Session, startSession } from "../game/session";
@@ -10,11 +11,24 @@ import { HEIGHT_MODES, type HeightMode } from "../render/palette";
 import { createTopDown } from "../render/top-down/renderer";
 import { type Row, inputRows, sessionRows, topDownRows } from "../ui/debug";
 import { createHud } from "../ui/hud";
+import type { Pixels } from "../render/map/frame";
+import type { OverviewOf } from "../render/map/painter";
 import { createMap } from "../ui/map";
 import { type Chunk, chunkOn, createWorldgen } from "../worldgen";
 import { createAddressSync, launchFrom } from "./address";
 
 const ZOOM_STEP = 4;
+
+const overviewsFrom = (seed: number): OverviewOf => {
+  const worker = new Worker(new URL("../map-worker.ts", import.meta.url), { type: "module" });
+  const awaiting: ((pixels: Pixels) => void)[] = [];
+  worker.addEventListener("message", ({ data }: MessageEvent<Pixels>) => awaiting.shift()!(data));
+  return (frame, mode) =>
+    new Promise((resolve) => {
+      awaiting.push(resolve);
+      worker.postMessage({ seed, mode, frame } satisfies OverviewRequest);
+    });
+};
 
 export const startGame = (host: HTMLElement, search: string) => {
   const { seed, tickMs, repeatDelayMs, start } = launchFrom(search);
@@ -61,7 +75,8 @@ export const startGame = (host: HTMLElement, search: string) => {
     { keys: ["Minus", "NumpadSubtract"], hint: "−", command: zoomOut },
   ];
   const hud = createHud(host, shortcuts, MOVE_HINT);
-  const map = createMap(host, world, chunks);
+  const map = createMap(host, overviewsFrom(seed), chunks);
+  map.prepare(play.session(), mode);
 
   let described: { readonly session: Session; readonly rows: readonly Row[] } | undefined;
   const describe = (session: Session): readonly Row[] => {

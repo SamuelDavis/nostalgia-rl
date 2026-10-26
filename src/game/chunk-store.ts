@@ -4,7 +4,7 @@ import { CHUNK_SIZE, type Chunk, type Layer, layerKey } from "../worldgen";
 export type ChunkAt = (cx: number, cy: number) => Chunk;
 type LayerChunkAt = (layer: Layer, cx: number, cy: number) => Chunk;
 
-interface ChunkCoord {
+export interface ChunkCoord {
   readonly cx: number;
   readonly cy: number;
 }
@@ -33,6 +33,14 @@ export const createChunkStore = (generate: LayerChunkAt, request: (layer: Layer,
     asked.delete(keyOf(chunk.layer, chunk.cx, chunk.cy));
     held.set(keyOf(chunk.layer, chunk.cx, chunk.cy), chunk);
   };
+  const fetch = (layer: Layer, coords: readonly ChunkCoord[]) => {
+    for (const { cx, cy } of coords) {
+      const key = keyOf(layer, cx, cy);
+      if (held.has(key) || asked.has(key)) continue;
+      asked.add(key);
+      request(layer, cx, cy);
+    }
+  };
   return {
     receive,
     peek: (layer: Layer, cx: number, cy: number): Chunk | undefined => held.get(keyOf(layer, cx, cy)),
@@ -43,13 +51,7 @@ export const createChunkStore = (generate: LayerChunkAt, request: (layer: Layer,
       receive(generated);
       return generated;
     },
-    prefetch: (layer: Layer, p: Vec2, reach: number) => {
-      for (const { cx, cy } of chunksAround(p, reach)) {
-        const key = keyOf(layer, cx, cy);
-        if (held.has(key) || asked.has(key)) continue;
-        asked.add(key);
-        request(layer, cx, cy);
-      }
-    },
+    fetch,
+    prefetch: (layer: Layer, p: Vec2, reach: number) => fetch(layer, chunksAround(p, reach)),
   };
 };

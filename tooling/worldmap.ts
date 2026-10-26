@@ -1,15 +1,9 @@
 import { parseArgs } from "node:util";
 import { memoize } from "procgen";
 import { createTerrain } from "../src/game/terrain";
-import { Cover, createWorldgen, generateChunk, heightLevel } from "../src/worldgen";
-import {
-  type Mark,
-  createOverviewTint,
-  fieldColor,
-  markPixels,
-  overviewFeatureMarks,
-  overviewMarks,
-} from "../src/render/map/overview";
+import { Cover, createWorldgen, generateChunk } from "../src/worldgen";
+import { pixelOf } from "../src/render/map/frame";
+import { markPixels, overviewFeatureMarks, overviewImage } from "../src/render/map/overview";
 import {
   HEIGHT_MODES,
   type HeightMode,
@@ -66,33 +60,27 @@ const tileColor = (x: number, y: number): Rgb => {
   return tile.cover === Cover.None ? color : shade(color, CANOPY_SHADE);
 };
 
-const center = { x: centerX, y: centerY };
-const radius = (size * scale) / 2;
-const isTiles = values.layer === "tiles";
-const tint = createOverviewTint(world, center, radius, scale);
+const frame = { center: { x: centerX, y: centerY }, size, scale };
 
-const overlay = new Map<string, Rgb>();
-const marks: Mark[] = isTiles ? overviewFeatureMarks(world, center, radius) : overviewMarks(world, center, radius);
-for (const mark of marks) {
-  const px = Math.round((mark.point.x - centerX) / scale + size / 2);
-  const py = Math.round((mark.point.y - centerY) / scale + size / 2);
-  for (const o of markPixels(mark)) overlay.set(`${px + o.x},${py + o.y}`, mark.color);
-}
+const tilesColorAt = () => {
+  const overlay = new Map<string, Rgb>();
+  for (const mark of overviewFeatureMarks(world, frame.center, (size * scale) / 2)) {
+    const { col, row } = pixelOf(frame, mark.point);
+    for (const o of markPixels(mark)) overlay.set(`${col + o.x},${row + o.y}`, mark.color);
+  }
+  return (px: number, py: number) => {
+    const { x, y } = worldAt(px, py);
+    return overlay.get(`${px},${py}`) ?? tileColor(Math.floor(x), Math.floor(y));
+  };
+};
 
-writePng(values.out!, size, size, (px, py) => {
-  const { x, y } = worldAt(px, py);
-  return (
-    overlay.get(`${px},${py}`) ??
-    (isTiles
-      ? tileColor(Math.floor(x), Math.floor(y))
-      : tint(
-          fieldColor(mode, world.fields.conditions(x, y), {
-            westLevel: heightLevel(world.fields.elevation(x - scale, y)),
-            northLevel: heightLevel(world.fields.elevation(x, y - scale)),
-            spacing: scale,
-          }),
-          { x, y },
-        ))
-  );
-});
+const overviewColorAt = () => {
+  const pixels = overviewImage(world, mode, frame);
+  return (px: number, py: number): Rgb => {
+    const i = (py * size + px) * 4;
+    return [pixels[i]!, pixels[i + 1]!, pixels[i + 2]!];
+  };
+};
+
+writePng(values.out!, size, size, values.layer === "tiles" ? tilesColorAt() : overviewColorAt());
 console.log(`wrote ${values.out}`);

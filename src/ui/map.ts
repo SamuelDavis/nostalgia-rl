@@ -1,16 +1,15 @@
 import type { HeightMode } from "../render/palette";
-import { type HeldChunks, type Whereabouts, createMapPainter } from "../render/map/painter";
-import type { Worldgen } from "../worldgen";
+import { type HeldChunks, type OverviewOf, type Whereabouts, createMapPainter } from "../render/map/painter";
 
 const MAP_VIEWS = ["closed", "overview", "local"] as const;
 type MapView = (typeof MAP_VIEWS)[number];
 
-export const createMap = (parent: HTMLElement, world: Worldgen, chunks: HeldChunks) => {
+export const createMap = (parent: HTMLElement, overviewOf: OverviewOf, chunks: HeldChunks) => {
   const canvas = document.createElement("canvas");
   canvas.className = "map";
   canvas.hidden = true;
   parent.append(canvas);
-  const painter = createMapPainter(canvas, world, chunks);
+  const painter = createMapPainter(canvas, overviewOf, chunks);
   let view: MapView = "closed";
 
   const cycle = (whereabouts: Whereabouts, mode: HeightMode) => {
@@ -21,5 +20,7 @@ export const createMap = (parent: HTMLElement, world: Worldgen, chunks: HeldChun
     if (view === "local") painter.paintLocal(whereabouts, mode);
   };
 
-  return { cycle };
+  const prepare = ({ position }: Whereabouts, mode: HeightMode) => painter.prepareOverview(position, mode);
+
+  return { cycle, prepare };
 };
