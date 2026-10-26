@@ -4,7 +4,17 @@ import { type Session, startSession } from "../game/session";
 import { onlySurface } from "../game/terrain";
 import { GRASS } from "../game/terrain.fixtures";
 import { SURFACE } from "../worldgen";
-import { approach, createMotion, facingAngle, footstep, gait, shownOf, STEP_LENGTH, turnToward } from "./motion";
+import {
+  STEP_LENGTH,
+  approach,
+  createMotion,
+  facingAngle,
+  footstep,
+  gait,
+  shownOf,
+  springToward,
+  turnToward,
+} from "./motion";
 
 const TICK_MS = 10;
 
@@ -77,6 +87,32 @@ describe("approach", () => {
 });
 
 const risingEast = onlySurface((x) => ({ ...GRASS, height: GRASS.height + x }));
+
+describe("springToward", () => {
+  const AT_REST = { value: 0, velocity: 0 };
+  const run = (frames: number, target = 1, from = AT_REST) =>
+    Array.from({ length: frames }).reduce<typeof AT_REST>((s) => springToward(s, target, 16, 200), from);
+
+  it("settles on its target", () => {
+    expect(run(200).value).toBeCloseTo(1);
+    expect(run(200).velocity).toBeCloseTo(0);
+  });
+
+  it("never overshoots from rest", () => {
+    for (let frames = 1; frames < 200; frames++) expect(run(frames).value).toBeLessThanOrEqual(1);
+  });
+
+  it("starts slowly, unlike an exponential approach", () => {
+    expect(run(1).value).toBeLessThan(approach(0, 1, 16, 200) / 2);
+  });
+
+  it("carries its velocity through a change of target", () => {
+    const moving = run(10);
+    const retargeted = springToward(moving, -5, 0, 200);
+    expect(retargeted).toEqual(moving);
+    expect(springToward(moving, -5, 1, 200).value).toBeGreaterThan(moving.value);
+  });
+});
 
 describe("createMotion", () => {
   const start = startSession({ x: 0, y: 0 });

@@ -82,5 +82,8 @@ export const inputRows = (tapTurnsFirst: boolean): Row[] => [["tap", tapTurnsFir
 
 export const topDownRows = (zoom: Zoom, mode: HeightMode): Row[] => [
   ["height mode", mode],
-  ["view", `${zoom.span} (settles ${zoom.natural}) ${zoom.modifier < 0 ? "−" : "+"} ${Math.abs(zoom.modifier)} tiles`],
+  [
+    "view",
+    `${zoom.span.toFixed(1)} (sight ${zoom.sight.toFixed(1)}) ${zoom.modifier < 0 ? "−" : "+"} ${Math.abs(zoom.modifier)} tiles`,
+  ],
 ];

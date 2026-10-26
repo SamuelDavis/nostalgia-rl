@@ -34,7 +34,6 @@ export const createTopDown = (
   const here = () => layers.terrainOn(session.layer);
   const motion = createMotion(tickMs, start, layers, now);
   const framing = createFraming(start, here(), now);
-  let zoom: Zoom = { span: framing.naturalSpan(), natural: framing.naturalSpan(), modifier: 0 };
   let drawn = "";
 
   return {
@@ -46,9 +45,7 @@ export const createTopDown = (
     draw: (now) => {
       const resized = fitBacking(canvas, ctx);
       const { shown, angle, eyeLevel } = motion.poseAt(now);
-      const framed = framing.frame(now, shown, { width: canvas.clientWidth, height: canvas.clientHeight });
-      const { view } = framed;
-      zoom = framed.zoom;
+      const view = framing.frame(now, shown, { width: canvas.clientWidth, height: canvas.clientHeight });
       const placement = [view.centre.x, view.centre.y, shown.x, shown.y]
         .map((v) => v * view.tilePx)
         .concat(view.tilePx * 100, eyeLevel * 100, angle * 100, session.position.x, session.position.y)
@@ -59,9 +56,9 @@ export const createTopDown = (
       drawViewport(here(), view, { layer: session.layer, position: session.position, shown, eyeLevel, angle }, mode);
       drawn = placement;
     },
-    reach: () => PREFETCH_SPANS * framing.naturalSpan() + CHUNK_SIZE,
+    reach: () => PREFETCH_SPANS * framing.widestSpan() + CHUNK_SIZE,
     zoomBy: (delta) => framing.zoomBy(delta),
-    zoom: () => zoom,
+    zoom: framing.zoom,
     showHeightAs: (next) => {
       mode = next;
     },

@@ -1,212 +1,161 @@
 import { describe, expect, it } from "vitest";
-import { Heading } from "../../game/movement";
 import { fieldOf } from "../../game/terrain.fixtures";
 import { type Vec2 } from "procgen";
 import { Prop } from "../../worldgen";
-import {
-  SETTLE_MS,
-  attentiveSpan,
-  SIGHT_REACH,
-  createCamera,
-  lookOffset,
-  naturalSpan,
-  openness,
-  practicalSpan,
-  sightAhead,
-  steer,
-} from "./camera";
+import { NOSE_SPAN, OPEN_SPAN, createCamera, leadOf, sightRange, spanFor, surveyFrom } from "./camera";
 
-const cone = (x: number, y: number) => 200 - Math.abs(x) - Math.abs(y);
-const plain = () => 100;
-const risingEast = (x: number) => 100 + x;
-
-const EAST: Vec2 = { x: 1, y: 0 };
-const WEST: Vec2 = { x: -1, y: 0 };
-const SOUTH: Vec2 = { x: 0, y: 1 };
-const STILL: Vec2 = { x: 0, y: 0 };
 const ORIGIN: Vec2 = { x: 0, y: 0 };
+const EAST = 0;
+const NORTH = -Math.PI / 2;
 
-const STEP_MS = 100;
-const walk = (steps: readonly Vec2[], from: Vec2 = STILL) =>
-  steps.reduce((heading, step) => steer(heading, step, STEP_MS), from);
+const only = (at: Vec2, prop: Prop = Prop.Oak) => fieldOf((x, y) => (x === at.x && y === at.y ? prop : Prop.None));
+const scattered = (every: number) =>
+  fieldOf((x, y) => ((x * 7 + y * 3) % every === 0 && (x !== 0 || y !== 0) ? Prop.Oak : Prop.None));
+const open = fieldOf(() => Prop.None);
 
-describe("openness", () => {
-  it("is closed in every direction on level ground", () => {
-    expect(openness(plain, ORIGIN).every((o) => o === 0)).toBe(true);
+const spanFacing = (terrain: ReturnType<typeof fieldOf>, facing = EAST) =>
+  spanFor(sightRange(surveyFrom(terrain, ORIGIN), facing));
+
+describe("spanFor", () => {
+  it("is the open view over open ground", () => {
+    expect(spanFacing(open)).toBe(OPEN_SPAN);
   });
 
-  it("is open in every direction from a summit", () => {
-    expect(openness(cone, ORIGIN).every((o) => o > 0.5)).toBe(true);
+  it("closes all the way with something in your face", () => {
+    expect(spanFacing(only({ x: 1, y: 0 }))).toBeLessThan(NOSE_SPAN + 1);
   });
 
-  it("is open down a slope and enclosed up it", () => {
-    const open = openness(risingEast, ORIGIN);
-    expect(Math.max(...open)).toBeGreaterThan(0.5);
-    expect(Math.min(...open)).toBeLessThan(-0.5);
-  });
-});
-
-describe("steer", () => {
-  it("takes a few steps to establish a heading", () => {
-    expect(walk([EAST]).x).toBeLessThan(0.5);
-    expect(walk([EAST, EAST, EAST, EAST, EAST]).x).toBeGreaterThan(0.75);
+  it("closes less the further away the obstacle", () => {
+    const [near, far] = [spanFacing(only({ x: 2, y: 0 })), spanFacing(only({ x: 4, y: 0 }))];
+    expect(near).toBeGreaterThan(NOSE_SPAN + 1);
+    expect(far).toBeGreaterThan(near);
+    expect(far).toBeLessThan(OPEN_SPAN);
   });
 
-  it("keeps an established heading through a single turn", () => {
-    const heading = walk([SOUTH], walk(Array(6).fill(EAST)));
-    expect(heading.x).toBeGreaterThan(heading.y);
+  it("closes a lot, but not all the way, among many obstacles a little way off", () => {
+    const span = spanFacing(scattered(5));
+    expect(span).toBeLessThan(OPEN_SPAN / 2);
+    expect(span).toBeGreaterThan(NOSE_SPAN + 1);
   });
 
-  it("settles on a diagonal when alternating directions", () => {
-    const heading = walk(Array.from({ length: 12 }, (_, i) => (i % 2 ? EAST : SOUTH)));
-    expect(Math.abs(heading.x - heading.y)).toBeLessThan(0.35);
-  });
-});
-
-describe("naturalSpan", () => {
-  it("stays close on level ground whichever way you look", () => {
-    expect(naturalSpan(openness(plain, ORIGIN), EAST)).toBe(naturalSpan(openness(plain, ORIGIN), STILL));
+  it("closes more the denser the obstacles", () => {
+    expect(spanFacing(scattered(3))).toBeLessThan(spanFacing(scattered(9)));
   });
 
-  it("opens looking down a slope and closes looking up it", () => {
-    const slope = openness(risingEast, ORIGIN);
-    const level = naturalSpan(openness(plain, ORIGIN), EAST);
-    expect(naturalSpan(slope, WEST)).toBeGreaterThan(level);
-    expect(naturalSpan(slope, EAST)).toBeLessThan(level);
+  it("closes less for an obstacle to the side than straight ahead", () => {
+    expect(spanFacing(only({ x: 1, y: -1 }))).toBeGreaterThan(spanFacing(only({ x: 1, y: 0 })));
   });
 
-  it("opens from a summit whichever way you look", () => {
-    const summit = openness(cone, ORIGIN);
-    expect(naturalSpan(summit, EAST)).toBeGreaterThan(naturalSpan(openness(plain, ORIGIN), EAST));
-    expect(naturalSpan(summit, EAST)).toBe(naturalSpan(summit, WEST));
-  });
-});
-
-describe("practicalSpan", () => {
-  it("stays well inside the settled view", () => {
-    for (const ground of [plain, cone, risingEast])
-      for (const heading of [EAST, WEST, STILL])
-        expect(practicalSpan(openness(ground, ORIGIN), heading)).toBeLessThan(
-          naturalSpan(openness(ground, ORIGIN), heading),
-        );
+  it("ignores what is behind you", () => {
+    expect(spanFacing(only({ x: -1, y: 0 }))).toBe(OPEN_SPAN);
   });
 
-  it("widens a little looking down and narrows a little looking up", () => {
-    const slope = openness(risingEast, ORIGIN);
-    const level = practicalSpan(openness(plain, ORIGIN), EAST);
-    expect(practicalSpan(slope, WEST)).toBeGreaterThan(level);
-    expect(practicalSpan(slope, EAST)).toBeLessThan(level);
+  it("closes less for a short obstacle than a tall one", () => {
+    const boulder = spanFacing(only({ x: 1, y: 0 }, Prop.Boulder));
+    expect(boulder).toBeLessThan(OPEN_SPAN);
+    expect(boulder).toBeGreaterThan(OPEN_SPAN / 2);
+  });
+
+  it("changes gradually as you turn", () => {
+    const survey = surveyFrom(only({ x: 1, y: 0 }), ORIGIN);
+    for (let facing = NORTH; facing < EAST; facing += 0.01)
+      expect(Math.abs(spanFor(sightRange(survey, facing + 0.01)) - spanFor(sightRange(survey, facing)))).toBeLessThan(
+        1,
+      );
   });
 });
 
-describe("sightAhead", () => {
-  const open = fieldOf(() => Prop.None);
-  const wallAt = (at: number) => fieldOf((x) => (x === at ? Prop.Oak : Prop.None));
-  const scattered = (every: number) => fieldOf((x, y) => ((x * 7 + y * 3) % every === 0 ? Prop.Oak : Prop.None));
+describe("leadOf", () => {
+  const leadFacing = (terrain: ReturnType<typeof fieldOf>, facing = EAST) =>
+    leadOf(surveyFrom(terrain, ORIGIN), facing);
 
-  it("sees to its reach over open ground", () => {
-    expect(sightAhead(open, ORIGIN, Heading.East).distance).toBeCloseTo(SIGHT_REACH);
+  it("leads the way you face over open ground", () => {
+    expect(leadFacing(open).x).toBeGreaterThan(OPEN_SPAN / 3);
+    expect(leadFacing(open).y).toBeCloseTo(0);
+    expect(leadFacing(open, NORTH).y).toBeLessThan(-OPEN_SPAN / 3);
   });
 
-  it("is nothing with a wall in your face, and grows as you step back", () => {
-    expect(sightAhead(wallAt(1), ORIGIN, Heading.East).distance).toBe(0);
-    expect(sightAhead(wallAt(2), ORIGIN, Heading.East).distance).toBeGreaterThan(0);
-    expect(sightAhead(wallAt(3), ORIGIN, Heading.East).distance).toBeGreaterThan(
-      sightAhead(wallAt(2), ORIGIN, Heading.East).distance,
-    );
+  it("hardly leads with a wall in your face", () => {
+    const { x, y } = leadFacing(fieldOf((x) => (x === 1 ? Prop.Oak : Prop.None)));
+    expect(Math.hypot(x, y)).toBeLessThan(1);
   });
 
-  it("is shortened only partly by a single obstacle a few tiles ahead", () => {
-    const tree = fieldOf((x, y) => (x === 3 && y === 0 ? Prop.Oak : Prop.None));
-    const sight = sightAhead(tree, ORIGIN, Heading.East).distance;
-    expect(sight).toBeGreaterThan(0);
-    expect(sight).toBeLessThan(SIGHT_REACH);
+  it("leads short of the obstacles ahead", () => {
+    expect(leadFacing(fieldOf((x) => (x === 6 ? Prop.Oak : Prop.None))).x).toBeLessThan(6);
   });
 
-  it("weighs near obstacles more than far open sight lines", () => {
-    const nearOnOneSide = fieldOf((x, y) => (y < 0 && x >= 1 ? Prop.Oak : Prop.None));
-    expect(sightAhead(nearOnOneSide, ORIGIN, Heading.East).distance).toBeLessThan(SIGHT_REACH / 2);
-  });
-
-  it("is shorter the denser the obstacles around you", () => {
-    const sparse = sightAhead(scattered(13), { x: 1, y: 1 }, Heading.East).distance;
-    const dense = sightAhead(scattered(3), { x: 1, y: 1 }, Heading.East).distance;
-    expect(dense).toBeLessThan(sparse);
-    expect(sparse).toBeLessThan(SIGHT_REACH);
-  });
-
-  it("narrows less for an obstacle to the side than for one straight ahead", () => {
-    const ahead = fieldOf((x, y) => (x === 2 && y === 0 ? Prop.Oak : Prop.None));
-    const aside = fieldOf((x, y) => (x === 2 && y === -2 ? Prop.Oak : Prop.None));
-    expect(sightAhead(aside, ORIGIN, Heading.East).distance).toBeGreaterThan(
-      sightAhead(ahead, ORIGIN, Heading.East).distance,
-    );
-  });
-
-  it("leads straight ahead when sight is clear", () => {
-    const { lead } = sightAhead(open, ORIGIN, Heading.East);
-    expect(lead.x).toBeCloseTo(1);
-    expect(lead.y).toBeCloseTo(0);
+  it("leads no further than it can see", () => {
+    const survey = surveyFrom(only({ x: 1, y: 0 }), ORIGIN);
+    const { x, y } = leadOf(survey, EAST);
+    expect(Math.hypot(x, y)).toBeLessThanOrEqual(sightRange(survey, EAST));
   });
 
   it("leads toward the clear side", () => {
-    const blockedLeft = fieldOf((x, y) => (y < 0 && x >= 1 ? Prop.Oak : Prop.None));
-    const { lead } = sightAhead(blockedLeft, ORIGIN, Heading.East);
-    expect(lead.x).toBeGreaterThan(0);
-    expect(lead.y).toBeGreaterThan(0.1);
+    const { x, y } = leadFacing(fieldOf((x, y) => (y < 0 && x >= 1 ? Prop.Oak : Prop.None)));
+    expect(x).toBeGreaterThan(0);
+    expect(y).toBeGreaterThan(1);
   });
 
-  it("hardly leads with a wall ahead", () => {
-    const { lead } = sightAhead(wallAt(2), ORIGIN, Heading.East);
-    expect(Math.hypot(lead.x, lead.y)).toBeLessThan(0.15);
-  });
-
-  it("only looks the way you face", () => {
-    expect(sightAhead(wallAt(1), ORIGIN, Heading.West).distance).toBeCloseTo(SIGHT_REACH);
-  });
-});
-
-describe("attentiveSpan", () => {
-  const spans = { natural: 50, practical: 15, sight: SIGHT_REACH };
-
-  it("holds the practical view while acting and settles to the natural view when idle", () => {
-    expect(attentiveSpan(spans, 0)).toBe(15);
-    expect(attentiveSpan(spans, SETTLE_MS - 1)).toBe(15);
-    expect(attentiveSpan(spans, SETTLE_MS)).toBe(50);
-  });
-
-  it("closes in as sight shortens, even when idle", () => {
-    const nose = attentiveSpan({ ...spans, sight: 0 }, SETTLE_MS);
-    const nearby = attentiveSpan({ ...spans, sight: 1 }, 0);
-    expect(nose).toBeLessThan(nearby);
-    expect(nearby).toBeLessThan(15);
-  });
-});
-
-describe("lookOffset", () => {
-  it("leads where sight leads", () => {
-    const offset = lookOffset(openness(plain, ORIGIN), EAST);
-    expect(offset.x).toBeGreaterThan(0);
-    expect(offset.y).toBe(0);
-  });
-
-  it("leans toward open ground, away from rising ground", () => {
-    expect(lookOffset(openness(risingEast, ORIGIN), STILL).x).toBeLessThan(0);
-    expect(lookOffset(openness(cone, ORIGIN), STILL).x).toBeCloseTo(0);
+  it("leads further past short obstacles than tall ones", () => {
+    expect(leadFacing(fieldOf((x) => (x === 2 ? Prop.Boulder : Prop.None))).x).toBeGreaterThan(
+      leadFacing(fieldOf((x) => (x === 2 ? Prop.Oak : Prop.None))).x,
+    );
   });
 });
 
 describe("createCamera", () => {
-  it("keeps the subject at the same place on screen while only the zoom changes", () => {
+  const SCREEN = { width: 1000, height: 600 };
+  const FRAME_MS = 16;
+  const still = { position: { x: 10, y: 20 }, lead: { x: 0, y: 0 }, span: OPEN_SPAN };
+  const settled = () => {
     const camera = createCamera();
-    const screen = { width: 1000, height: 600 };
-    const subject = { position: { x: 10, y: 20 }, look: { x: 0.25, y: 0 } };
-    const onScreen = (span: number, elapsedMs: number) => {
-      const { centre, tilePx } = camera({ ...subject, span }, screen, elapsedMs);
-      return (subject.position.x + 0.5 - centre.x) * tilePx;
+    camera(still, SCREEN, 0);
+    return camera;
+  };
+  const playerOnScreen = ({ centre, tilePx }: ReturnType<ReturnType<typeof createCamera>>, at: Vec2) => ({
+    x: (at.x + 0.5 - centre.x) * tilePx + SCREEN.width / 2,
+    y: (at.y + 0.5 - centre.y) * tilePx + SCREEN.height / 2,
+  });
+
+  it("centres on the player when there is nothing to lead to", () => {
+    expect(playerOnScreen(settled()(still, SCREEN, FRAME_MS), still.position)).toEqual({ x: 500, y: 300 });
+  });
+
+  it("flows toward a new lead without jumping", () => {
+    const camera = settled();
+    const leading = { ...still, lead: { x: 8, y: 0 } };
+    const first = camera(leading, SCREEN, FRAME_MS).centre.x - 10.5;
+    expect(first).toBeGreaterThan(0);
+    expect(first).toBeLessThan(0.1);
+    for (let frame = 0; frame < 300; frame++) camera(leading, SCREEN, FRAME_MS);
+    expect(camera(leading, SCREEN, FRAME_MS).centre.x).toBeCloseTo(18.5);
+  });
+
+  it("keeps the player on screen however far it leads", () => {
+    const camera = settled();
+    const far = { ...still, lead: { x: 1000, y: -1000 } };
+    for (let frame = 0; frame < 300; frame++) camera(far, SCREEN, FRAME_MS);
+    const { x, y } = playerOnScreen(camera(far, SCREEN, FRAME_MS), still.position);
+    expect(x).toBeGreaterThan(SCREEN.width * 0.1);
+    expect(y).toBeLessThan(SCREEN.height * 0.9);
+  });
+
+  it("closes in faster than it opens out", () => {
+    const zoomedAfter = (from: number, to: number) => {
+      const camera = createCamera();
+      camera({ ...still, span: from }, SCREEN, 0);
+      const resting = camera({ ...still, span: to }, SCREEN, 0).restingTilePx;
+      const start = SCREEN.height / from;
+      return Math.abs(Math.log(camera({ ...still, span: to }, SCREEN, 200).tilePx / start) / Math.log(resting / start));
     };
-    onScreen(14, 0);
-    const settled = onScreen(14, 5000);
-    for (let frame = 0; frame < 30; frame++) expect(onScreen(40, 16)).toBeCloseTo(settled);
+    expect(zoomedAfter(OPEN_SPAN, NOSE_SPAN)).toBeGreaterThan(zoomedAfter(NOSE_SPAN, OPEN_SPAN));
+  });
+
+  it("comes to rest at a whole tile size", () => {
+    const camera = settled();
+    for (let frame = 0; frame < 300; frame++) camera({ ...still, span: 11 }, SCREEN, FRAME_MS);
+    const { tilePx, restingTilePx } = camera({ ...still, span: 11 }, SCREEN, FRAME_MS);
+    expect(tilePx).toBe(restingTilePx);
+    expect(Number.isInteger(tilePx)).toBe(true);
   });
 });

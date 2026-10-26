@@ -1,9 +1,7 @@
-import { type Heading, lengthOf, vectorOf } from "../../game/movement";
-import { clearSight } from "../../game/sight";
+import { type SightLine, lineOfSight } from "../../game/sight";
 import type { Terrain } from "../../game/terrain";
-import { type Vec2, clamp, lerp } from "procgen";
-import { metresToLevels } from "../../worldgen";
-import { approach } from "../motion";
+import { type Vec2, clamp } from "procgen";
+import { type Spring, springToward } from "../motion";
 
 export interface Extent {
   readonly width: number;
@@ -16,153 +14,107 @@ export interface View {
   readonly restingTilePx: number;
 }
 
-const COMPASS: readonly Vec2[] = Array.from({ length: 8 }, (_, i) => ({
-  x: Math.cos((i * Math.PI) / 4),
-  y: Math.sin((i * Math.PI) / 4),
-}));
-const SIGHT_RADII = [12, 24] as const;
-const SETTLED_SPANS: Spread = { up: 14, level: 20, down: 64 };
-const FULL_DROP = metresToLevels(12);
-const PRACTICAL_SPANS: Spread = { up: 10, level: 14, down: 20 };
-const NOSE_SPAN = 6;
-const SPAN_PER_CLEAR_TILE = 2.5;
 export const SIGHT_REACH = 24;
-const SIGHT_CONE = 90;
-const SIGHT_RAY_COUNT = 9;
-const HEADING_EASING_MS = 280;
-export const SETTLE_MS = 1500;
-const LEAD = 0.25;
-const LEAN = 0.5;
-const MAX_OFFSET = 0.35;
-const PAN_EASING_MS = 250;
-const ZOOM_EASING_MS = 600;
+export const OPEN_SPAN = 24;
+export const NOSE_SPAN = 5;
+const LINE_COUNT = 48;
+const LINE_CENTROID = 2 / 3;
+const MAX_LEAD = 0.6;
+const FOLLOW_MS = 80;
+const LEAD_MS = 450;
+const ZOOM_IN_MS = 250;
+const ZOOM_OUT_MS = 800;
 const RESTING_PX_TOLERANCE = 0.01;
 const MIN_SPAN = 4;
 const MAX_SPAN = 160;
 
-interface Spread {
-  readonly up: number;
-  readonly level: number;
-  readonly down: number;
-}
+const DIRECTIONS: readonly Vec2[] = Array.from({ length: LINE_COUNT }, (_, i) => ({
+  x: Math.cos((2 * Math.PI * i) / LINE_COUNT),
+  y: Math.sin((2 * Math.PI * i) / LINE_COUNT),
+}));
 
-const dot = (a: Vec2, b: Vec2) => a.x * b.x + a.y * b.y;
-const sum = (values: readonly number[]) => values.reduce((total, v) => total + v, 0);
-const mean = (values: readonly number[]) => sum(values) / values.length;
+export type Survey = readonly SightLine[];
 
-export const openness = (levelAt: (x: number, y: number) => number, at: Vec2): readonly number[] => {
-  const eye = levelAt(at.x, at.y);
-  return COMPASS.map((d) => {
-    const drops = SIGHT_RADII.map((r) => eye - levelAt(at.x + Math.round(d.x * r), at.y + Math.round(d.y * r)));
-    return clamp(mean(drops) / FULL_DROP, -1, 1);
+export const surveyFrom = (terrain: Terrain, tile: Vec2): Survey =>
+  DIRECTIONS.map((direction) => lineOfSight(terrain, tile, direction, SIGHT_REACH));
+
+const frontWeight = (direction: Vec2, facing: number): number =>
+  Math.max(0, direction.x * Math.cos(facing) + direction.y * Math.sin(facing)) ** 2;
+
+const weighted = (survey: Survey, facing: number, of: (line: SightLine, direction: Vec2) => number): number => {
+  let total = 0;
+  let weights = 0;
+  survey.forEach((line, i) => {
+    const weight = frontWeight(DIRECTIONS[i]!, facing);
+    total += weight * of(line, DIRECTIONS[i]!);
+    weights += weight;
   });
+  return total / weights;
 };
 
-export const steer = (heading: Vec2, facing: Vec2, elapsedMs: number): Vec2 => ({
-  x: approach(heading.x, facing.x, elapsedMs, HEADING_EASING_MS),
-  y: approach(heading.y, facing.y, elapsedMs, HEADING_EASING_MS),
+export const sightRange = (survey: Survey, facing: number): number =>
+  Math.min(SIGHT_REACH, 1 / weighted(survey, facing, (line) => line.obscurity) - 1);
+
+export const spanFor = (sight: number): number =>
+  NOSE_SPAN * (OPEN_SPAN / NOSE_SPAN) ** clamp(Math.log(sight) / Math.log(SIGHT_REACH), 0, 1);
+
+const centroidOf = (survey: Survey, facing: number): Vec2 => ({
+  x: weighted(survey, facing, (line, d) => LINE_CENTROID * line.clear * d.x),
+  y: weighted(survey, facing, (line, d) => LINE_CENTROID * line.clear * d.y),
 });
 
-const opennessAhead = (open: readonly number[], heading: Vec2): number => {
-  const weights = COMPASS.map((d) => Math.max(0, dot(d, heading)));
-  const total = weights.reduce((sum, w) => sum + w, 0);
-  if (total === 0) return mean(open);
-  const ahead = open.reduce((sum, o, i) => sum + o * weights[i]!, 0) / total;
-  return lerp(mean(open), ahead, Math.min(1, Math.hypot(heading.x, heading.y)));
+export const leadOf = (survey: Survey, facing: number): Vec2 => {
+  const centroid = centroidOf(survey, facing);
+  const reach = Math.min(1, sightRange(survey, facing) / Math.hypot(centroid.x, centroid.y));
+  return { x: centroid.x * reach, y: centroid.y * reach };
 };
 
-const spanAcross = ({ up, level, down }: Spread, ahead: number): number =>
-  Math.round(ahead < 0 ? lerp(level, up, -ahead) : lerp(level, down, ahead));
+export const spanOf = (span: number, modifier: number): number => clamp(span + modifier, MIN_SPAN, MAX_SPAN);
 
-export const naturalSpan = (open: readonly number[], heading: Vec2): number =>
-  spanAcross(SETTLED_SPANS, opennessAhead(open, heading));
-
-export const practicalSpan = (open: readonly number[], heading: Vec2): number =>
-  spanAcross(PRACTICAL_SPANS, opennessAhead(open, heading));
-
-const SIGHT_RAYS: readonly number[] = Array.from(
-  { length: SIGHT_RAY_COUNT },
-  (_, i) => ((i / (SIGHT_RAY_COUNT - 1) - 0.5) * SIGHT_CONE * Math.PI) / 180,
-);
-
-const rotate = ({ x, y }: Vec2, angle: number): Vec2 => ({
-  x: x * Math.cos(angle) - y * Math.sin(angle),
-  y: x * Math.sin(angle) + y * Math.cos(angle),
-});
-
-export interface Sight {
-  readonly distance: number;
-  readonly lead: Vec2;
-}
-
-export const unitToward = (heading: Heading): Vec2 => {
-  const { x, y } = vectorOf(heading);
-  return { x: x / lengthOf(heading), y: y / lengthOf(heading) };
-};
-
-export const sightAhead = (terrain: Terrain, from: Vec2, facing: Heading): Sight => {
-  const ahead = unitToward(facing);
-  const lines = SIGHT_RAYS.map((angle) => {
-    const direction = rotate(ahead, angle);
-    return { direction, clear: clearSight(terrain, from, direction, SIGHT_REACH), weight: Math.cos(2 * angle) };
-  });
-  const nearness = sum(lines.map(({ clear, weight }) => weight / (1 + clear))) / sum(lines.map(({ weight }) => weight));
-  const reach = sum(SIGHT_RAYS.map(Math.cos)) * SIGHT_REACH;
-  const lead = {
-    x: sum(lines.map(({ direction, clear }) => direction.x * clear)) / reach,
-    y: sum(lines.map(({ direction, clear }) => direction.y * clear)) / reach,
-  };
-  return { distance: 1 / nearness - 1, lead };
-};
-
-interface Spans {
-  readonly natural: number;
-  readonly practical: number;
-  readonly sight: number;
-}
-
-export const attentiveSpan = ({ natural, practical, sight }: Spans, idleMs: number): number =>
-  Math.min(idleMs >= SETTLE_MS ? natural : practical, Math.round(NOSE_SPAN + sight * SPAN_PER_CLEAR_TILE));
-
-export const lookOffset = (open: readonly number[], lead: Vec2): Vec2 => {
-  const lean = (axis: "x" | "y") => mean(COMPASS.map((d, i) => d[axis] * open[i]!));
-  return {
-    x: clamp(lead.x * LEAD + lean("x") * LEAN, -MAX_OFFSET, MAX_OFFSET),
-    y: clamp(lead.y * LEAD + lean("y") * LEAN, -MAX_OFFSET, MAX_OFFSET),
-  };
-};
-
-export const spanOf = (natural: number, modifier: number): number => clamp(natural + modifier, MIN_SPAN, MAX_SPAN);
-
-export const modifierWithin = (natural: number, modifier: number): number =>
-  clamp(modifier, MIN_SPAN - natural, MAX_SPAN - natural);
+export const modifierWithin = (span: number, modifier: number): number =>
+  clamp(modifier, MIN_SPAN - span, MAX_SPAN - span);
 
 interface Subject {
   readonly position: Vec2;
-  readonly look: Vec2;
+  readonly lead: Vec2;
   readonly span: number;
 }
 
+const AT_REST = (value: number): Spring => ({ value, velocity: 0 });
+
 export const createCamera = () => {
-  let current: { followed: Vec2; look: Vec2; tilePx: number } | undefined;
-  return (subject: Subject, screen: Extent, elapsedMs: number): View => {
-    const restingTilePx = Math.max(1, Math.round(Math.min(screen.width, screen.height) / subject.span));
-    const easedTilePx = current ? approach(current.tilePx, restingTilePx, elapsedMs, ZOOM_EASING_MS) : restingTilePx;
-    const tilePx = Math.abs(easedTilePx - restingTilePx) < RESTING_PX_TOLERANCE ? restingTilePx : easedTilePx;
-    const pan = (from: Vec2, to: Vec2): Vec2 =>
-      current
-        ? { x: approach(from.x, to.x, elapsedMs, PAN_EASING_MS), y: approach(from.y, to.y, elapsedMs, PAN_EASING_MS) }
-        : to;
-    const followed = pan(current?.followed ?? subject.position, {
-      x: subject.position.x + 0.5,
-      y: subject.position.y + 0.5,
-    });
-    const look = pan(current?.look ?? subject.look, subject.look);
-    current = { followed, look, tilePx };
-    const centre = {
-      x: followed.x + (look.x * screen.width) / tilePx,
-      y: followed.y + (look.y * screen.height) / tilePx,
+  let current: { x: Spring; y: Spring; leadX: Spring; leadY: Spring; zoom: Spring } | undefined;
+  return ({ position, lead, span }: Subject, screen: Extent, elapsedMs: number): View => {
+    const restingTilePx = Math.max(1, Math.round(Math.min(screen.width, screen.height) / span));
+    const reach = (extent: number) => (MAX_LEAD * extent) / 2 / restingTilePx;
+    const target = {
+      x: position.x + 0.5,
+      y: position.y + 0.5,
+      leadX: clamp(lead.x, -reach(screen.width), reach(screen.width)),
+      leadY: clamp(lead.y, -reach(screen.height), reach(screen.height)),
+      zoom: Math.log(restingTilePx),
     };
-    return { centre, tilePx, restingTilePx };
+    const was = current ?? {
+      x: AT_REST(target.x),
+      y: AT_REST(target.y),
+      leadX: AT_REST(target.leadX),
+      leadY: AT_REST(target.leadY),
+      zoom: AT_REST(target.zoom),
+    };
+    const zoomMs = target.zoom > was.zoom.value ? ZOOM_IN_MS : ZOOM_OUT_MS;
+    const zoom = springToward(was.zoom, target.zoom, elapsedMs, zoomMs);
+    const isResting = Math.abs(Math.exp(zoom.value) - restingTilePx) < RESTING_PX_TOLERANCE;
+    current = {
+      x: springToward(was.x, target.x, elapsedMs, FOLLOW_MS),
+      y: springToward(was.y, target.y, elapsedMs, FOLLOW_MS),
+      leadX: springToward(was.leadX, target.leadX, elapsedMs, LEAD_MS),
+      leadY: springToward(was.leadY, target.leadY, elapsedMs, LEAD_MS),
+      zoom: isResting ? AT_REST(target.zoom) : zoom,
+    };
+    return {
+      centre: { x: current.x.value + current.leadX.value, y: current.y.value + current.leadY.value },
+      tilePx: isResting ? restingTilePx : Math.exp(current.zoom.value),
+      restingTilePx,
+    };
   };
 };

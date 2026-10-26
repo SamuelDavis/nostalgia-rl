@@ -1,27 +1,36 @@
-import { type Vec2, distance } from "procgen";
+import { type Vec2, clamp } from "procgen";
 import { PROPS, metresToLevels } from "../worldgen";
-import { blockerBetween } from "./movement";
-import type { Terrain } from "./terrain";
+import { standingHeight } from "./movement";
+import type { Terrain, Tile } from "./terrain";
 
 const EYE_HEIGHT = metresToLevels(1.5);
 const SIGHT_STEP = 0.25;
+const SHORT_OPACITY = 0.2;
 
-export const clearSight = (terrain: Terrain, from: Vec2, direction: Vec2, reach: number): number => {
-  const eye = terrain(from.x, from.y).height + EYE_HEIGHT;
-  const blocks = (here: Vec2, there: Vec2) => {
-    const [near, far] = [terrain(here.x, here.y), terrain(there.x, there.y)];
-    const blocker = blockerBetween(near, far);
-    const top = far.height + (blocker === "obstacle" ? PROPS[far.prop].height : 0);
-    return blocker !== undefined && top >= eye;
+export interface SightLine {
+  readonly clear: number;
+  readonly obscurity: number;
+}
+
+const topOf = (tile: Tile): number => tile.height + PROPS[tile.prop].height;
+
+export const lineOfSight = (terrain: Terrain, from: Vec2, direction: Vec2, reach: number): SightLine => {
+  const feet = standingHeight(terrain(from.x, from.y));
+  const opacityAt = (x: number, y: number) => {
+    const rise = (topOf(terrain(x, y)) - feet) / EYE_HEIGHT;
+    return rise >= 1 ? 1 : SHORT_OPACITY * clamp(rise, 0, 1);
   };
+  let obscurity = 0;
   let last = from;
   for (let t = SIGHT_STEP; t <= reach; t += SIGHT_STEP) {
     const at = { x: Math.floor(from.x + 0.5 + direction.x * t), y: Math.floor(from.y + 0.5 + direction.y * t) };
     if (at.x === last.x && at.y === last.y) continue;
     const isCorner = at.x !== last.x && at.y !== last.y;
-    const throughCorner = isCorner && blocks(last, { x: at.x, y: last.y }) && blocks(last, { x: last.x, y: at.y });
-    if (blocks(last, at) || throughCorner) return distance(last, from);
+    const corner = isCorner ? Math.min(opacityAt(at.x, last.y), opacityAt(last.x, at.y)) : 0;
+    const opacity = Math.max(opacityAt(at.x, at.y), corner);
+    obscurity = Math.max(obscurity, opacity / (1 + t));
+    if (opacity === 1) return { clear: t, obscurity };
     last = at;
   }
-  return reach;
+  return { clear: reach, obscurity };
 };

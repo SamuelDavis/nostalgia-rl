@@ -92,3 +92,24 @@ export const createMotion = (tickMs: number, start: Session, layers: Layers, now
     },
   };
 };
+
+export interface Spring {
+  readonly value: number;
+  readonly velocity: number;
+}
+
+export const springToward = (
+  { value, velocity }: Spring,
+  target: number,
+  elapsedMs: number,
+  smoothMs: number,
+): Spring => {
+  const stiffness = 2 / smoothMs;
+  const offset = value - target;
+  const push = velocity + stiffness * offset;
+  const decay = Math.exp(-stiffness * elapsedMs);
+  return {
+    value: target + (offset + push * elapsedMs) * decay,
+    velocity: (velocity - stiffness * push * elapsedMs) * decay,
+  };
+};

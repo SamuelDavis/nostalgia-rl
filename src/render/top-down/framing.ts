@@ -2,65 +2,64 @@ import type { Vec2 } from "procgen";
 import type { Ticks } from "../../game/play";
 import type { Session } from "../../game/session";
 import type { Terrain } from "../../game/terrain";
+import { layerKey } from "../../worldgen";
+import { facingAngle, turnToward } from "../motion";
 import {
   type Extent,
-  attentiveSpan,
+  OPEN_SPAN,
+  SIGHT_REACH,
   createCamera,
-  lookOffset,
+  leadOf,
   modifierWithin,
-  naturalSpan,
-  openness,
-  practicalSpan,
-  sightAhead,
+  sightRange,
+  spanFor,
   spanOf,
-  steer,
-  unitToward,
+  surveyFrom,
 } from "./camera";
 
-const opennessOn = (terrain: Terrain, p: Vec2) => openness((x, y) => terrain(x, y).height, p);
+const TURN_EASING_MS = 250;
 
 export interface Zoom {
   readonly span: number;
-  readonly natural: number;
+  readonly sight: number;
   readonly modifier: number;
 }
 
+const placeOf = ({ layer, position }: Session) => `${layerKey(layer)} ${position.x},${position.y}`;
+
 export const createFraming = (session: Session, terrain: Terrain, now: number) => {
   const camera = createCamera();
-  let open = opennessOn(terrain, session.position);
-  let heading: Vec2 = { x: 0, y: 0 };
-  let natural = naturalSpan(open, heading);
-  let facing = session.facing;
-  let sight = sightAhead(terrain, session.position, session.facing);
-  let zoomModifier = 0;
-  let lastActionAt = now;
+  let surveyed = placeOf(session);
+  let survey = surveyFrom(terrain, session.position);
+  let heading = session.facing;
+  let facing = facingAngle(heading);
+  let modifier = 0;
+  let zoom: Zoom = { span: OPEN_SPAN, sight: SIGHT_REACH, modifier };
   let lastFrame = now;
 
   return {
-    ticked: ({ session, scheduled, moved, acted }: Ticks, terrain: Terrain) => {
-      if (acted) lastActionAt = scheduled;
-      if (moved) open = opennessOn(terrain, session.position);
-      if (moved || session.facing !== facing) sight = sightAhead(terrain, session.position, session.facing);
-      facing = session.facing;
+    ticked: ({ session }: Ticks, terrain: Terrain) => {
+      heading = session.facing;
+      if (placeOf(session) === surveyed) return;
+      surveyed = placeOf(session);
+      survey = surveyFrom(terrain, session.position);
     },
     zoomBy: (delta: number) => {
-      zoomModifier = modifierWithin(natural, zoomModifier + delta);
+      modifier = modifierWithin(OPEN_SPAN, modifier + delta);
     },
-    naturalSpan: () => spanOf(natural, zoomModifier),
+    widestSpan: () => spanOf(OPEN_SPAN, modifier),
+    zoom: () => zoom,
     frame: (now: number, shown: Vec2, screen: Extent) => {
       const elapsed = now - lastFrame;
       lastFrame = now;
-      heading = steer(heading, unitToward(facing), elapsed);
-      natural = naturalSpan(open, heading);
-      const practical = practicalSpan(open, heading);
-      const span = attentiveSpan({ natural, practical, sight: sight.distance }, now - lastActionAt);
-      const view = camera(
-        { position: shown, look: lookOffset(open, sight.lead), span: spanOf(span, zoomModifier) },
+      facing = turnToward(facing, facingAngle(heading), elapsed, TURN_EASING_MS);
+      const sight = sightRange(survey, facing);
+      zoom = { span: spanFor(sight), sight, modifier };
+      return camera(
+        { position: shown, lead: leadOf(survey, facing), span: spanOf(zoom.span, modifier) },
         screen,
         elapsed,
       );
-      const zoom: Zoom = { span, natural, modifier: zoomModifier };
-      return { view, zoom };
     },
   };
 };
