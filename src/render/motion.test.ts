@@ -122,6 +122,7 @@ describe("createMotion", () => {
     const motion = createMotion(TICK_MS, start, risingEast, 0);
     expect(motion.poseAt(0)).toEqual({
       shown: { x: 0, y: 0 },
+      steady: { x: 0, y: 0 },
       angle: facingAngle(start.facing),
       eyeLevel: GRASS.height,
     });
@@ -160,6 +161,22 @@ describe("createMotion", () => {
       const [dx, dy] = [shown.x - straight.x, shown.y - straight.y];
       const across = Math.abs(dx - dy) / Math.SQRT2;
       expect(across).toBeLessThan(0.04);
+    }
+  });
+
+  it("keeps a steady position along the straight path, free of the gait", () => {
+    const motion = createMotion(TICK_MS, start, risingEast, 0);
+    for (let tick = 0; tick < 40; tick++) {
+      motion.ticked({
+        prior: eastward(tick * 50),
+        session: eastward((tick + 1) * 50),
+        scheduled: tick * TICK_MS,
+        moved: false,
+        acted: true,
+      });
+      const { steady } = motion.poseAt(tick * TICK_MS + TICK_MS / 2);
+      expect(steady.x).toBeCloseTo(shownOf(eastward(tick * 50 + 25)).x);
+      expect(steady.y).toBeCloseTo(0);
     }
   });
 

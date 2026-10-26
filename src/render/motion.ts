@@ -45,6 +45,7 @@ export const approach = (current: number, target: number, elapsedMs: number, eas
 
 export interface Pose {
   readonly shown: Vec2;
+  readonly steady: Vec2;
   readonly angle: number;
   readonly eyeLevel: number;
 }
@@ -88,7 +89,7 @@ export const createMotion = (tickMs: number, start: Session, layers: Layers, now
         x: at.x + sway * (way.x * along - way.y * across),
         y: at.y + sway * (way.y * along + way.x * across),
       };
-      return { shown, angle, eyeLevel };
+      return { shown, steady: at, angle, eyeLevel };
     },
   };
 };

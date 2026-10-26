@@ -44,8 +44,8 @@ export const createTopDown = (
     },
     draw: (now) => {
       const resized = fitBacking(canvas, ctx);
-      const { shown, angle, eyeLevel } = motion.poseAt(now);
-      const view = framing.frame(now, shown, { width: canvas.clientWidth, height: canvas.clientHeight });
+      const { shown, steady, angle, eyeLevel } = motion.poseAt(now);
+      const view = framing.frame(now, steady, { width: canvas.clientWidth, height: canvas.clientHeight });
       const placement = [view.centre.x, view.centre.y, shown.x, shown.y]
         .map((v) => v * view.tilePx)
         .concat(view.tilePx * 100, eyeLevel * 100, angle * 100, session.position.x, session.position.y)

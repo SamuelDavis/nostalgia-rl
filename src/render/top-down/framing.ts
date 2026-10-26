@@ -49,14 +49,14 @@ export const createFraming = (session: Session, terrain: Terrain, now: number) =
     },
     widestSpan: () => spanOf(OPEN_SPAN, modifier),
     zoom: () => zoom,
-    frame: (now: number, shown: Vec2, screen: Extent) => {
+    frame: (now: number, followed: Vec2, screen: Extent) => {
       const elapsed = now - lastFrame;
       lastFrame = now;
       facing = turnToward(facing, facingAngle(heading), elapsed, TURN_EASING_MS);
       const sight = sightRange(survey, facing);
       zoom = { span: spanFor(sight), sight, modifier };
       return camera(
-        { position: shown, lead: leadOf(survey, facing), span: spanOf(zoom.span, modifier) },
+        { position: followed, lead: leadOf(survey, facing), span: spanOf(zoom.span, modifier) },
         screen,
         elapsed,
       );
