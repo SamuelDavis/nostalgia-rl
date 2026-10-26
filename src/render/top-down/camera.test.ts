@@ -18,7 +18,7 @@ const spanFacing = (terrain: ReturnType<typeof fieldOf>, facing = EAST) =>
 
 describe("spanFor", () => {
   it("is the open view over open ground", () => {
-    expect(spanFacing(open)).toBe(OPEN_SPAN);
+    expect(spanFacing(open)).toBeCloseTo(OPEN_SPAN);
   });
 
   it("closes all the way with something in your face", () => {
@@ -47,13 +47,39 @@ describe("spanFor", () => {
   });
 
   it("ignores what is behind you", () => {
-    expect(spanFacing(only({ x: -1, y: 0 }))).toBe(OPEN_SPAN);
+    expect(spanFacing(only({ x: -1, y: 0 }))).toBeCloseTo(OPEN_SPAN);
   });
 
   it("closes less for a short obstacle than a tall one", () => {
     const boulder = spanFacing(only({ x: 1, y: 0 }, Prop.Boulder));
     expect(boulder).toBeLessThan(OPEN_SPAN);
     expect(boulder).toBeGreaterThan(OPEN_SPAN / 2);
+  });
+
+  const cone = fieldOf(
+    () => Prop.None,
+    (x, y) => 200 - Math.abs(x) - Math.abs(y),
+  );
+  const fallingEast = fieldOf(
+    () => Prop.None,
+    (x) => 100 - x,
+  );
+
+  it("opens past the open view from a summit with nothing in the way", () => {
+    expect(spanFacing(cone)).toBeGreaterThan(OPEN_SPAN * 2);
+  });
+
+  it("stays close on a summit among trees", () => {
+    const wooded = fieldOf(
+      (x, y) => ((x * 7 + y * 3) % 5 === 0 && (x !== 0 || y !== 0) ? Prop.Oak : Prop.None),
+      (x, y) => 200 - Math.abs(x) - Math.abs(y),
+    );
+    expect(spanFacing(wooded)).toBeLessThan(OPEN_SPAN / 2);
+  });
+
+  it("opens looking down a slope, and closes looking up it", () => {
+    expect(spanFacing(fallingEast, EAST)).toBeGreaterThan(OPEN_SPAN);
+    expect(spanFacing(fallingEast, Math.PI)).toBeLessThan(OPEN_SPAN);
   });
 
   it("changes gradually as you turn", () => {

@@ -13,7 +13,7 @@ describe("lineOfSight", () => {
   const wallAt = (at: number, prop: Prop = Prop.Oak) => fieldOf((x) => (x === at ? prop : Prop.None));
 
   it("sees to its reach, unobscured, over open ground", () => {
-    expect(lineOfSight(open, ORIGIN, EAST, REACH)).toEqual({ clear: REACH, obscurity: 0 });
+    expect(lineOfSight(open, ORIGIN, EAST, REACH)).toMatchObject({ clear: REACH, obscurity: 0 });
   });
 
   it("is stopped at the edge of an obstacle reaching eye level", () => {
@@ -46,7 +46,7 @@ describe("lineOfSight", () => {
       (x) => (x >= 2 ? Prop.Pine : Prop.None),
       (x) => (x >= 2 ? 84 : 100),
     );
-    expect(lineOfSight(below, ORIGIN, EAST, REACH)).toEqual({ clear: REACH, obscurity: 0 });
+    expect(lineOfSight(below, ORIGIN, EAST, REACH)).toMatchObject({ clear: REACH, obscurity: 0 });
   });
 
   it("is stopped by tall things on lower ground that still reach eye level", () => {
@@ -64,7 +64,7 @@ describe("lineOfSight", () => {
         (x) => (x >= 2 ? height : 100),
       );
     expect(lineOfSight(stepAt2(120), ORIGIN, EAST, REACH).clear).toBeCloseTo(1.5);
-    expect(lineOfSight(stepAt2(80), ORIGIN, EAST, REACH)).toEqual({ clear: REACH, obscurity: 0 });
+    expect(lineOfSight(stepAt2(80), ORIGIN, EAST, REACH)).toMatchObject({ clear: REACH, obscurity: 0 });
   });
 
   it("sees across a dip back to ground no higher than its feet", () => {
@@ -72,11 +72,21 @@ describe("lineOfSight", () => {
       () => Prop.None,
       (x) => (x === 1 ? 84 : 100),
     );
-    expect(lineOfSight(dip, ORIGIN, EAST, REACH)).toEqual({ clear: REACH, obscurity: 0 });
+    expect(lineOfSight(dip, ORIGIN, EAST, REACH)).toMatchObject({ clear: REACH, obscurity: 0 });
   });
 
   it("does not slip between obstacles that meet at a corner", () => {
     const diagonalWall = fieldOf((x, y) => (x + y === 3 ? Prop.Oak : Prop.None));
     expect(lineOfSight(diagonalWall, ORIGIN, { x: Math.SQRT1_2, y: Math.SQRT1_2 }, REACH).clear).toBeLessThan(3);
+  });
+
+  it("measures how far the ground it crosses falls below its feet", () => {
+    const fallingEast = fieldOf(
+      () => Prop.None,
+      (x) => 100 - x,
+    );
+    expect(lineOfSight(open, ORIGIN, EAST, REACH).drop).toBe(0);
+    expect(lineOfSight(fallingEast, ORIGIN, EAST, REACH).drop).toBeCloseTo(12.5);
+    expect(lineOfSight(fallingEast, ORIGIN, { x: -1, y: 0 }, REACH).drop).toBe(0);
   });
 });

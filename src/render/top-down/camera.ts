@@ -1,6 +1,7 @@
 import { type SightLine, lineOfSight } from "../../game/sight";
 import type { Terrain } from "../../game/terrain";
 import { type Vec2, clamp } from "procgen";
+import { metresToLevels } from "../../worldgen";
 import { type Spring, springToward } from "../motion";
 
 export interface Extent {
@@ -17,6 +18,9 @@ export interface View {
 export const SIGHT_REACH = 24;
 export const OPEN_SPAN = 24;
 export const NOSE_SPAN = 5;
+const LOOKOUT_REACH = 64;
+const LOOKOUT_SPAN = 64;
+const LOOKOUT_DROP = metresToLevels(12);
 const LINE_COUNT = 48;
 const LINE_CENTROID = 2 / 3;
 const MAX_LEAD = 0.6;
@@ -36,7 +40,10 @@ const DIRECTIONS: readonly Vec2[] = Array.from({ length: LINE_COUNT }, (_, i) =>
 export type Survey = readonly SightLine[];
 
 export const surveyFrom = (terrain: Terrain, tile: Vec2): Survey =>
-  DIRECTIONS.map((direction) => lineOfSight(terrain, tile, direction, SIGHT_REACH));
+  DIRECTIONS.map((direction) => lineOfSight(terrain, tile, direction, LOOKOUT_REACH));
+
+const seenAlong = ({ clear, drop }: SightLine): number =>
+  Math.min(clear, SIGHT_REACH + (LOOKOUT_REACH - SIGHT_REACH) * clamp(drop / LOOKOUT_DROP, 0, 1));
 
 const frontWeight = (direction: Vec2, facing: number): number =>
   Math.max(0, direction.x * Math.cos(facing) + direction.y * Math.sin(facing)) ** 2;
@@ -53,14 +60,18 @@ const weighted = (survey: Survey, facing: number, of: (line: SightLine, directio
 };
 
 export const sightRange = (survey: Survey, facing: number): number =>
-  Math.min(SIGHT_REACH, 1 / weighted(survey, facing, (line) => line.obscurity) - 1);
+  Math.min(1 / weighted(survey, facing, (line) => line.obscurity) - 1, weighted(survey, facing, seenAlong));
+
+const logLerp = (from: number, to: number, t: number): number => from * (to / from) ** clamp(t, 0, 1);
 
 export const spanFor = (sight: number): number =>
-  NOSE_SPAN * (OPEN_SPAN / NOSE_SPAN) ** clamp(Math.log(sight) / Math.log(SIGHT_REACH), 0, 1);
+  sight <= SIGHT_REACH
+    ? logLerp(NOSE_SPAN, OPEN_SPAN, Math.log(sight) / Math.log(SIGHT_REACH))
+    : logLerp(OPEN_SPAN, LOOKOUT_SPAN, Math.log(sight / SIGHT_REACH) / Math.log(LOOKOUT_REACH / SIGHT_REACH));
 
 const centroidOf = (survey: Survey, facing: number): Vec2 => ({
-  x: weighted(survey, facing, (line, d) => LINE_CENTROID * line.clear * d.x),
-  y: weighted(survey, facing, (line, d) => LINE_CENTROID * line.clear * d.y),
+  x: weighted(survey, facing, (line, d) => LINE_CENTROID * seenAlong(line) * d.x),
+  y: weighted(survey, facing, (line, d) => LINE_CENTROID * seenAlong(line) * d.y),
 });
 
 export const leadOf = (survey: Survey, facing: number): Vec2 => {
