@@ -24,6 +24,10 @@ Decided in an interview with the user (2026-10-24).
 
 _Record user feedback verbatim, newest first, with the commit it refers to._
 
+### 992cae0: camera as line of sight
+
+> This is amazing and I love it
+
 ### 622552b: gait along the direction of travel
 
 > when traveling diagonally, the character wobbles in a circle. When travelling cardinally, they merely have an accelleration stagger. (This is all visual); no matter what direction they travel, they should have a slight accelleration stagger, but I think it would be good if they had a slight perpendicular stagger as well to give the impression of walking.
